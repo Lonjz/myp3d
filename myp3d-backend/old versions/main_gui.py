@@ -4,7 +4,7 @@ import eyed3
 from yt_dlp import YoutubeDL
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-from PIL import Image, ImageTk
+# from PIL import Image, ImageTk
 import io
 
 OUTPUT_DIR = "downloads"

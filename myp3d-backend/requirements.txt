@@ -1,0 +1,6 @@
+yt-dlp
+eyed3
+fastapi
+uvicorn[standard]
+python-dotenv
+python-multipart
