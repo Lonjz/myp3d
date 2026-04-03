@@ -37,6 +37,9 @@ def download_as_mp3(url: str, metadata: Optional[dict] = None, custom_name: Opti
     ydl_opts = {
         "format": "bestaudio/best",
         "outtmpl": outtmpl,
+        "js_runtimes": {
+            "node": {},
+        },
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
