@@ -30,3 +30,21 @@ class MP3Info(BaseModel):
     album: Optional[str] = None
     has_cover: bool = False
     file_size: int = 0
+
+
+class NormalizeAudioFileResult(BaseModel):
+    filename: str
+    status: str
+    original_peak_db: Optional[float] = None
+    applied_gain_db: Optional[float] = None
+    message: Optional[str] = None
+
+
+class NormalizeAudioResponse(BaseModel):
+    success: bool
+    processed: int
+    normalized: int
+    skipped: int
+    failed: int
+    target_peak_db: float
+    results: list[NormalizeAudioFileResult]
