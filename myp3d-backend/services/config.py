@@ -6,7 +6,6 @@ load_dotenv()
 
 # Configuration
 USE_SYSTEM_FFMPEG = os.getenv("USE_SYSTEM_FFMPEG", "false").lower() == "true"
-DEFAULT_NORMALIZE_TARGET_PEAK_DB = float(os.getenv("DEFAULT_NORMALIZE_TARGET_PEAK_DB", "-0.4"))
 BASE_DIR = Path(__file__).parent.parent
 OUTPUT_DIR = BASE_DIR / "downloads"
 OUTPUT_DIR.mkdir(exist_ok=True)

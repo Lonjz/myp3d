@@ -2,9 +2,9 @@ import eyed3
 from fastapi import APIRouter, HTTPException, UploadFile, File, Response
 from fastapi.responses import FileResponse
 
-from models.schemas import MP3Info, MetadataUpdate, NormalizeAudioResponse
-from services.config import DEFAULT_NORMALIZE_TARGET_PEAK_DB, OUTPUT_DIR
-from services.mp3_service import get_mp3_info, normalize_all_mp3s
+from models.schemas import MP3Info, MetadataUpdate
+from services.config import OUTPUT_DIR
+from services.mp3_service import get_mp3_info
 
 router = APIRouter(prefix="/mp3s", tags=["MP3s"])
 
@@ -17,19 +17,6 @@ async def list_mp3s():
         if f.suffix.lower() == ".mp3":
             mp3_files.append(get_mp3_info(f))
     return mp3_files
-
-
-@router.post("/normalize-all", response_model=NormalizeAudioResponse)
-async def normalize_all_audio(target_peak_db: float = DEFAULT_NORMALIZE_TARGET_PEAK_DB):
-    """Normalize all MP3 files by reducing tracks above target peak dB."""
-    try:
-        return normalize_all_mp3s(target_peak_db=target_peak_db)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.get("/{filename}")
@@ -152,5 +139,3 @@ async def upload_mp3(file: UploadFile = File(...)):
         f.write(content)
     
     return {"success": True, "filename": file.filename, "message": "File uploaded successfully"}
-
-
