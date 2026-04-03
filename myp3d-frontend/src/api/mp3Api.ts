@@ -24,24 +24,6 @@ export interface MetadataUpdate {
   new_filename?: string;
 }
 
-export interface NormalizeAudioFileResult {
-  filename: string;
-  status: string;
-  original_peak_db?: number;
-  applied_gain_db?: number;
-  message?: string;
-}
-
-export interface NormalizeAudioResponse {
-  success: boolean;
-  processed: number;
-  normalized: number;
-  skipped: number;
-  failed: number;
-  target_peak_db: number;
-  results: NormalizeAudioFileResult[];
-}
-
 export const mp3Api = {
   // Download a YouTube video as MP3
   async download(request: DownloadRequest): Promise<{ success: boolean; filename: string; message: string }> {
@@ -116,18 +98,6 @@ export const mp3Api = {
       method: 'DELETE',
     });
     if (!res.ok) throw new Error('Delete failed');
-    return res.json();
-  },
-
-  // Normalize all MP3s using backend default target
-  async normalizeAll(): Promise<NormalizeAudioResponse> {
-    const res = await fetch(`${API_BASE}/mp3s/normalize-all`, {
-      method: 'POST',
-    });
-    if (!res.ok) {
-      const error = await res.json();
-      throw new Error(error.detail || 'Normalization failed');
-    }
     return res.json();
   },
 };
