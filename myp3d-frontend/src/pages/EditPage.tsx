@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { mp3Api } from '../api/mp3Api';
 import type { MP3Info } from '../api/mp3Api';
+import { AppModal } from '../components/AppModal';
 
 interface EditPageProps {
   filename: string;
@@ -11,7 +12,7 @@ export function EditPage({ filename, onBack }: EditPageProps) {
   const [mp3, setMp3] = useState<MP3Info | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [modalState, setModalState] = useState<{ title: string; text: string; returnToLibrary?: boolean } | null>(null);
 
   const [title, setTitle] = useState('');
   const [artist, setArtist] = useState('');
@@ -39,7 +40,7 @@ export function EditPage({ filename, onBack }: EditPageProps) {
         setCoverPreview(mp3Api.getCoverUrl(filename));
       }
     } catch {
-      setMessage({ type: 'error', text: 'Failed to load MP3 info' });
+      setModalState({ title: 'Load Failed', text: 'Failed to load MP3 info.' });
     } finally {
       setLoading(false);
     }
@@ -55,7 +56,6 @@ export function EditPage({ filename, onBack }: EditPageProps) {
 
   const handleSave = async () => {
     setSaving(true);
-    setMessage(null);
 
     try {
       // Update metadata
@@ -71,14 +71,16 @@ export function EditPage({ filename, onBack }: EditPageProps) {
         await mp3Api.updateCover(result.filename, newCoverFile);
       }
 
-      setMessage({ type: 'success', text: 'Saved successfully!' });
-      
-      // If filename changed, go back to library
-      if (result.filename !== filename) {
-        setTimeout(() => onBack(), 1000);
-      }
+      setModalState({
+        title: 'Save Complete',
+        text: 'Saved successfully!',
+        returnToLibrary: result.filename !== filename,
+      });
     } catch (err) {
-      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Save failed' });
+      setModalState({
+        title: 'Save Failed',
+        text: err instanceof Error ? err.message : 'Save failed',
+      });
     } finally {
       setSaving(false);
     }
@@ -164,12 +166,6 @@ export function EditPage({ filename, onBack }: EditPageProps) {
           <button onClick={handleSave} disabled={saving} className="btn-primary">
             {saving ? 'Saving...' : 'Save Changes'}
           </button>
-
-          {message && (
-            <div className={`message ${message.type}`}>
-              {message.text}
-            </div>
-          )}
         </div>
       </div>
 
@@ -177,6 +173,34 @@ export function EditPage({ filename, onBack }: EditPageProps) {
         <h3>Preview</h3>
         <audio controls src={mp3Api.getFileUrl(filename)} />
       </div>
+
+      <AppModal
+        open={modalState !== null}
+        title={modalState?.title ?? ''}
+        onClose={() => {
+          const shouldReturn = modalState?.returnToLibrary;
+          setModalState(null);
+          if (shouldReturn) {
+            onBack();
+          }
+        }}
+        actions={
+          <button
+            className="btn-primary"
+            onClick={() => {
+              const shouldReturn = modalState?.returnToLibrary;
+              setModalState(null);
+              if (shouldReturn) {
+                onBack();
+              }
+            }}
+          >
+            Close
+          </button>
+        }
+      >
+        <p>{modalState?.text}</p>
+      </AppModal>
     </div>
   );
 }

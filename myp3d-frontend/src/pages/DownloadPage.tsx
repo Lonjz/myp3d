@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { mp3Api } from '../api/mp3Api';
 import type { DownloadRequest } from '../api/mp3Api';
+import { AppModal } from '../components/AppModal';
 
 export function DownloadPage() {
   const [url, setUrl] = useState('');
@@ -9,17 +10,16 @@ export function DownloadPage() {
   const [artist, setArtist] = useState('');
   const [album, setAlbum] = useState('');
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [modalState, setModalState] = useState<{ title: string; text: string } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim()) {
-      setMessage({ type: 'error', text: 'Please enter a YouTube URL' });
+      setModalState({ title: 'Missing URL', text: 'Please enter a YouTube URL.' });
       return;
     }
 
     setLoading(true);
-    setMessage(null);
 
     try {
       const request: DownloadRequest = {
@@ -31,7 +31,7 @@ export function DownloadPage() {
       };
 
       const result = await mp3Api.download(request);
-      setMessage({ type: 'success', text: `Downloaded: ${result.filename}` });
+      setModalState({ title: 'Download Complete', text: `Downloaded: ${result.filename}` });
       
       // Clear form
       setUrl('');
@@ -40,7 +40,10 @@ export function DownloadPage() {
       setArtist('');
       setAlbum('');
     } catch (err) {
-      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Download failed' });
+      setModalState({
+        title: 'Download Failed',
+        text: err instanceof Error ? err.message : 'Download failed',
+      });
     } finally {
       setLoading(false);
     }
@@ -113,13 +116,20 @@ export function DownloadPage() {
         <button type="submit" disabled={loading} className="btn-primary">
           {loading ? 'Downloading...' : 'Download MP3'}
         </button>
-
-        {message && (
-          <div className={`message ${message.type}`}>
-            {message.text}
-          </div>
-        )}
       </form>
+
+      <AppModal
+        open={modalState !== null}
+        title={modalState?.title ?? ''}
+        onClose={() => setModalState(null)}
+        actions={
+          <button className="btn-primary" onClick={() => setModalState(null)}>
+            Close
+          </button>
+        }
+      >
+        <p>{modalState?.text}</p>
+      </AppModal>
     </div>
   );
 }
