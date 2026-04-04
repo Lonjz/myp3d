@@ -4,6 +4,7 @@ cover_arts/
 
 .env
 ffmpeg.exe
+*.mp3
 
 __pycache__/
 

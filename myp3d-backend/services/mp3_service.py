@@ -7,6 +7,7 @@ from io import BytesIO
 from typing import Optional
 
 import eyed3
+from eyed3.id3 import frames as id3_frames
 from yt_dlp import YoutubeDL
 
 from models.schemas import MP3Info
@@ -59,6 +60,18 @@ def make_square_cover(image_data: bytes) -> tuple[bytes, str]:
             return output.getvalue(), "image/jpeg"
     except unidentified_image_error as exc:
         raise ValueError("Uploaded cover is not a valid image") from exc
+
+
+def set_cover_images(tag: eyed3.id3.tag.Tag, image_data: bytes, mime_type: str) -> None:
+    """Write cover art using a single APIC frame shaped like common iTunes files."""
+    # Clear all existing APIC frames so stale descriptors/types do not confuse players.
+    existing_descriptions = [img.description for img in list(tag.images)]
+    for description in existing_descriptions:
+        while tag.images.remove(description) is not None:
+            pass
+
+    # Match the observed iTunes style: picture_type=OTHER (0), empty description.
+    tag.images.set(id3_frames.ImageFrame.OTHER, image_data, mime_type, description="")
 
 
 def get_mp3_info(filepath: Path) -> MP3Info:
@@ -127,7 +140,7 @@ def download_as_mp3(url: str, metadata: Optional[dict] = None, custom_name: Opti
         if metadata.get("cover_image_base64"):
             cover_image_data = _decode_base64_image(metadata["cover_image_base64"])
             processed_cover, mime_type = make_square_cover(cover_image_data)
-            audio.tag.images.set(3, processed_cover, mime_type)
+            set_cover_images(audio.tag, processed_cover, mime_type)
         audio.tag.save(version=(2, 3, 0))
 
     return os.path.basename(mp3_file)
