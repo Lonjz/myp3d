@@ -235,25 +235,39 @@ export function DownloadPage() {
 
         <div className="form-group">
           <label htmlFor="coverImage">Cover Image (optional)</label>
-          <input
-            id="coverImage"
-            type="file"
-            accept="image/*"
-            ref={coverInputRef}
-            onChange={handleCoverChange}
-            disabled={loading}
-          />
-          <p className="input-help">Choose image, then crop/zoom. Saved as 500x500.</p>
-          {coverPreview && (
-            <>
-              <div className="download-cover-preview">
-                <img src={coverPreview} alt="Selected cover preview" />
-              </div>
-              <button type="button" className="btn-secondary" onClick={handleRemoveCover} disabled={loading}>
-                Remove Cover
+          <div className="download-cover-field">
+            <input
+              id="coverImage"
+              type="file"
+              accept="image/*"
+              ref={coverInputRef}
+              onChange={handleCoverChange}
+              disabled={loading}
+              className="hidden-file-input"
+            />
+            <div className="download-cover-actions">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => coverInputRef.current?.click()}
+                disabled={loading}
+              >
+                Browse Image
               </button>
-            </>
-          )}
+              {coverPreview && (
+                <button type="button" className="btn-secondary" onClick={handleRemoveCover} disabled={loading}>
+                  Remove Cover
+                </button>
+              )}
+            </div>
+            <div className="download-cover-preview">
+              {coverPreview ? (
+                <img src={coverPreview} alt="Selected cover preview" />
+              ) : (
+                <div className="download-cover-placeholder">No cover selected</div>
+              )}
+            </div>
+          </div>
         </div>
 
         <button type="submit" disabled={loading} className="btn-primary">
