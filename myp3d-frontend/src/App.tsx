@@ -1,47 +1,66 @@
-import { useState } from 'react';
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { DownloadPage } from './pages/DownloadPage';
 import { LibraryPage } from './pages/LibraryPage';
 import { EditPage } from './pages/EditPage';
 import './App.css';
 
-type Page = 'download' | 'library' | { type: 'edit'; filename: string };
+function EditRoute() {
+  const { songName } = useParams();
+  const navigate = useNavigate();
+
+  if (!songName) {
+    return <Navigate to="/library" replace />;
+  }
+
+  const filename = (() => {
+    try {
+      return decodeURIComponent(songName);
+    } catch {
+      return songName;
+    }
+  })();
+
+  return (
+    <EditPage
+      filename={filename}
+      onBack={() => navigate('/library')}
+    />
+  );
+}
 
 function App() {
-  const [currentPage, setCurrentPage] = useState<Page>('download');
-
-  const renderPage = () => {
-    if (currentPage === 'download') {
-      return <DownloadPage />;
-    }
-    if (currentPage === 'library') {
-      return <LibraryPage onEdit={(filename) => setCurrentPage({ type: 'edit', filename })} />;
-    }
-    if (typeof currentPage === 'object' && currentPage.type === 'edit') {
-      return <EditPage filename={currentPage.filename} onBack={() => setCurrentPage('library')} />;
-    }
-    return null;
-  };
+  const location = useLocation();
+  const isLibraryActive =
+    location.pathname === '/library' || location.pathname.startsWith('/details/');
 
   return (
     <div className="app">
       <nav className="navbar">
         <h2>🎵 MP3 Downloader</h2>
         <div className="nav-links">
-          <button
-            className={currentPage === 'download' ? 'active' : ''}
-            onClick={() => setCurrentPage('download')}
+          <NavLink
+            to="/download"
+            className={({ isActive }) => (isActive ? 'active' : '')}
           >
             Download
-          </button>
-          <button
-            className={currentPage === 'library' || (typeof currentPage === 'object') ? 'active' : ''}
-            onClick={() => setCurrentPage('library')}
+          </NavLink>
+          <NavLink
+            to="/library"
+            className={isLibraryActive ? 'active' : ''}
           >
             Library
-          </button>
+          </NavLink>
         </div>
       </nav>
-      <main>{renderPage()}</main>
+      <main>
+        <Routes>
+          <Route path="/" element={<Navigate to="/download" replace />} />
+          <Route path="/download" element={<DownloadPage />} />
+          <Route path="/library" element={<LibraryPage />} />
+          <Route path="/details/:songName" element={<EditRoute />} />
+          <Route path="*" element={<Navigate to="/download" replace />} />
+        </Routes>
+      </main>
     </div>
   );
 }

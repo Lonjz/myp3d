@@ -34,7 +34,7 @@ body {
   gap: 0.5rem;
 }
 
-.nav-links button {
+.nav-links a {
   background: transparent;
   border: none;
   color: #aaa;
@@ -43,14 +43,15 @@ body {
   border-radius: 6px;
   font-size: 1rem;
   transition: all 0.2s;
+  text-decoration: none;
 }
 
-.nav-links button:hover {
+.nav-links a:hover {
   background: #0f3460;
   color: #fff;
 }
 
-.nav-links button.active {
+.nav-links a.active {
   background: #e94560;
   color: #fff;
 }

@@ -1,12 +1,10 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { mp3Api } from '../api/mp3Api';
 import type { MP3Info } from '../api/mp3Api';
 
-interface LibraryPageProps {
-  onEdit: (filename: string) => void;
-}
-
-export function LibraryPage({ onEdit }: LibraryPageProps) {
+export function LibraryPage() {
+  const navigate = useNavigate();
   const [mp3s, setMp3s] = useState<MP3Info[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +72,10 @@ export function LibraryPage({ onEdit }: LibraryPageProps) {
                 <p className="size">{formatSize(mp3.file_size)}</p>
               </div>
               <div className="mp3-actions">
-                <button onClick={() => onEdit(mp3.filename)} className="btn-secondary">
+                <button
+                  onClick={() => navigate(`/details/${encodeURIComponent(mp3.filename)}`)}
+                  className="btn-secondary"
+                >
                   Edit
                 </button>
                 <a href={mp3Api.getFileUrl(mp3.filename)} download className="btn-secondary">
