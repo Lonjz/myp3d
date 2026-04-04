@@ -15,6 +15,7 @@ export interface DownloadRequest {
   title?: string;
   artist?: string;
   album?: string;
+  cover_image_base64?: string;
 }
 
 export interface MetadataUpdate {

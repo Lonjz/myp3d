@@ -8,6 +8,7 @@ class DownloadRequest(BaseModel):
     title: Optional[str] = None
     artist: Optional[str] = None
     album: Optional[str] = None
+    cover_image_base64: Optional[str] = None
 
 
 class DownloadResponse(BaseModel):

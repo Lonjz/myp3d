@@ -4,7 +4,7 @@ from fastapi.responses import FileResponse
 
 from models.schemas import MP3Info, MetadataUpdate
 from services.config import OUTPUT_DIR
-from services.mp3_service import get_mp3_info
+from services.mp3_service import get_mp3_info, make_square_cover
 
 router = APIRouter(prefix="/mp3s", tags=["MP3s"])
 
@@ -88,11 +88,15 @@ async def update_cover(filename: str, cover: UploadFile = File(...)):
         audio.initTag()
 
     image_data = await cover.read()
-    mime_type = cover.content_type or "image/jpeg"
-    audio.tag.images.set(3, image_data, mime_type)  # 3 = front cover
+    try:
+        processed_cover, mime_type = make_square_cover(image_data)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    audio.tag.images.set(3, processed_cover, mime_type)  # 3 = front cover
     audio.tag.save(version=(2, 3, 0))
 
-    return {"success": True, "message": "Cover image updated successfully"}
+    return {"success": True, "message": "Cover image updated successfully (500x500 center crop)"}
 
 
 @router.get("/{filename}/cover")

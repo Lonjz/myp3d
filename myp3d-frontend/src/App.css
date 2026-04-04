@@ -98,6 +98,77 @@ body {
   opacity: 0.6;
 }
 
+.input-help {
+  margin-top: 0.4rem;
+  color: #888;
+  font-size: 0.85rem;
+}
+
+.download-cover-preview {
+  margin-top: 0.75rem;
+  width: 120px;
+  height: 120px;
+}
+
+.download-cover-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #0f3460;
+}
+
+.crop-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.crop-modal {
+  width: min(560px, 100%);
+  background: #16213e;
+  border: 1px solid #0f3460;
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.crop-modal h3 {
+  margin-bottom: 0.75rem;
+}
+
+.cropper-wrap {
+  position: relative;
+  width: 100%;
+  height: 320px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0d1530;
+}
+
+.crop-zoom-label {
+  display: block;
+  margin-top: 0.8rem;
+  margin-bottom: 0.4rem;
+  color: #aaa;
+  font-size: 0.9rem;
+}
+
+.crop-zoom-slider {
+  width: 100%;
+}
+
+.crop-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
 /* Buttons */
 .btn-primary {
   background: #e94560;
