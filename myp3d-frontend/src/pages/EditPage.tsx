@@ -12,6 +12,8 @@ interface EditPageProps {
 
 const COVER_SIZE = 500;
 const SIDEBAR_SCROLL_KEY = 'edit-sidebar-scroll-top';
+const EDIT_AUDIO_VOLUME_KEY = 'edit-audio-volume';
+const EDIT_AUDIO_MUTED_KEY = 'edit-audio-muted';
 
 const fileToDataUrl = (file: File) =>
   new Promise<string>((resolve, reject) => {
@@ -263,6 +265,35 @@ export function EditPage({ filename, onBack }: EditPageProps) {
     );
   });
 
+  const restoreAudioState = (audio: HTMLAudioElement) => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const storedVolume = window.localStorage.getItem(EDIT_AUDIO_VOLUME_KEY);
+    if (storedVolume !== null) {
+      const parsedVolume = Number(storedVolume);
+      if (Number.isFinite(parsedVolume)) {
+        const clampedVolume = Math.min(1, Math.max(0, parsedVolume));
+        audio.volume = clampedVolume;
+      }
+    }
+
+    const storedMuted = window.localStorage.getItem(EDIT_AUDIO_MUTED_KEY);
+    if (storedMuted !== null) {
+      audio.muted = storedMuted === 'true';
+    }
+  };
+
+  const persistAudioState = (audio: HTMLAudioElement) => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.localStorage.setItem(EDIT_AUDIO_VOLUME_KEY, String(audio.volume));
+    window.localStorage.setItem(EDIT_AUDIO_MUTED_KEY, String(audio.muted));
+  };
+
   return (
     <div className="page">
       <div className="details-layout">
@@ -396,7 +427,12 @@ export function EditPage({ filename, onBack }: EditPageProps) {
 
           <div className="audio-player">
             <h3>Preview</h3>
-            <audio controls src={mp3Api.getFileUrl(filename)} />
+            <audio
+              controls
+              src={mp3Api.getFileUrl(filename)}
+              onLoadedMetadata={(e) => restoreAudioState(e.currentTarget)}
+              onVolumeChange={(e) => persistAudioState(e.currentTarget)}
+            />
           </div>
         </section>
       </div>
