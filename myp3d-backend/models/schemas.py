@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel
 
@@ -31,3 +32,4 @@ class MP3Info(BaseModel):
     album: Optional[str] = None
     has_cover: bool = False
     file_size: int = 0
+    date_added: Optional[datetime] = None

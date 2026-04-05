@@ -7,6 +7,7 @@ export interface MP3Info {
   album: string | null;
   has_cover: boolean;
   file_size: number;
+  date_added?: string | null;
 }
 
 export interface DownloadRequest {

@@ -6,6 +6,8 @@ import type { MP3Info } from '../api/mp3Api';
 const PAGE_SIZE = 25;
 
 type FilterBy = 'all' | 'title' | 'artist' | 'filename' | 'album';
+type SortBy = 'date_added' | 'filename' | 'size' | 'artist' | 'title';
+type SortDirection = 'asc' | 'desc';
 
 export function LibraryPage() {
   const navigate = useNavigate();
@@ -14,6 +16,8 @@ export function LibraryPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterBy, setFilterBy] = useState<FilterBy>('all');
+  const [sortBy, setSortBy] = useState<SortBy>('date_added');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [currentPage, setCurrentPage] = useState(1);
 
   const loadMp3s = async () => {
@@ -74,11 +78,41 @@ export function LibraryPage() {
     });
   }, [mp3s, searchQuery, filterBy]);
 
+  const sortedMp3s = useMemo(() => {
+    const sorted = [...filteredMp3s];
+    sorted.sort((a, b) => {
+      const normalizeText = (value: string | null | undefined) => (value || '').toLowerCase();
+
+      let comparison = 0;
+      if (sortBy === 'date_added') {
+        const aDate = a.date_added ? new Date(a.date_added).getTime() : 0;
+        const bDate = b.date_added ? new Date(b.date_added).getTime() : 0;
+        comparison = aDate - bDate;
+      } else if (sortBy === 'size') {
+        comparison = a.file_size - b.file_size;
+      } else if (sortBy === 'artist') {
+        comparison = normalizeText(a.artist).localeCompare(normalizeText(b.artist));
+      } else if (sortBy === 'title') {
+        comparison = normalizeText(a.title).localeCompare(normalizeText(b.title));
+      } else {
+        comparison = normalizeText(a.filename).localeCompare(normalizeText(b.filename));
+      }
+
+      if (comparison === 0) {
+        comparison = normalizeText(a.filename).localeCompare(normalizeText(b.filename));
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+
+    return sorted;
+  }, [filteredMp3s, sortBy, sortDirection]);
+
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, filterBy]);
+  }, [searchQuery, filterBy, sortBy, sortDirection]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredMp3s.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(sortedMp3s.length / PAGE_SIZE));
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -88,9 +122,16 @@ export function LibraryPage() {
 
   const pageStart = (currentPage - 1) * PAGE_SIZE;
   const pageEnd = pageStart + PAGE_SIZE;
-  const pagedMp3s = filteredMp3s.slice(pageStart, pageEnd);
-  const shownStart = filteredMp3s.length === 0 ? 0 : pageStart + 1;
-  const shownEnd = Math.min(pageEnd, filteredMp3s.length);
+  const pagedMp3s = sortedMp3s.slice(pageStart, pageEnd);
+  const shownStart = sortedMp3s.length === 0 ? 0 : pageStart + 1;
+  const shownEnd = Math.min(pageEnd, sortedMp3s.length);
+
+  const formatDateAdded = (dateAdded: string | null | undefined) => {
+    if (!dateAdded) return '-';
+    const parsed = new Date(dateAdded);
+    if (Number.isNaN(parsed.getTime())) return '-';
+    return parsed.toLocaleString();
+  };
 
   if (loading) return <div className="page"><p>Loading...</p></div>;
   if (error) return <div className="page"><p className="error">{error}</p></div>;
@@ -129,6 +170,33 @@ export function LibraryPage() {
               placeholder="Search title, artist, filename..."
             />
           </div>
+
+          <div className="form-group library-sort-group">
+            <label htmlFor="librarySortBy">Sort By</label>
+            <select
+              id="librarySortBy"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortBy)}
+            >
+              <option value="date_added">Date Added</option>
+              <option value="filename">File Name</option>
+              <option value="title">Title</option>
+              <option value="artist">Artist</option>
+              <option value="size">Size</option>
+            </select>
+          </div>
+
+          <div className="form-group library-sort-order-group">
+            <label htmlFor="librarySortDirection">Order</label>
+            <select
+              id="librarySortDirection"
+              value={sortDirection}
+              onChange={(e) => setSortDirection(e.target.value as SortDirection)}
+            >
+              <option value="desc">Descending</option>
+              <option value="asc">Ascending</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -146,13 +214,14 @@ export function LibraryPage() {
                   <th>Album</th>
                   <th>File Name</th>
                   <th>Size</th>
+                  <th>Date Added</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {pagedMp3s.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="library-empty-row">
+                    <td colSpan={8} className="library-empty-row">
                       No results for this search.
                     </td>
                   </tr>
@@ -173,6 +242,7 @@ export function LibraryPage() {
                       <td>{mp3.album || '-'}</td>
                       <td className="library-filename">{mp3.filename}</td>
                       <td>{formatSize(mp3.file_size)}</td>
+                      <td className="library-date">{formatDateAdded(mp3.date_added)}</td>
                       <td>
                         <div className="table-actions">
                           <button
@@ -198,7 +268,7 @@ export function LibraryPage() {
 
           <div className="library-pagination">
             <p>
-              Showing {shownStart}-{shownEnd} of {filteredMp3s.length}
+              Showing {shownStart}-{shownEnd} of {sortedMp3s.length}
             </p>
             <div className="pagination-buttons">
               <button

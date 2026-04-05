@@ -2,6 +2,7 @@ import os
 import base64
 import binascii
 import importlib
+from datetime import datetime, timezone
 from pathlib import Path
 from io import BytesIO
 from typing import Optional
@@ -77,9 +78,11 @@ def set_cover_images(tag: eyed3.id3.tag.Tag, image_data: bytes, mime_type: str) 
 def get_mp3_info(filepath: Path) -> MP3Info:
     """Extract MP3 metadata."""
     audio = eyed3.load(str(filepath))
+    file_stats = filepath.stat()
     info = MP3Info(
         filename=filepath.name,
-        file_size=filepath.stat().st_size
+        file_size=file_stats.st_size,
+        date_added=datetime.fromtimestamp(file_stats.st_ctime, tz=timezone.utc),
     )
     if audio and audio.tag:
         info.title = audio.tag.title

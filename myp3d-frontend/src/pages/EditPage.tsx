@@ -11,6 +11,7 @@ interface EditPageProps {
 }
 
 const COVER_SIZE = 500;
+const SIDEBAR_SCROLL_KEY = 'edit-sidebar-scroll-top';
 
 const fileToDataUrl = (file: File) =>
   new Promise<string>((resolve, reject) => {
@@ -84,6 +85,8 @@ export function EditPage({ filename, onBack }: EditPageProps) {
   const [newFilename, setNewFilename] = useState('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const detailsSongListRef = useRef<HTMLDivElement>(null);
+  const hasRestoredSidebarScrollRef = useRef(false);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [newCoverFile, setNewCoverFile] = useState<File | null>(null);
   const [cropSource, setCropSource] = useState<string | null>(null);
@@ -100,6 +103,36 @@ export function EditPage({ filename, onBack }: EditPageProps) {
   useEffect(() => {
     loadLibrarySongs();
   }, []);
+
+  useEffect(() => {
+    if (hasRestoredSidebarScrollRef.current) {
+      return;
+    }
+
+    if (!detailsSongListRef.current || typeof window === 'undefined') {
+      return;
+    }
+
+    const storedScrollTop = window.sessionStorage.getItem(SIDEBAR_SCROLL_KEY);
+    const scrollTop = storedScrollTop ? Number(storedScrollTop) : 0;
+
+    if (Number.isFinite(scrollTop) && scrollTop > 0) {
+      detailsSongListRef.current.scrollTop = scrollTop;
+    }
+
+    hasRestoredSidebarScrollRef.current = true;
+  }, [librarySongs.length]);
+
+  const persistSidebarScroll = () => {
+    if (typeof window === 'undefined' || !detailsSongListRef.current) {
+      return;
+    }
+
+    window.sessionStorage.setItem(
+      SIDEBAR_SCROLL_KEY,
+      String(detailsSongListRef.current.scrollTop),
+    );
+  };
 
   const loadMp3 = async () => {
     try {
@@ -217,7 +250,7 @@ export function EditPage({ filename, onBack }: EditPageProps) {
     }
   };
 
-  if (loading) return <div className="page"><p>Loading...</p></div>;
+  if (loading && !mp3) return <div className="page"><p>Loading...</p></div>;
   if (!mp3) return <div className="page"><p>MP3 not found</p></div>;
 
   const normalizedSongSearch = songSearch.trim().toLowerCase();
@@ -234,7 +267,13 @@ export function EditPage({ filename, onBack }: EditPageProps) {
     <div className="page">
       <div className="details-layout">
         <aside className="details-sidebar">
-          <button onClick={onBack} className="btn-secondary details-back-btn">
+          <button
+            onClick={() => {
+              persistSidebarScroll();
+              onBack();
+            }}
+            className="btn-secondary details-back-btn"
+          >
             ← Back to Library
           </button>
 
@@ -248,7 +287,7 @@ export function EditPage({ filename, onBack }: EditPageProps) {
             />
           </div>
 
-          <div className="details-song-list">
+          <div className="details-song-list" ref={detailsSongListRef} onScroll={persistSidebarScroll}>
             {visibleSongs.map((song) => {
               const isActive = song.filename === filename;
               return (
@@ -256,7 +295,10 @@ export function EditPage({ filename, onBack }: EditPageProps) {
                   key={song.filename}
                   type="button"
                   className={`details-song-item ${isActive ? 'active' : ''}`}
-                  onClick={() => navigate(`/details/${encodeURIComponent(song.filename)}`)}
+                  onClick={() => {
+                    persistSidebarScroll();
+                    navigate(`/details/${encodeURIComponent(song.filename)}`);
+                  }}
                   disabled={isActive}
                 >
                   <span className="details-song-title">{song.title || song.filename}</span>
@@ -271,6 +313,7 @@ export function EditPage({ filename, onBack }: EditPageProps) {
 
         <section className="details-main">
           <h1>Edit: {mp3.filename}</h1>
+          {loading && <p className="input-help">Loading selected song...</p>}
 
           <div className="edit-container">
             <div className="cover-section">

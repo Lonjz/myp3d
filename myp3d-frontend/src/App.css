@@ -306,9 +306,9 @@ body {
 
 .library-filters {
   display: grid;
-  grid-template-columns: 180px minmax(260px, 1fr);
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
   gap: 0.75rem;
-  width: min(100%, 540px);
+  width: min(100%, 980px);
 }
 
 .library-filter-group,
@@ -326,7 +326,7 @@ body {
 .library-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 950px;
+  min-width: 1100px;
 }
 
 .library-table th,
@@ -375,6 +375,12 @@ body {
 .library-filename {
   color: #d0d7ff;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-size: 0.85rem;
+}
+
+.library-date {
+  white-space: nowrap;
+  color: #cfd6f6;
   font-size: 0.85rem;
 }
 
