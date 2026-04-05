@@ -306,9 +306,9 @@ body {
 
 .library-filters {
   display: grid;
-  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  grid-template-columns: 180px minmax(260px, 1fr);
   gap: 0.75rem;
-  width: min(100%, 980px);
+  width: min(100%, 620px);
 }
 
 .library-filter-group,
@@ -343,6 +343,34 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   background: #111a35;
+}
+
+.library-sort-button {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.library-sort-button:hover {
+  color: #f1f4ff;
+}
+
+.library-sort-button.active {
+  color: #ffffff;
+}
+
+.library-sort-indicator {
+  color: #8fa3d8;
+  font-size: 0.75rem;
 }
 
 .library-table tbody tr:hover {

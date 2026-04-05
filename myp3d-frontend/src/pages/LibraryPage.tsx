@@ -6,7 +6,7 @@ import type { MP3Info } from '../api/mp3Api';
 const PAGE_SIZE = 25;
 
 type FilterBy = 'all' | 'title' | 'artist' | 'filename' | 'album';
-type SortBy = 'date_added' | 'filename' | 'size' | 'artist' | 'title';
+type SortBy = 'date_added' | 'filename' | 'size' | 'artist' | 'title' | 'album';
 type SortDirection = 'asc' | 'desc';
 
 export function LibraryPage() {
@@ -19,6 +19,15 @@ export function LibraryPage() {
   const [sortBy, setSortBy] = useState<SortBy>('date_added');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [currentPage, setCurrentPage] = useState(1);
+
+  const sortColumnLabels: Record<SortBy, string> = {
+    title: 'Title',
+    artist: 'Artist',
+    album: 'Album',
+    filename: 'File Name',
+    size: 'Size',
+    date_added: 'Date Added',
+  };
 
   const loadMp3s = async () => {
     try {
@@ -94,6 +103,8 @@ export function LibraryPage() {
         comparison = normalizeText(a.artist).localeCompare(normalizeText(b.artist));
       } else if (sortBy === 'title') {
         comparison = normalizeText(a.title).localeCompare(normalizeText(b.title));
+      } else if (sortBy === 'album') {
+        comparison = normalizeText(a.album).localeCompare(normalizeText(b.album));
       } else {
         comparison = normalizeText(a.filename).localeCompare(normalizeText(b.filename));
       }
@@ -131,6 +142,32 @@ export function LibraryPage() {
     const parsed = new Date(dateAdded);
     if (Number.isNaN(parsed.getTime())) return '-';
     return parsed.toLocaleString();
+  };
+
+  const handleSortClick = (column: SortBy) => {
+    if (column === sortBy) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+      return;
+    }
+
+    setSortBy(column);
+    setSortDirection(column === 'date_added' ? 'desc' : 'asc');
+  };
+
+  const renderSortHeader = (column: SortBy) => {
+    const isActive = sortBy === column;
+    const indicator = sortDirection === 'asc' ? '↑' : '↓';
+
+    return (
+      <button
+        type="button"
+        className={`library-sort-button ${isActive ? 'active' : ''}`}
+        onClick={() => handleSortClick(column)}
+      >
+        <span>{sortColumnLabels[column]}</span>
+        {isActive && <span className="library-sort-indicator" aria-hidden="true">{indicator}</span>}
+      </button>
+    );
   };
 
   if (loading) return <div className="page"><p>Loading...</p></div>;
@@ -171,32 +208,6 @@ export function LibraryPage() {
             />
           </div>
 
-          <div className="form-group library-sort-group">
-            <label htmlFor="librarySortBy">Sort By</label>
-            <select
-              id="librarySortBy"
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortBy)}
-            >
-              <option value="date_added">Date Added</option>
-              <option value="filename">File Name</option>
-              <option value="title">Title</option>
-              <option value="artist">Artist</option>
-              <option value="size">Size</option>
-            </select>
-          </div>
-
-          <div className="form-group library-sort-order-group">
-            <label htmlFor="librarySortDirection">Order</label>
-            <select
-              id="librarySortDirection"
-              value={sortDirection}
-              onChange={(e) => setSortDirection(e.target.value as SortDirection)}
-            >
-              <option value="desc">Descending</option>
-              <option value="asc">Ascending</option>
-            </select>
-          </div>
         </div>
       </div>
 
@@ -209,12 +220,12 @@ export function LibraryPage() {
               <thead>
                 <tr>
                   <th>Cover</th>
-                  <th>Title</th>
-                  <th>Artist</th>
-                  <th>Album</th>
-                  <th>File Name</th>
-                  <th>Size</th>
-                  <th>Date Added</th>
+                  <th>{renderSortHeader('title')}</th>
+                  <th>{renderSortHeader('artist')}</th>
+                  <th>{renderSortHeader('album')}</th>
+                  <th>{renderSortHeader('filename')}</th>
+                  <th>{renderSortHeader('size')}</th>
+                  <th>{renderSortHeader('date_added')}</th>
                   <th>Actions</th>
                 </tr>
               </thead>
