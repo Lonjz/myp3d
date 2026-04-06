@@ -36,6 +36,34 @@ export interface MetadataUpdate {
   new_filename?: string;
 }
 
+export interface AlbumInfo {
+  album_key: string;
+  album_name: string;
+  track_count: number;
+  total_size: number;
+  artists: string[];
+  has_cover: boolean;
+  cover_filename: string | null;
+  date_added?: string | null;
+}
+
+export interface AlbumDetail {
+  album: AlbumInfo;
+  tracks: MP3Info[];
+}
+
+export interface AlbumUpdateRequest {
+  album_name: string;
+}
+
+export interface AlbumUpdateResponse {
+  success: boolean;
+  album_key: string;
+  album_name: string;
+  updated_tracks: number;
+  message: string;
+}
+
 export const mp3Api = {
   // Download a YouTube video as MP3
   async download(request: DownloadRequest): Promise<{ success: boolean; filename: string; message: string }> {
@@ -126,5 +154,57 @@ export const mp3Api = {
     });
     if (!res.ok) throw new Error('Delete failed');
     return res.json();
+  },
+
+  // List all albums
+  async listAlbums(): Promise<AlbumInfo[]> {
+    const res = await fetch(`${API_BASE}/albums`);
+    if (!res.ok) throw new Error('Failed to fetch album list');
+    return res.json();
+  },
+
+  // Get album details and tracks
+  async getAlbum(albumKey: string): Promise<AlbumDetail> {
+    const res = await fetch(`${API_BASE}/albums/${encodeURIComponent(albumKey)}`);
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(error.detail || 'Failed to fetch album details');
+    }
+    return res.json();
+  },
+
+  // Update album metadata for all tracks in album
+  async updateAlbum(albumKey: string, payload: AlbumUpdateRequest): Promise<AlbumUpdateResponse> {
+    const res = await fetch(`${API_BASE}/albums/${encodeURIComponent(albumKey)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(error.detail || 'Album update failed');
+    }
+    return res.json();
+  },
+
+  // Update album cover for all tracks in album
+  async updateAlbumCover(albumKey: string, file: File): Promise<{ success: boolean; updated_tracks: number; message: string }> {
+    const formData = new FormData();
+    formData.append('cover', file);
+
+    const res = await fetch(`${API_BASE}/albums/${encodeURIComponent(albumKey)}/cover`, {
+      method: 'POST',
+      body: formData,
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(error.detail || 'Album cover update failed');
+    }
+    return res.json();
+  },
+
+  // Get album cover URL
+  getAlbumCoverUrl(albumKey: string): string {
+    return `${API_BASE}/albums/${encodeURIComponent(albumKey)}/cover`;
   },
 };

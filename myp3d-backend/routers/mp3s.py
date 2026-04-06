@@ -4,7 +4,7 @@ from fastapi.responses import FileResponse
 
 from models.schemas import MP3Info, MetadataUpdate
 from services.config import OUTPUT_DIR
-from services.mp3_service import get_mp3_info, make_square_cover, set_cover_images
+from services.mp3_service import get_mp3_info, list_mp3_infos, make_square_cover, set_cover_images
 
 router = APIRouter(prefix="/mp3s", tags=["MP3s"])
 
@@ -12,11 +12,7 @@ router = APIRouter(prefix="/mp3s", tags=["MP3s"])
 @router.get("", response_model=list[MP3Info])
 async def list_mp3s():
     """List all downloaded MP3 files."""
-    mp3_files = []
-    for f in OUTPUT_DIR.iterdir():
-        if f.suffix.lower() == ".mp3":
-            mp3_files.append(get_mp3_info(f))
-    return mp3_files
+    return list_mp3_infos()
 
 
 @router.get("/{filename}")

@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class DownloadRequest(BaseModel):
@@ -48,3 +48,31 @@ class MP3Info(BaseModel):
     has_cover: bool = False
     file_size: int = 0
     date_added: Optional[datetime] = None
+
+
+class AlbumInfo(BaseModel):
+    album_key: str
+    album_name: str
+    track_count: int
+    total_size: int
+    artists: list[str] = Field(default_factory=list)
+    has_cover: bool = False
+    cover_filename: Optional[str] = None
+    date_added: Optional[datetime] = None
+
+
+class AlbumDetail(BaseModel):
+    album: AlbumInfo
+    tracks: list[MP3Info]
+
+
+class AlbumUpdate(BaseModel):
+    album_name: str
+
+
+class AlbumUpdateResponse(BaseModel):
+    success: bool
+    album_key: str
+    album_name: str
+    updated_tracks: int
+    message: str

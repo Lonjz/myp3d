@@ -311,6 +311,10 @@ body {
   width: min(100%, 620px);
 }
 
+.albums-filters {
+  grid-template-columns: minmax(280px, 1fr);
+}
+
 .library-filter-group,
 .library-search-group {
   margin-bottom: 0;
@@ -410,6 +414,10 @@ body {
   white-space: nowrap;
   color: #cfd6f6;
   font-size: 0.85rem;
+}
+
+.albums-table {
+  min-width: 900px;
 }
 
 .table-actions {
@@ -561,6 +569,35 @@ body {
 
 .metadata-section {
   flex: 1;
+}
+
+.albums-back-btn {
+  margin-bottom: 0.9rem;
+}
+
+.album-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.album-stat-card {
+  border: 1px solid #0f3460;
+  border-radius: 8px;
+  background: #111a35;
+  padding: 0.6rem 0.75rem;
+}
+
+.album-stat-card-wide {
+  grid-column: 1 / -1;
+}
+
+.album-stat-label {
+  display: block;
+  color: #9aa6d6;
+  margin-bottom: 0.25rem;
+  font-size: 0.8rem;
 }
 
 /* Audio Player */
@@ -789,6 +826,10 @@ body {
 
   .edit-container {
     flex-direction: column;
+  }
+
+  .album-stats-grid {
+    grid-template-columns: 1fr;
   }
 
   .query-layout {

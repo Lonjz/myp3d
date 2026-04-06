@@ -1,7 +1,9 @@
 import os
 import base64
 import binascii
+import hashlib
 import importlib
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from io import BytesIO
@@ -11,11 +13,150 @@ import eyed3
 from eyed3.id3 import frames as id3_frames
 from yt_dlp import YoutubeDL
 
-from models.schemas import MP3Info
+from models.schemas import AlbumInfo, MP3Info
 from services.config import OUTPUT_DIR, get_ffmpeg_path
 
 
 COVER_SIZE = (500, 500)
+NO_ALBUM_LABEL = "(No Album)"
+
+
+@dataclass
+class AlbumGroup:
+    album_key: str
+    album_name: str
+    normalized_album: str
+    tracks: list[MP3Info]
+    filepaths: list[Path]
+    artists: set[str]
+    total_size: int = 0
+    has_cover: bool = False
+    cover_filename: Optional[str] = None
+    date_added: Optional[datetime] = None
+
+    def to_info(self) -> AlbumInfo:
+        return AlbumInfo(
+            album_key=self.album_key,
+            album_name=self.album_name,
+            track_count=len(self.tracks),
+            total_size=self.total_size,
+            artists=sorted(self.artists, key=lambda artist: artist.lower()),
+            has_cover=self.has_cover,
+            cover_filename=self.cover_filename,
+            date_added=self.date_added,
+        )
+
+
+def _normalize_album_value(album_name: Optional[str]) -> str:
+    return (album_name or "").strip()
+
+
+def _album_key(normalized_album: str) -> str:
+    return hashlib.sha1(normalized_album.encode("utf-8")).hexdigest()
+
+
+def make_album_key(album_name: Optional[str]) -> str:
+    normalized_album = _normalize_album_value(album_name).casefold()
+    return _album_key(normalized_album)
+
+
+def list_mp3_filepaths() -> list[Path]:
+    return sorted(
+        [path for path in OUTPUT_DIR.iterdir() if path.is_file() and path.suffix.lower() == ".mp3"],
+        key=lambda path: path.name.lower(),
+    )
+
+
+def list_mp3_infos() -> list[MP3Info]:
+    return [get_mp3_info(filepath) for filepath in list_mp3_filepaths()]
+
+
+def build_album_groups() -> dict[str, AlbumGroup]:
+    groups: dict[str, AlbumGroup] = {}
+
+    for filepath in list_mp3_filepaths():
+        track = get_mp3_info(filepath)
+        album_value = _normalize_album_value(track.album)
+        normalized_album = album_value.casefold()
+        album_key = _album_key(normalized_album)
+
+        group = groups.get(album_key)
+        if group is None:
+            group = AlbumGroup(
+                album_key=album_key,
+                album_name=album_value or NO_ALBUM_LABEL,
+                normalized_album=normalized_album,
+                tracks=[],
+                filepaths=[],
+                artists=set(),
+            )
+            groups[album_key] = group
+
+        group.tracks.append(track)
+        group.filepaths.append(filepath)
+        group.total_size += track.file_size
+
+        artist_value = (track.artist or "").strip()
+        if artist_value:
+            group.artists.add(artist_value)
+
+        if track.has_cover and not group.has_cover:
+            group.has_cover = True
+            group.cover_filename = track.filename
+
+        if track.date_added and (group.date_added is None or track.date_added > group.date_added):
+            group.date_added = track.date_added
+
+        if album_value and group.album_name == NO_ALBUM_LABEL:
+            group.album_name = album_value
+
+    return groups
+
+
+def list_albums() -> list[AlbumInfo]:
+    groups = build_album_groups()
+    albums = [group.to_info() for group in groups.values()]
+    return sorted(albums, key=lambda album: (album.album_name or "").lower())
+
+
+def get_album_group(album_key: str) -> Optional[AlbumGroup]:
+    groups = build_album_groups()
+    return groups.get(album_key)
+
+
+def set_album_name(filepaths: list[Path], album_name: str) -> None:
+    normalized_name = album_name.strip()
+    tag_album_value = normalized_name or None
+
+    for filepath in filepaths:
+        audio = eyed3.load(str(filepath))
+        if audio is None:
+            continue
+        if audio.tag is None:
+            audio.initTag()
+        audio.tag.album = tag_album_value
+        audio.tag.save(version=(2, 3, 0))
+
+
+def set_album_cover(filepaths: list[Path], image_data: bytes, mime_type: str) -> None:
+    for filepath in filepaths:
+        audio = eyed3.load(str(filepath))
+        if audio is None:
+            continue
+        if audio.tag is None:
+            audio.initTag()
+        set_cover_images(audio.tag, image_data, mime_type)
+        audio.tag.save(version=(2, 3, 0))
+
+
+def get_album_cover(filepaths: list[Path]) -> Optional[tuple[bytes, str]]:
+    for filepath in filepaths:
+        audio = eyed3.load(str(filepath))
+        if not audio or not audio.tag or not audio.tag.images:
+            continue
+        image = audio.tag.images[0]
+        return image.image_data, image.mime_type or "image/jpeg"
+    return None
 
 
 def _decode_base64_image(image_base64: str) -> bytes:
