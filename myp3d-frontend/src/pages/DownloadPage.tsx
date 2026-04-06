@@ -1,8 +1,9 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import Cropper from 'react-easy-crop';
 import type { Area, Point } from 'react-easy-crop';
 import { mp3Api } from '../api/mp3Api';
 import type { DownloadRequest } from '../api/mp3Api';
+import { CoverUploadSquare } from '../components/CoverUploadSquare';
 
 const COVER_SIZE = 500;
 
@@ -56,7 +57,6 @@ export function DownloadPage() {
   const [isApplyingCrop, setIsApplyingCrop] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const coverInputRef = useRef<HTMLInputElement>(null);
 
   const fileToDataUrl = (file: File) =>
     new Promise<string>((resolve, reject) => {
@@ -66,15 +66,10 @@ export function DownloadPage() {
       reader.readAsDataURL(file);
     });
 
-  const handleCoverChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) {
-      return;
-    }
+  const handleCoverChange = async (file: File) => {
 
     if (!file.type.startsWith('image/')) {
       setMessage({ type: 'error', text: 'Cover file must be an image' });
-      e.target.value = '';
       return;
     }
 
@@ -88,8 +83,6 @@ export function DownloadPage() {
       setMessage(null);
     } catch (err) {
       setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Invalid cover image' });
-    } finally {
-      e.target.value = '';
     }
   };
 
@@ -121,9 +114,6 @@ export function DownloadPage() {
   const handleRemoveCover = () => {
     setCoverImageBase64(undefined);
     setCoverPreview(null);
-    if (coverInputRef.current) {
-      coverInputRef.current.value = '';
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -159,9 +149,6 @@ export function DownloadPage() {
       setCoverPreview(null);
       setCropSource(null);
       setIsCropModalOpen(false);
-      if (coverInputRef.current) {
-        coverInputRef.current.value = '';
-      }
     } catch (err) {
       setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Download failed' });
     } finally {
@@ -173,99 +160,81 @@ export function DownloadPage() {
     <div className="page">
       <h1>Download MP3</h1>
       <form onSubmit={handleSubmit} className="download-form">
-        <div className="form-group">
-          <label htmlFor="url">YouTube URL *</label>
-          <input
-            id="url"
-            type="text"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://youtube.com/watch?v=..."
-            disabled={loading}
-          />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="customFilename">Custom Filename (optional)</label>
-          <input
-            id="customFilename"
-            type="text"
-            value={customFilename}
-            onChange={(e) => setCustomFilename(e.target.value)}
-            placeholder="my-song"
-            disabled={loading}
-          />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="title">Title</label>
-          <input
-            id="title"
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Song Title"
-            disabled={loading}
-          />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="artist">Artist</label>
-          <input
-            id="artist"
-            type="text"
-            value={artist}
-            onChange={(e) => setArtist(e.target.value)}
-            placeholder="Artist Name"
-            disabled={loading}
-          />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="album">Album</label>
-          <input
-            id="album"
-            type="text"
-            value={album}
-            onChange={(e) => setAlbum(e.target.value)}
-            placeholder="Album Name"
-            disabled={loading}
-          />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="coverImage">Cover Image (optional)</label>
-          <div className="download-cover-field">
+        <div className="download-config-shell">
+          <div className="form-group download-url-row">
+            <label htmlFor="url">YouTube URL *</label>
             <input
-              id="coverImage"
-              type="file"
-              accept="image/*"
-              ref={coverInputRef}
-              onChange={handleCoverChange}
+              id="url"
+              type="text"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://youtube.com/watch?v=..."
               disabled={loading}
-              className="hidden-file-input"
             />
-            <div className="download-cover-actions">
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => coverInputRef.current?.click()}
-                disabled={loading}
-              >
-                Browse Image
-              </button>
-              {coverPreview && (
-                <button type="button" className="btn-secondary" onClick={handleRemoveCover} disabled={loading}>
-                  Remove Cover
-                </button>
-              )}
+          </div>
+
+          <div className="download-config-grid">
+            <div className="download-meta-column">
+              <div className="form-group">
+                <label htmlFor="customFilename">Custom Filename (optional)</label>
+                <input
+                  id="customFilename"
+                  type="text"
+                  value={customFilename}
+                  onChange={(e) => setCustomFilename(e.target.value)}
+                  placeholder="my-song"
+                  disabled={loading}
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="title">Title</label>
+                <input
+                  id="title"
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Song Title"
+                  disabled={loading}
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="artist">Artist</label>
+                <input
+                  id="artist"
+                  type="text"
+                  value={artist}
+                  onChange={(e) => setArtist(e.target.value)}
+                  placeholder="Artist Name"
+                  disabled={loading}
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="album">Album</label>
+                <input
+                  id="album"
+                  type="text"
+                  value={album}
+                  onChange={(e) => setAlbum(e.target.value)}
+                  placeholder="Album Name"
+                  disabled={loading}
+                />
+              </div>
             </div>
-            <div className="download-cover-preview">
-              {coverPreview ? (
-                <img src={coverPreview} alt="Selected cover preview" />
-              ) : (
-                <div className="download-cover-placeholder">No cover selected</div>
-              )}
+
+            <div className="download-cover-column">
+              <CoverUploadSquare
+                inputId="coverImage"
+                label="Cover Image (optional)"
+                previewUrl={coverPreview}
+                disabled={loading}
+                onSelectFile={handleCoverChange}
+                onClear={handleRemoveCover}
+                emptyText="Click to upload cover"
+                helpText="Image is cropped to 500x500."
+              />
             </div>
           </div>
         </div>
