@@ -19,6 +19,16 @@ export interface DownloadRequest {
   cover_image_base64?: string;
 }
 
+export interface YouTubeSearchResult {
+  video_id: string;
+  url: string;
+  title: string;
+  artist: string | null;
+  album: string | null;
+  thumbnail_url: string | null;
+  duration: number | null;
+}
+
 export interface MetadataUpdate {
   title?: string;
   artist?: string;
@@ -46,6 +56,21 @@ export const mp3Api = {
     const res = await fetch(`${API_BASE}/mp3s`);
     if (!res.ok) throw new Error('Failed to fetch MP3 list');
     return res.json();
+  },
+
+  // Search YouTube through backend yt-dlp integration
+  async searchYouTube(query: string, limit = 12): Promise<YouTubeSearchResult[]> {
+    const params = new URLSearchParams({
+      query,
+      limit: String(limit),
+    });
+    const res = await fetch(`${API_BASE}/youtube/search?${params.toString()}`);
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(error.detail || 'Failed to search YouTube');
+    }
+    const payload = await res.json();
+    return payload.results || [];
   },
 
   // Get MP3 metadata

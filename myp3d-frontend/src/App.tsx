@@ -1,5 +1,6 @@
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { DownloadPage } from './pages/DownloadPage';
+import { QueryPage } from './pages/QueryPage';
 import { LibraryPage } from './pages/LibraryPage';
 import { EditPage } from './pages/EditPage';
 import './App.css';
@@ -45,6 +46,12 @@ function App() {
             Download
           </NavLink>
           <NavLink
+            to="/query"
+            className={({ isActive }) => (isActive ? 'active' : '')}
+          >
+            Query
+          </NavLink>
+          <NavLink
             to="/library"
             className={isLibraryActive ? 'active' : ''}
           >
@@ -56,6 +63,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/download" replace />} />
           <Route path="/download" element={<DownloadPage />} />
+          <Route path="/query" element={<QueryPage />} />
           <Route path="/library" element={<LibraryPage />} />
           <Route path="/details/:songName" element={<EditRoute />} />
           <Route path="*" element={<Navigate to="/download" replace />} />

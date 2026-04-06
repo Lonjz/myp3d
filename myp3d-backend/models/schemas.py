@@ -18,6 +18,21 @@ class DownloadResponse(BaseModel):
     message: str
 
 
+class YouTubeSearchResult(BaseModel):
+    video_id: str
+    url: str
+    title: str
+    artist: Optional[str] = None
+    album: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    duration: Optional[int] = None
+
+
+class YouTubeSearchResponse(BaseModel):
+    query: str
+    results: list[YouTubeSearchResult]
+
+
 class MetadataUpdate(BaseModel):
     title: Optional[str] = None
     artist: Optional[str] = None
