@@ -6,13 +6,15 @@ React + TypeScript + Vite UI for downloading, browsing, and editing local MP3 fi
 
 - `Download` page:
   - Submit YouTube URL.
+  - URL input stays in its own top row.
+  - Metadata fields and cover upload are split into two columns.
   - Optional filename/title/artist/album metadata.
-  - Optional cover image upload, crop, and preview.
+  - Optional cover image upload, crop, and preview using a shared square click-to-upload component.
 - `Query` page:
   - Search YouTube from the backend `yt-dlp` endpoint.
   - Browse results in a left sidebar and preview selected video in an embedded player.
   - Autofill URL/title/artist/album from selected result.
-  - Keep cover image manual (upload + crop) to keep download payload simple.
+  - Uses the same cover upload UI and config layout as Download page.
 - `Library` page:
   - Show local MP3 library in a table.
   - Search/filter by title, artist, album, filename.
@@ -21,6 +23,13 @@ React + TypeScript + Vite UI for downloading, browsing, and editing local MP3 fi
 - `Details` page:
   - Edit metadata and cover for a selected song.
   - Left sidebar to quickly switch between songs.
+- `Albums` page:
+  - Show grouped albums (same album name across different artists counts as one album group).
+  - Search/sort albums and open album edit screen.
+- `Album Edit` page:
+  - Rename album for all tracks in the selected group.
+  - Apply a single cover to all tracks in the selected group.
+  - Includes left sidebar for quick album-to-album navigation.
 
 ## Routing
 
@@ -28,6 +37,8 @@ React + TypeScript + Vite UI for downloading, browsing, and editing local MP3 fi
 - `/query` -> `QueryPage`
 - `/library` -> `LibraryPage`
 - `/details/:songName` -> `EditPage`
+- `/albums` -> `AlbumsPage`
+- `/albums/:albumKey` -> `AlbumEditPage`
 - `/` redirects to `/download`
 
 Route wiring is in `src/App.tsx`.
@@ -41,15 +52,19 @@ myp3d-frontend/
   src/
     main.tsx                   # BrowserRouter + app bootstrapping
     App.tsx                    # Top-level nav + route definitions
-    App.css                    # Shared styles (download/library/details)
+    App.css                    # Shared styles (download/query/library/details/albums)
     index.css                  # Global base styles
     api/
       mp3Api.ts                # Backend client (all HTTP calls)
+    components/
+      CoverUploadSquare.tsx    # Shared square uploader UI for Download/Query cover input
     pages/
       DownloadPage.tsx         # Download form + cover crop modal
       QueryPage.tsx            # YouTube search + preview + autofill download form
       LibraryPage.tsx          # Search/filter table + pagination
       EditPage.tsx             # Metadata/cover editor + sidebar picker
+      AlbumsPage.tsx           # Album list/search/sort/pagination
+      AlbumEditPage.tsx        # Bulk album metadata/cover editor + sidebar picker
 ```
 
 ## Data/API Integration
@@ -71,6 +86,11 @@ Client methods:
 - `updateCover(filename, file)` -> `POST /mp3s/{filename}/cover`
 - `delete(filename)` -> `DELETE /mp3s/{filename}`
 - `getCoverUrl(filename)` and `getFileUrl(filename)` for media URLs
+- `listAlbums()` -> `GET /albums`
+- `getAlbum(albumKey)` -> `GET /albums/{album_key}`
+- `updateAlbum(albumKey, payload)` -> `PUT /albums/{album_key}`
+- `updateAlbumCover(albumKey, file)` -> `POST /albums/{album_key}/cover`
+- `getAlbumCoverUrl(albumKey)` for album cover previews
 
 ## File Responsibility Map (for AI and Maintainers)
 
@@ -80,6 +100,9 @@ Client methods:
 - Query/search + embedded preview workflow: `src/pages/QueryPage.tsx`
 - Library search/filter/pagination UX: `src/pages/LibraryPage.tsx`
 - Song edit workflow and sidebar navigation: `src/pages/EditPage.tsx`
+- Albums listing and album-level navigation: `src/pages/AlbumsPage.tsx`
+- Album-level edit workflow: `src/pages/AlbumEditPage.tsx`
+- Shared cover upload interaction: `src/components/CoverUploadSquare.tsx`
 - Visual consistency and layout behavior: `src/App.css`
 
 If a bug is about:
@@ -88,7 +111,9 @@ If a bug is about:
 - Route navigation issues: check `src/App.tsx`.
 - Query search results, selection, or preview: check `src/pages/QueryPage.tsx`.
 - Cover crop/preview behavior: check `src/pages/DownloadPage.tsx` and `src/pages/EditPage.tsx`.
+- Download/Query cover picker behavior parity: check `src/components/CoverUploadSquare.tsx`.
 - Library rendering/performance/filtering: check `src/pages/LibraryPage.tsx`.
+- Album grouping/list/detail rendering: check `src/pages/AlbumsPage.tsx` and `src/pages/AlbumEditPage.tsx`.
 
 ## Local Development
 
@@ -137,6 +162,12 @@ This frontend assumes backend behavior from `myp3d-backend`:
   - `thumbnail_url` (for sidebar visuals)
   - `duration`
 - Cover endpoint accepts multipart image upload.
+- Albums endpoints return grouped album metadata and track lists:
+  - `GET /albums`
+  - `GET /albums/{album_key}`
+  - `PUT /albums/{album_key}`
+  - `POST /albums/{album_key}/cover`
+  - `GET /albums/{album_key}/cover`
 
 ## Notes for Future Work
 

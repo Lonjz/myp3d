@@ -9,6 +9,8 @@ FastAPI backend for downloading YouTube audio as MP3, storing files locally, and
 - Stores MP3 files in the local `downloads/` folder.
 - Reads and updates ID3 metadata (title, artist, album).
 - Adds or replaces cover artwork (normalized to `500x500` JPEG).
+- Groups tracks into albums using normalized album metadata.
+- Supports bulk album edits (rename and cover updates applied to every track in album).
 - Serves MP3 files and embedded cover images over HTTP.
 
 Core stack:
@@ -25,6 +27,7 @@ Core stack:
 3. Backend downloads audio via `yt-dlp`, extracts MP3 via ffmpeg.
 4. Backend writes metadata and optional uploaded cover image.
 5. Frontend lists files via `GET /mp3s` and edits via `/mp3s/{filename}/...` endpoints.
+6. Frontend Albums page uses `GET /albums` and `/albums/{album_key}` for grouped album editing.
 
 ## API Surface
 
@@ -64,6 +67,20 @@ Core stack:
 - `POST /mp3s/upload`
 	- Upload an existing MP3 to the library.
 
+### Albums
+
+- `GET /albums`
+	- List all album groups (grouping by normalized album name).
+- `GET /albums/{album_key}`
+	- Get album summary and all tracks in that album.
+- `PUT /albums/{album_key}`
+	- Rename album for all tracks in the group.
+	- Returns updated `album_key` (derived from updated name).
+- `POST /albums/{album_key}/cover`
+	- Upload image file and apply as cover to all tracks in the album.
+- `GET /albums/{album_key}/cover`
+	- Get representative embedded cover image for album previews.
+
 ## Project Structure
 
 ```text
@@ -76,6 +93,7 @@ myp3d-backend/
 	models/
 		schemas.py               # Pydantic request/response models
 	routers/
+		albums.py                # /albums* grouped album endpoints
 		download.py              # /download endpoint
 		mp3s.py                  # /mp3s* endpoints
 		youtube.py               # /youtube/search endpoint
@@ -95,8 +113,10 @@ myp3d-backend/
 - Download orchestration: `routers/download.py` -> `services/mp3_service.py::download_as_mp3`
 - YouTube search orchestration: `routers/youtube.py` -> `services/youtube_service.py::search_youtube`
 - Metadata/cover update endpoints: `routers/mp3s.py`
+- Album grouping and bulk album update endpoints: `routers/albums.py`
 - Artwork crop/normalize logic: `services/mp3_service.py::make_square_cover`
 - Cover frame writing behavior: `services/mp3_service.py::set_cover_images`
+- Album grouping logic: `services/mp3_service.py::build_album_groups`
 - Storage location config: `services/config.py`
 
 If a bug is about:
@@ -105,6 +125,7 @@ If a bug is about:
 - Query page search results: inspect `youtube_search` route and `search_youtube` mapping.
 - Bad artwork in players: inspect `make_square_cover` and `set_cover_images`.
 - Rename/metadata mismatch: inspect `routers/mp3s.py::update_metadata`.
+- Album grouping/update mismatch: inspect `routers/albums.py` and `services/mp3_service.py::build_album_groups`.
 
 ## Configuration
 
@@ -169,5 +190,6 @@ Or use root scripts documented in `../run/README.md`.
 ```bash
 curl http://localhost:8000/
 curl http://localhost:8000/mp3s
+curl http://localhost:8000/albums
 curl "http://localhost:8000/youtube/search?query=lofi&limit=3"
 ```
