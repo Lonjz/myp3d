@@ -5,6 +5,7 @@ FastAPI backend for downloading YouTube audio as MP3, storing files locally, and
 ## What This Service Does
 
 - Downloads a YouTube URL as a 320 kbps MP3.
+- Searches YouTube videos via `yt-dlp` for Query page discovery.
 - Stores MP3 files in the local `downloads/` folder.
 - Reads and updates ID3 metadata (title, artist, album).
 - Adds or replaces cover artwork (normalized to `500x500` JPEG).
@@ -19,10 +20,11 @@ Core stack:
 
 ## Runtime Flow
 
-1. Frontend sends `POST /download` with URL and optional metadata.
-2. Backend downloads audio via `yt-dlp`, extracts MP3 via ffmpeg.
-3. Backend writes metadata and optional cover image.
-4. Frontend lists files via `GET /mp3s` and edits via `/mp3s/{filename}/...` endpoints.
+1. Frontend Query page calls `GET /youtube/search` to fetch candidate videos.
+2. Frontend selects one result and submits `POST /download` with URL and optional metadata.
+3. Backend downloads audio via `yt-dlp`, extracts MP3 via ffmpeg.
+4. Backend writes metadata and optional uploaded cover image.
+5. Frontend lists files via `GET /mp3s` and edits via `/mp3s/{filename}/...` endpoints.
 
 ## API Surface
 
@@ -36,6 +38,12 @@ Core stack:
 - `POST /download`
 	- Body: `DownloadRequest` (`url`, optional `custom_filename`, `title`, `artist`, `album`, `cover_image_base64`).
 	- Returns: `DownloadResponse` (`success`, `filename`, `message`).
+
+### YouTube Discovery
+
+- `GET /youtube/search`
+	- Query params: `query` (required), `limit` (optional, `1-30`, default `12`).
+	- Returns: `YouTubeSearchResponse` with lightweight result fields for Query page.
 
 ### MP3 Library
 
@@ -70,9 +78,11 @@ myp3d-backend/
 	routers/
 		download.py              # /download endpoint
 		mp3s.py                  # /mp3s* endpoints
+		youtube.py               # /youtube/search endpoint
 	services/
 		config.py                # env loading + output directory + ffmpeg path logic
 		mp3_service.py           # yt-dlp download + metadata + artwork processing
+		youtube_service.py       # yt-dlp search + result mapping
 	utils/
 		inspect_id3_artwork.py   # helper scripts for ID3 artwork debugging
 		normalize_itunes_artwork.py
@@ -83,6 +93,7 @@ myp3d-backend/
 - Route wiring: `main.py`
 - Request/response models: `models/schemas.py`
 - Download orchestration: `routers/download.py` -> `services/mp3_service.py::download_as_mp3`
+- YouTube search orchestration: `routers/youtube.py` -> `services/youtube_service.py::search_youtube`
 - Metadata/cover update endpoints: `routers/mp3s.py`
 - Artwork crop/normalize logic: `services/mp3_service.py::make_square_cover`
 - Cover frame writing behavior: `services/mp3_service.py::set_cover_images`
@@ -91,6 +102,7 @@ myp3d-backend/
 If a bug is about:
 
 - URL download failure: inspect `download_as_mp3` and ffmpeg config first.
+- Query page search results: inspect `youtube_search` route and `search_youtube` mapping.
 - Bad artwork in players: inspect `make_square_cover` and `set_cover_images`.
 - Rename/metadata mismatch: inspect `routers/mp3s.py::update_metadata`.
 
@@ -149,10 +161,13 @@ Or use root scripts documented in `../run/README.md`.
 - Backend storage is local filesystem only (no DB/object storage yet).
 - No auth; endpoints are intended for local/dev trusted usage.
 - Large libraries are listed from local directory each request (no pagination at API layer).
+- YouTube search uses `yt-dlp` (no API key), so upstream metadata quality can vary by result.
+- Query autofill for artist is best-effort creator fallback (`uploader` then `channel`), not guaranteed music artist data.
 
 ## Quick Endpoint Smoke Checks
 
 ```bash
 curl http://localhost:8000/
 curl http://localhost:8000/mp3s
+curl "http://localhost:8000/youtube/search?query=lofi&limit=3"
 ```

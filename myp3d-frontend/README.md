@@ -8,6 +8,11 @@ React + TypeScript + Vite UI for downloading, browsing, and editing local MP3 fi
   - Submit YouTube URL.
   - Optional filename/title/artist/album metadata.
   - Optional cover image upload, crop, and preview.
+- `Query` page:
+  - Search YouTube from the backend `yt-dlp` endpoint.
+  - Browse results in a left sidebar and preview selected video in an embedded player.
+  - Autofill URL/title/artist/album from selected result.
+  - Keep cover image manual (upload + crop) to keep download payload simple.
 - `Library` page:
   - Show local MP3 library in a table.
   - Search/filter by title, artist, album, filename.
@@ -20,6 +25,7 @@ React + TypeScript + Vite UI for downloading, browsing, and editing local MP3 fi
 ## Routing
 
 - `/download` -> `DownloadPage`
+- `/query` -> `QueryPage`
 - `/library` -> `LibraryPage`
 - `/details/:songName` -> `EditPage`
 - `/` redirects to `/download`
@@ -41,6 +47,7 @@ myp3d-frontend/
       mp3Api.ts                # Backend client (all HTTP calls)
     pages/
       DownloadPage.tsx         # Download form + cover crop modal
+      QueryPage.tsx            # YouTube search + preview + autofill download form
       LibraryPage.tsx          # Search/filter table + pagination
       EditPage.tsx             # Metadata/cover editor + sidebar picker
 ```
@@ -57,6 +64,7 @@ Base URL:
 Client methods:
 
 - `download(request)` -> `POST /download`
+- `searchYouTube(query, limit)` -> `GET /youtube/search`
 - `listAll()` -> `GET /mp3s`
 - `getInfo(filename)` -> `GET /mp3s/{filename}/info`
 - `updateMetadata(filename, metadata)` -> `PUT /mp3s/{filename}/metadata`
@@ -69,6 +77,7 @@ Client methods:
 - Route-level behavior: `src/App.tsx`
 - HTTP boundary + typed contracts: `src/api/mp3Api.ts`
 - Download and image crop UX: `src/pages/DownloadPage.tsx`
+- Query/search + embedded preview workflow: `src/pages/QueryPage.tsx`
 - Library search/filter/pagination UX: `src/pages/LibraryPage.tsx`
 - Song edit workflow and sidebar navigation: `src/pages/EditPage.tsx`
 - Visual consistency and layout behavior: `src/App.css`
@@ -77,6 +86,7 @@ If a bug is about:
 
 - Wrong endpoint or payload: check `src/api/mp3Api.ts` first.
 - Route navigation issues: check `src/App.tsx`.
+- Query search results, selection, or preview: check `src/pages/QueryPage.tsx`.
 - Cover crop/preview behavior: check `src/pages/DownloadPage.tsx` and `src/pages/EditPage.tsx`.
 - Library rendering/performance/filtering: check `src/pages/LibraryPage.tsx`.
 
@@ -118,6 +128,14 @@ This frontend assumes backend behavior from `myp3d-backend`:
   - `album`
   - `has_cover`
   - `file_size`
+- YouTube search endpoint returns `results[]` with:
+  - `video_id`
+  - `url`
+  - `title`
+  - `artist` (best-effort fallback from creator metadata)
+  - `album` (often empty)
+  - `thumbnail_url` (for sidebar visuals)
+  - `duration`
 - Cover endpoint accepts multipart image upload.
 
 ## Notes for Future Work
