@@ -1,53 +1,9 @@
 import { useMemo, useState } from 'react';
-import Cropper from 'react-easy-crop';
-import type { Area, Point } from 'react-easy-crop';
 import { mp3Api } from '../api/mp3Api';
 import type { DownloadRequest, YouTubeSearchResult } from '../api/mp3Api';
-import { CoverUploadSquare } from '../components/CoverUploadSquare';
-
-const COVER_SIZE = 500;
-
-const loadImage = (src: string) =>
-  new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error('Failed to load selected image'));
-    image.src = src;
-  });
-
-const getCroppedCoverDataUrl = async (imageSrc: string, cropArea: Area): Promise<string> => {
-  const image = await loadImage(imageSrc);
-  const canvas = document.createElement('canvas');
-  canvas.width = COVER_SIZE;
-  canvas.height = COVER_SIZE;
-  const ctx = canvas.getContext('2d');
-
-  if (!ctx) {
-    throw new Error('Failed to initialize crop canvas');
-  }
-
-  ctx.drawImage(
-    image,
-    cropArea.x,
-    cropArea.y,
-    cropArea.width,
-    cropArea.height,
-    0,
-    0,
-    COVER_SIZE,
-    COVER_SIZE,
-  );
-
-  return canvas.toDataURL('image/jpeg', 0.92);
-};
-
-const fileToDataUrl = (file: File) =>
-  new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error('Failed to read selected cover image'));
-    reader.readAsDataURL(file);
-  });
+import { CoverCropModal } from '../components/CoverCropModal';
+import { DownloadConfigSection } from '../components/DownloadConfigSection';
+import { useCoverImageCrop } from '../components/useCoverImageCrop';
 
 const getVideoIdFromUrl = (url: string): string => {
   try {
@@ -88,17 +44,29 @@ export function QueryPage() {
   const [artist, setArtist] = useState('');
   const [album, setAlbum] = useState('');
 
-  const [coverImageBase64, setCoverImageBase64] = useState<string | undefined>(undefined);
-  const [coverPreview, setCoverPreview] = useState<string | null>(null);
-  const [cropSource, setCropSource] = useState<string | null>(null);
-  const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
-  const [isCropModalOpen, setIsCropModalOpen] = useState(false);
-  const [isApplyingCrop, setIsApplyingCrop] = useState(false);
-
   const [downloading, setDownloading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const {
+    coverImageBase64,
+    coverPreview,
+    cropSource,
+    crop,
+    zoom,
+    isCropModalOpen,
+    isApplyingCrop,
+    setCrop,
+    setZoom,
+    handleCropComplete,
+    handleCoverFileSelect,
+    handleApplyCrop,
+    handleCancelCrop,
+    handleRemoveCover,
+    resetCoverState,
+  } = useCoverImageCrop({
+    onError: (text) => setMessage({ type: 'error', text }),
+    onClearError: () => setMessage(null),
+  });
 
   const hasResults = useMemo(() => searchResults.length > 0, [searchResults.length]);
 
@@ -142,55 +110,6 @@ export function QueryPage() {
     }
   };
 
-  const handleCoverFileSelect = async (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      setMessage({ type: 'error', text: 'Cover file must be an image' });
-      return;
-    }
-
-    try {
-      const dataUrl = await fileToDataUrl(file);
-      setCropSource(dataUrl);
-      setCrop({ x: 0, y: 0 });
-      setZoom(1);
-      setCroppedAreaPixels(null);
-      setIsCropModalOpen(true);
-      setMessage(null);
-    } catch (err) {
-      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Invalid cover image' });
-    }
-  };
-
-  const handleApplyCrop = async () => {
-    if (!cropSource || !croppedAreaPixels) {
-      setMessage({ type: 'error', text: 'Please adjust the crop before applying' });
-      return;
-    }
-
-    try {
-      setIsApplyingCrop(true);
-      const croppedImage = await getCroppedCoverDataUrl(cropSource, croppedAreaPixels);
-      setCoverImageBase64(croppedImage);
-      setCoverPreview(croppedImage);
-      setIsCropModalOpen(false);
-      setCropSource(null);
-    } catch (err) {
-      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to crop image' });
-    } finally {
-      setIsApplyingCrop(false);
-    }
-  };
-
-  const handleCancelCrop = () => {
-    setIsCropModalOpen(false);
-    setCropSource(null);
-  };
-
-  const handleRemoveCover = () => {
-    setCoverImageBase64(undefined);
-    setCoverPreview(null);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim()) {
@@ -219,10 +138,7 @@ export function QueryPage() {
       setTitle('');
       setArtist('');
       setAlbum('');
-      setCoverImageBase64(undefined);
-      setCoverPreview(null);
-      setCropSource(null);
-      setIsCropModalOpen(false);
+      resetCoverState();
       setSelectedResult(null);
       setSelectedVideoId('');
     } catch (err) {
@@ -316,88 +232,26 @@ export function QueryPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="download-form">
-            <div className="download-config-shell">
-              <div className="form-group download-url-row">
-                <label htmlFor="queryUrl">YouTube URL *</label>
-                <input
-                  id="queryUrl"
-                  type="text"
-                  value={url}
-                  onChange={(e) => {
-                    const nextUrl = e.target.value;
-                    setUrl(nextUrl);
-                    setSelectedVideoId(getVideoIdFromUrl(nextUrl));
-                  }}
-                  placeholder="https://youtube.com/watch?v=..."
-                  disabled={downloading}
-                />
-              </div>
-
-              <div className="download-config-grid">
-                <div className="download-meta-column">
-                  <div className="form-group">
-                    <label htmlFor="queryCustomFilename">Custom Filename (optional)</label>
-                    <input
-                      id="queryCustomFilename"
-                      type="text"
-                      value={customFilename}
-                      onChange={(e) => setCustomFilename(e.target.value)}
-                      placeholder="my-song"
-                      disabled={downloading}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="queryTitle">Title</label>
-                    <input
-                      id="queryTitle"
-                      type="text"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      placeholder="Song Title"
-                      disabled={downloading}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="queryArtist">Artist</label>
-                    <input
-                      id="queryArtist"
-                      type="text"
-                      value={artist}
-                      onChange={(e) => setArtist(e.target.value)}
-                      placeholder="Artist Name"
-                      disabled={downloading}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="queryAlbum">Album</label>
-                    <input
-                      id="queryAlbum"
-                      type="text"
-                      value={album}
-                      onChange={(e) => setAlbum(e.target.value)}
-                      placeholder="Album Name"
-                      disabled={downloading}
-                    />
-                  </div>
-                </div>
-
-                <div className="download-cover-column">
-                  <CoverUploadSquare
-                    inputId="queryCoverImage"
-                    label="Cover Image (optional)"
-                    previewUrl={coverPreview}
-                    disabled={downloading}
-                    onSelectFile={handleCoverFileSelect}
-                    onClear={handleRemoveCover}
-                    emptyText="Click to upload cover"
-                    helpText="Image is cropped to 500x500."
-                  />
-                </div>
-              </div>
-            </div>
+            <DownloadConfigSection
+              idPrefix="query"
+              url={url}
+              onUrlChange={(nextUrl) => {
+                setUrl(nextUrl);
+                setSelectedVideoId(getVideoIdFromUrl(nextUrl));
+              }}
+              customFilename={customFilename}
+              onCustomFilenameChange={setCustomFilename}
+              title={title}
+              onTitleChange={setTitle}
+              artist={artist}
+              onArtistChange={setArtist}
+              album={album}
+              onAlbumChange={setAlbum}
+              coverPreview={coverPreview}
+              onCoverSelect={handleCoverFileSelect}
+              onCoverClear={handleRemoveCover}
+              disabled={downloading}
+            />
 
             <button type="submit" disabled={downloading} className="btn-primary">
               {downloading ? 'Downloading...' : 'Download MP3'}
@@ -412,48 +266,19 @@ export function QueryPage() {
         </section>
       </div>
 
-      {isCropModalOpen && cropSource && (
-        <div className="crop-modal-backdrop">
-          <div className="crop-modal">
-            <h3>Crop Cover</h3>
-            <div className="cropper-wrap">
-              <Cropper
-                image={cropSource}
-                crop={crop}
-                zoom={zoom}
-                aspect={1}
-                minZoom={1}
-                maxZoom={3}
-                onCropChange={setCrop}
-                onZoomChange={setZoom}
-                onCropComplete={(_, areaPixels) => setCroppedAreaPixels(areaPixels)}
-                objectFit="contain"
-              />
-            </div>
-            <label className="crop-zoom-label" htmlFor="queryCropZoom">
-              Zoom: {zoom.toFixed(2)}x
-            </label>
-            <input
-              id="queryCropZoom"
-              type="range"
-              min={1}
-              max={3}
-              step={0.01}
-              value={zoom}
-              onChange={(e) => setZoom(Number(e.target.value))}
-              className="crop-zoom-slider"
-            />
-            <div className="crop-actions">
-              <button type="button" className="btn-secondary" onClick={handleCancelCrop} disabled={isApplyingCrop}>
-                Cancel
-              </button>
-              <button type="button" className="btn-primary" onClick={handleApplyCrop} disabled={isApplyingCrop}>
-                {isApplyingCrop ? 'Applying...' : 'Use Crop'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <CoverCropModal
+        isOpen={isCropModalOpen}
+        cropSource={cropSource}
+        crop={crop}
+        zoom={zoom}
+        isApplyingCrop={isApplyingCrop}
+        zoomInputId="queryCropZoom"
+        onCropChange={setCrop}
+        onZoomChange={setZoom}
+        onCropComplete={handleCropComplete}
+        onCancel={handleCancelCrop}
+        onApply={handleApplyCrop}
+      />
     </div>
   );
 }
