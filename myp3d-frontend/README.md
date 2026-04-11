@@ -4,6 +4,11 @@ React + TypeScript + Vite UI for downloading, browsing, and editing local MP3 fi
 
 ## What This App Does
 
+- App shell/navigation:
+  - Left sidebar with active route highlighting.
+  - Desktop collapse/expand toggle.
+  - Mobile menu button and overlay close behavior.
+
 - `Download` page:
   - Submit YouTube URL.
   - URL input stays in its own top row.
@@ -41,7 +46,7 @@ React + TypeScript + Vite UI for downloading, browsing, and editing local MP3 fi
 - `/albums/:albumKey` -> `AlbumEditPage`
 - `/` redirects to `/download`
 
-Route wiring is in `src/App.tsx`.
+Route wiring and sidebar shell behavior are in `src/App.tsx`.
 
 ## Project Structure
 
@@ -51,8 +56,8 @@ myp3d-frontend/
   .env                         # VITE_API_BASE_URL
   src/
     main.tsx                   # BrowserRouter + app bootstrapping
-    App.tsx                    # Top-level nav + route definitions
-    App.css                    # Shared styles (download/query/library/details/albums)
+    App.tsx                    # Sidebar shell + route definitions
+    App.css                    # Shared styles (shell + download/query/library/details/albums)
     index.css                  # Global base styles
     api/
       mp3Api.ts                # Backend client (all HTTP calls)
@@ -130,6 +135,14 @@ Useful scripts:
 - `npm run build` - type-check + production build
 - `npm run preview` - serve built app
 - `npm run lint` - ESLint
+- `npm audit` - dependency vulnerability report
+
+UI icon dependencies used by navigation shell:
+
+- `@mui/material`
+- `@mui/icons-material`
+- `@emotion/react`
+- `@emotion/styled`
 
 ## Environment
 

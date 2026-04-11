@@ -1,3 +1,12 @@
+import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
+import AlbumRoundedIcon from '@mui/icons-material/AlbumRounded';
+import AlignHorizontalLeftRoundedIcon from '@mui/icons-material/AlignHorizontalLeftRounded';
+import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
+import LibraryMusicRoundedIcon from '@mui/icons-material/LibraryMusicRounded';
+import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
+import MusicNoteRoundedIcon from '@mui/icons-material/MusicNoteRounded';
+import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { DownloadPage } from './pages/DownloadPage';
 import { QueryPage } from './pages/QueryPage';
@@ -57,42 +66,113 @@ function AlbumEditRoute() {
 
 function App() {
   const location = useLocation();
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    setIsMobileSidebarOpen(false);
+  }, [location.pathname]);
+
   const isLibraryActive =
     location.pathname === '/library' || location.pathname.startsWith('/details/');
   const isAlbumsActive = location.pathname === '/albums' || location.pathname.startsWith('/albums/');
 
+  const getLinkClass = (active: boolean) => (active ? 'sidebar-link active' : 'sidebar-link');
+
+  const navItems = [
+    {
+      to: '/download',
+      label: 'Download',
+      icon: <DownloadRoundedIcon fontSize="small" />,
+      className: ({ isActive }: { isActive: boolean }) => getLinkClass(isActive),
+    },
+    {
+      to: '/query',
+      label: 'Query',
+      icon: <SearchRoundedIcon fontSize="small" />,
+      className: ({ isActive }: { isActive: boolean }) => getLinkClass(isActive),
+    },
+    {
+      to: '/library',
+      label: 'Library',
+      icon: <LibraryMusicRoundedIcon fontSize="small" />,
+      className: () => getLinkClass(isLibraryActive),
+    },
+    {
+      to: '/albums',
+      label: 'Albums',
+      icon: <AlbumRoundedIcon fontSize="small" />,
+      className: () => getLinkClass(isAlbumsActive),
+    },
+  ] as Array<{
+    to: string;
+    label: string;
+    icon: ReactNode;
+    className: ((state: { isActive: boolean }) => string) | (() => string);
+  }>;
+
   return (
-    <div className="app">
-      <nav className="navbar">
-        <h2>🎵 MP3 Downloader</h2>
-        <div className="nav-links">
-          <NavLink
-            to="/download"
-            className={({ isActive }) => (isActive ? 'active' : '')}
+    <div className="app-shell">
+      <aside
+        className={`sidebar ${isSidebarExpanded ? 'expanded' : 'collapsed'} ${
+          isMobileSidebarOpen ? 'mobile-open' : ''
+        }`}
+      >
+        <div className="sidebar-header">
+          <h2 className="sidebar-brand">
+            <MusicNoteRoundedIcon fontSize="small" className="sidebar-brand-icon" />
+            <span>MP3D</span>
+          </h2>
+          <button
+            type="button"
+            className="sidebar-collapse-btn"
+            onClick={() => setIsSidebarExpanded((value) => !value)}
+            aria-label={isSidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
+            title={isSidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
           >
-            Download
-          </NavLink>
-          <NavLink
-            to="/query"
-            className={({ isActive }) => (isActive ? 'active' : '')}
-          >
-            Query
-          </NavLink>
-          <NavLink
-            to="/library"
-            className={isLibraryActive ? 'active' : ''}
-          >
-            Library
-          </NavLink>
-          <NavLink
-            to="/albums"
-            className={isAlbumsActive ? 'active' : ''}
-          >
-            Albums
-          </NavLink>
+            <AlignHorizontalLeftRoundedIcon
+              fontSize="small"
+              className={`sidebar-collapse-icon ${isSidebarExpanded ? '' : 'collapsed'}`}
+            />
+          </button>
         </div>
-      </nav>
-      <main>
+
+        <nav className="sidebar-nav" aria-label="Primary navigation">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={item.className}
+            >
+              <span className="sidebar-icon" aria-hidden="true">{item.icon}</span>
+              <span className="sidebar-label">{item.label}</span>
+            </NavLink>
+          ))}
+        </nav>
+      </aside>
+
+      {isMobileSidebarOpen && (
+        <button
+          type="button"
+          aria-label="Close navigation"
+          className="sidebar-overlay"
+          onClick={() => setIsMobileSidebarOpen(false)}
+        />
+      )}
+
+      <section className="app-content">
+        <header className="content-header">
+          <button
+            type="button"
+            className="sidebar-mobile-btn"
+            onClick={() => setIsMobileSidebarOpen(true)}
+            aria-label="Open navigation"
+          >
+            <MenuRoundedIcon fontSize="small" />
+          </button>
+        </header>
+
+        <main className="content-main">
         <Routes>
           <Route path="/" element={<Navigate to="/download" replace />} />
           <Route path="/download" element={<DownloadPage />} />
@@ -103,7 +183,8 @@ function App() {
           <Route path="/albums/:albumKey" element={<AlbumEditRoute />} />
           <Route path="*" element={<Navigate to="/download" replace />} />
         </Routes>
-      </main>
+        </main>
+      </section>
     </div>
   );
 }
