@@ -21,9 +21,11 @@ React + TypeScript + Vite UI for downloading, browsing, and editing local MP3 fi
   - Autofill URL/title/artist/album from selected result.
   - Uses the same download config section and cover upload/crop flow as Download page.
 - `Library` page:
-  - Show local MP3 library in a table.
+  - Show local MP3 library in a shared paginated table component.
   - Search/filter by title, artist, album, filename.
   - Local pagination (25 rows per page).
+  - Column sorting via shared sortable header buttons.
+  - Stable row heights with per-column widths and ellipsis truncation for long values.
   - Per-row actions: edit, download, delete.
 - `Details` page:
   - Edit metadata and cover for a selected song.
@@ -32,6 +34,8 @@ React + TypeScript + Vite UI for downloading, browsing, and editing local MP3 fi
 - `Albums` page:
   - Show grouped albums (same album name across different artists counts as one album group).
   - Search/sort albums and open album edit screen.
+  - Uses the same shared paginated table + sortable header components as Library.
+  - Stable row heights with per-column widths and ellipsis truncation for long values.
 - `Album Edit` page:
   - Rename album for all tracks in the selected group.
   - Apply a single cover to all tracks in the selected group.
@@ -50,6 +54,18 @@ React + TypeScript + Vite UI for downloading, browsing, and editing local MP3 fi
 
 Route wiring and sidebar shell behavior are in `src/App.tsx`.
 
+## UI Architecture Highlights
+
+- Theme/token source:
+  - `src/theme.css` defines shared CSS variables used across the app.
+- Style organization:
+  - `src/App.css` is now an import aggregator only.
+  - Feature/layout styles are split under `src/assets/styles/` (shell, forms, tables/library, details, query, responsive, etc.).
+- Shared UI building blocks:
+  - Download + Query share the same `DownloadConfigSection`.
+  - Download/Query/Edit/AlbumEdit share one cover upload + crop flow (`CoverUploadSquare`, `CoverCropModal`, `useCoverImageCrop`).
+  - Library + Albums share table primitives (`PaginatedTable`, `SortableHeaderButton`).
+
 ## Project Structure
 
 ```text
@@ -60,15 +76,32 @@ myp3d-frontend/
     main.tsx                   # BrowserRouter + app bootstrapping
     theme.css                  # Theme tokens (colors used across app styles)
     App.tsx                    # Sidebar shell + route definitions
-    App.css                    # Shared styles (shell + download/query/library/details/albums)
+    App.css                    # Style import aggregator
     index.css                  # Global base styles
+    assets/
+      styles/
+        base.css               # Resets + root body baseline
+        shell.css              # Sidebar shell, header, mobile nav overlay
+        pages.css              # Common page container spacing/title styles
+        forms.css              # Form controls + cover upload/crop modal styles
+        buttons.css            # Primary/secondary/danger button styles
+        messages.css           # Success/error message blocks + generic error text
+        library.css            # Shared table, sorting, pagination, truncation styles
+        details.css            # Song/album edit layouts and audio player styles
+        query.css              # Query search/preview layouts and result list styles
+        responsive.css         # Mobile breakpoints and layout overrides
     api/
       mp3Api.ts                # Backend client (all HTTP calls)
     components/
-      DownloadConfigSection.tsx# Shared download form block for Download/Query pages
-      CoverUploadSquare.tsx    # Shared square uploader UI
-      CoverCropModal.tsx       # Shared crop modal UI
-      useCoverImageCrop.ts     # Shared cover upload/crop state + behavior
+      cover/
+        CoverUploadSquare.tsx  # Shared square uploader UI
+        CoverCropModal.tsx     # Shared crop modal UI
+        useCoverImageCrop.ts   # Shared cover upload/crop state + behavior
+      download/
+        DownloadConfigSection.tsx # Shared download form block for Download/Query pages
+      table/
+        PaginatedTable.tsx     # Shared table shell + empty state + pagination controls
+        SortableHeaderButton.tsx # Shared sortable table header button
     pages/
       DownloadPage.tsx         # Download form + cover crop modal
       QueryPage.tsx            # YouTube search + preview + autofill download form
@@ -107,17 +140,20 @@ Client methods:
 
 - Route-level behavior: `src/App.tsx`
 - HTTP boundary + typed contracts: `src/api/mp3Api.ts`
-- Shared download form block: `src/components/DownloadConfigSection.tsx`
-- Shared cover upload interaction: `src/components/CoverUploadSquare.tsx`
-- Shared crop modal UI: `src/components/CoverCropModal.tsx`
-- Shared crop/upload state logic: `src/components/useCoverImageCrop.ts`
+- Shared download form block: `src/components/download/DownloadConfigSection.tsx`
+- Shared cover upload interaction: `src/components/cover/CoverUploadSquare.tsx`
+- Shared crop modal UI: `src/components/cover/CoverCropModal.tsx`
+- Shared crop/upload state logic: `src/components/cover/useCoverImageCrop.ts`
+- Shared table wrapper + pagination: `src/components/table/PaginatedTable.tsx`
+- Shared sortable table header button: `src/components/table/SortableHeaderButton.tsx`
 - Download page orchestration: `src/pages/DownloadPage.tsx`
 - Query/search + embedded preview workflow: `src/pages/QueryPage.tsx`
 - Library search/filter/pagination UX: `src/pages/LibraryPage.tsx`
 - Song edit workflow and sidebar navigation: `src/pages/EditPage.tsx`
 - Albums listing and album-level navigation: `src/pages/AlbumsPage.tsx`
 - Album-level edit workflow: `src/pages/AlbumEditPage.tsx`
-- Visual consistency and layout behavior: `src/App.css`
+- Style import entrypoint: `src/App.css`
+- Style modules by feature/layout: `src/assets/styles/*.css`
 - Theme token definitions: `src/theme.css`
 
 If a bug is about:
@@ -125,9 +161,10 @@ If a bug is about:
 - Wrong endpoint or payload: check `src/api/mp3Api.ts` first.
 - Route navigation issues: check `src/App.tsx`.
 - Query search results, selection, or preview: check `src/pages/QueryPage.tsx`.
-- Cover crop/preview behavior across pages: check `src/components/useCoverImageCrop.ts` and `src/components/CoverCropModal.tsx`.
-- Download/Query form field parity: check `src/components/DownloadConfigSection.tsx`.
-- Cover picker button behavior: check `src/components/CoverUploadSquare.tsx`.
+- Cover crop/preview behavior across pages: check `src/components/cover/useCoverImageCrop.ts` and `src/components/cover/CoverCropModal.tsx`.
+- Download/Query form field parity: check `src/components/download/DownloadConfigSection.tsx`.
+- Cover picker button behavior: check `src/components/cover/CoverUploadSquare.tsx`.
+- Table sorting/pagination shell behavior: check `src/components/table/PaginatedTable.tsx` and `src/components/table/SortableHeaderButton.tsx`.
 - Library rendering/performance/filtering: check `src/pages/LibraryPage.tsx`.
 - Album grouping/list/detail rendering: check `src/pages/AlbumsPage.tsx` and `src/pages/AlbumEditPage.tsx`.
 
@@ -195,6 +232,6 @@ This frontend assumes backend behavior from `myp3d-backend`:
 
 ## Notes for Future Work
 
-- Sorting can be added to the library table without backend changes.
+- Server-side sorting can be added later by extending `GET /mp3s` and `GET /albums`.
 - Server-side pagination can be added later by extending `GET /mp3s`.
 - If filename identity becomes unstable after rename, migrate route identity from filename to a persistent ID.
