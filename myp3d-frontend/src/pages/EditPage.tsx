@@ -2,8 +2,8 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { mp3Api } from '../api/mp3Api';
 import type { MP3Info } from '../api/mp3Api';
-import { CoverCropModal } from '../components/CoverCropModal';
-import { useCoverImageCrop } from '../components/useCoverImageCrop';
+import { CoverCropModal } from '../components/cover/CoverCropModal';
+import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
 
 interface EditPageProps {
   filename: string;

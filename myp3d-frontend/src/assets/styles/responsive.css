@@ -1,0 +1,123 @@
+@media (max-width: 980px) {
+  .app-shell {
+    display: block;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: min(84vw, 300px);
+    max-height: none;
+    transform: translateX(-105%);
+    transition: transform 0.22s ease;
+    box-shadow: 12px 0 34px var(--theme-shadow-mobile);
+  }
+
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .sidebar.collapsed {
+    width: min(84vw, 300px);
+  }
+
+  .sidebar.collapsed .sidebar-header {
+    justify-content: space-between;
+    gap: 0.8rem;
+  }
+
+  .sidebar.collapsed .sidebar-brand {
+    display: inline-flex;
+    opacity: 1;
+    width: auto;
+  }
+
+  .sidebar.collapsed .sidebar-label {
+    display: inline;
+    opacity: 1;
+    width: auto;
+  }
+
+  .sidebar.collapsed .sidebar-link {
+    justify-content: flex-start;
+    padding: 0.65rem 0.7rem;
+  }
+
+  .sidebar-collapse-btn {
+    display: none;
+  }
+
+  .sidebar-mobile-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .content-header {
+    display: flex;
+    padding: 0 1rem;
+  }
+
+  .page {
+    padding: 1.2rem;
+  }
+
+  .library-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .library-filters {
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .library-pagination {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .download-config-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .download-cover-column {
+    justify-content: flex-start;
+  }
+
+  .details-layout {
+    flex-direction: column;
+  }
+
+  .details-sidebar {
+    width: 100%;
+    position: static;
+  }
+
+  .details-song-list {
+    max-height: 260px;
+  }
+
+  .edit-container {
+    flex-direction: column;
+  }
+
+  .album-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .query-layout {
+    flex-direction: column;
+  }
+
+  .query-sidebar {
+    width: 100%;
+    position: static;
+  }
+
+  .query-results-list {
+    max-height: 280px;
+  }
+}

@@ -2,8 +2,20 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { mp3Api } from '../api/mp3Api';
 import type { MP3Info } from '../api/mp3Api';
+import { PaginatedTable } from '../components/table/PaginatedTable';
+import { SortableHeaderButton } from '../components/table/SortableHeaderButton';
 
 const PAGE_SIZE = 25;
+const LIBRARY_COLUMN_WIDTHS = {
+  cover: '76px',
+  title: '18%',
+  artist: '14%',
+  album: '14%',
+  filename: '21%',
+  size: '96px',
+  dateAdded: '176px',
+  actions: '210px',
+} as const;
 
 type FilterBy = 'all' | 'title' | 'artist' | 'filename' | 'album';
 type SortBy = 'date_added' | 'filename' | 'size' | 'artist' | 'title' | 'album';
@@ -155,18 +167,13 @@ export function LibraryPage() {
   };
 
   const renderSortHeader = (column: SortBy) => {
-    const isActive = sortBy === column;
-    const indicator = sortDirection === 'asc' ? '↑' : '↓';
-
     return (
-      <button
-        type="button"
-        className={`library-sort-button ${isActive ? 'active' : ''}`}
+      <SortableHeaderButton
+        label={sortColumnLabels[column]}
+        isActive={sortBy === column}
+        sortDirection={sortDirection}
         onClick={() => handleSortClick(column)}
-      >
-        <span>{sortColumnLabels[column]}</span>
-        {isActive && <span className="library-sort-indicator" aria-hidden="true">{indicator}</span>}
-      </button>
+      />
     );
   };
 
@@ -214,94 +221,79 @@ export function LibraryPage() {
       {mp3s.length === 0 ? (
         <p>No MP3 files yet. Download some!</p>
       ) : (
-        <div>
-          <div className="library-table-wrap">
-            <table className="library-table">
-              <thead>
-                <tr>
-                  <th>Cover</th>
-                  <th>{renderSortHeader('title')}</th>
-                  <th>{renderSortHeader('artist')}</th>
-                  <th>{renderSortHeader('album')}</th>
-                  <th>{renderSortHeader('filename')}</th>
-                  <th>{renderSortHeader('size')}</th>
-                  <th>{renderSortHeader('date_added')}</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pagedMp3s.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="library-empty-row">
-                      No results for this search.
-                    </td>
-                  </tr>
-                ) : (
-                  pagedMp3s.map((mp3) => (
-                    <tr key={mp3.filename}>
-                      <td>
-                        <div className="library-cover-sm">
-                          {mp3.has_cover ? (
-                            <img src={mp3Api.getCoverUrl(mp3.filename)} alt="Cover" />
-                          ) : (
-                            <div className="no-cover">🎵</div>
-                          )}
-                        </div>
-                      </td>
-                      <td>{mp3.title || '-'}</td>
-                      <td>{mp3.artist || '-'}</td>
-                      <td>{mp3.album || '-'}</td>
-                      <td className="library-filename">{mp3.filename}</td>
-                      <td>{formatSize(mp3.file_size)}</td>
-                      <td className="library-date">{formatDateAdded(mp3.date_added)}</td>
-                      <td>
-                        <div className="table-actions">
-                          <button
-                            onClick={() => navigate(`/details/${encodeURIComponent(mp3.filename)}`)}
-                            className="btn-secondary btn-small"
-                          >
-                            Edit
-                          </button>
-                          <a href={mp3Api.getFileUrl(mp3.filename)} download className="btn-secondary btn-small">
-                            Download
-                          </a>
-                          <button onClick={() => handleDelete(mp3.filename)} className="btn-danger btn-small">
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="library-pagination">
-            <p>
-              Showing {shownStart}-{shownEnd} of {sortedMp3s.length}
-            </p>
-            <div className="pagination-buttons">
-              <button
-                className="btn-secondary"
-                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                disabled={currentPage <= 1}
-              >
-                Previous
-              </button>
-              <span>
-                Page {currentPage} / {totalPages}
-              </span>
-              <button
-                className="btn-secondary"
-                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                disabled={currentPage >= totalPages}
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        </div>
+        <PaginatedTable
+          colGroup={(
+            <colgroup>
+              <col style={{ width: LIBRARY_COLUMN_WIDTHS.cover }} />
+              <col style={{ width: LIBRARY_COLUMN_WIDTHS.title }} />
+              <col style={{ width: LIBRARY_COLUMN_WIDTHS.artist }} />
+              <col style={{ width: LIBRARY_COLUMN_WIDTHS.album }} />
+              <col style={{ width: LIBRARY_COLUMN_WIDTHS.filename }} />
+              <col style={{ width: LIBRARY_COLUMN_WIDTHS.size }} />
+              <col style={{ width: LIBRARY_COLUMN_WIDTHS.dateAdded }} />
+              <col style={{ width: LIBRARY_COLUMN_WIDTHS.actions }} />
+            </colgroup>
+          )}
+          emptyColSpan={8}
+          hasRows={pagedMp3s.length > 0}
+          emptyMessage="No results for this search."
+          headerRow={(
+            <tr>
+              <th>Cover</th>
+              <th>{renderSortHeader('title')}</th>
+              <th>{renderSortHeader('artist')}</th>
+              <th>{renderSortHeader('album')}</th>
+              <th>{renderSortHeader('filename')}</th>
+              <th>{renderSortHeader('size')}</th>
+              <th>{renderSortHeader('date_added')}</th>
+              <th>Actions</th>
+            </tr>
+          )}
+          rowContent={pagedMp3s.map((mp3) => (
+            <tr key={mp3.filename}>
+              <td>
+                <div className="library-cover-sm">
+                  {mp3.has_cover ? (
+                    <img src={mp3Api.getCoverUrl(mp3.filename)} alt="Cover" />
+                  ) : (
+                    <div className="no-cover">🎵</div>
+                  )}
+                </div>
+              </td>
+              <td><span className="table-cell-ellipsis" title={mp3.title || '-'}>{mp3.title || '-'}</span></td>
+              <td><span className="table-cell-ellipsis" title={mp3.artist || '-'}>{mp3.artist || '-'}</span></td>
+              <td><span className="table-cell-ellipsis" title={mp3.album || '-'}>{mp3.album || '-'}</span></td>
+              <td><span className="library-filename" title={mp3.filename}>{mp3.filename}</span></td>
+              <td><span className="table-cell-ellipsis" title={formatSize(mp3.file_size)}>{formatSize(mp3.file_size)}</span></td>
+              <td><span className="library-date" title={formatDateAdded(mp3.date_added)}>{formatDateAdded(mp3.date_added)}</span></td>
+              <td>
+                <div className="table-actions">
+                  <button
+                    onClick={() => navigate(`/details/${encodeURIComponent(mp3.filename)}`)}
+                    className="btn-secondary btn-small"
+                  >
+                    Edit
+                  </button>
+                  <a href={mp3Api.getFileUrl(mp3.filename)} download className="btn-secondary btn-small">
+                    Download
+                  </a>
+                  <button onClick={() => handleDelete(mp3.filename)} className="btn-danger btn-small">
+                    Delete
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+          shownStart={shownStart}
+          shownEnd={shownEnd}
+          totalItems={sortedMp3s.length}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPrevious={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+          onNext={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+          previousDisabled={currentPage <= 1}
+          nextDisabled={currentPage >= totalPages}
+        />
       )}
     </div>
   );

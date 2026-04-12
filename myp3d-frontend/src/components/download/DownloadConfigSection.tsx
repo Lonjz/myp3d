@@ -1,4 +1,4 @@
-import { CoverUploadSquare } from './CoverUploadSquare';
+import { CoverUploadSquare } from '../cover/CoverUploadSquare';
 
 interface DownloadConfigSectionProps {
   idPrefix?: string;

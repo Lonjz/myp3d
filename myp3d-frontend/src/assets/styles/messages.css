@@ -1,0 +1,21 @@
+/* Messages */
+.message {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 6px;
+}
+
+.message.success {
+  background: var(--theme-success-500);
+  color: var(--theme-text-primary);
+}
+
+.message.error {
+  background: var(--theme-danger-500);
+  color: var(--theme-text-primary);
+}
+
+/* Error */
+.error {
+  color: var(--theme-brand-500);
+}

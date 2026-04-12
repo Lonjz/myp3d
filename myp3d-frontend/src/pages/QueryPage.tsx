@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { mp3Api } from '../api/mp3Api';
 import type { DownloadRequest, YouTubeSearchResult } from '../api/mp3Api';
-import { CoverCropModal } from '../components/CoverCropModal';
-import { DownloadConfigSection } from '../components/DownloadConfigSection';
-import { useCoverImageCrop } from '../components/useCoverImageCrop';
+import { CoverCropModal } from '../components/cover/CoverCropModal';
+import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
+import { DownloadConfigSection } from '../components/download/DownloadConfigSection';
 
 const getVideoIdFromUrl = (url: string): string => {
   try {

@@ -2,8 +2,19 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { mp3Api } from '../api/mp3Api';
 import type { AlbumInfo } from '../api/mp3Api';
+import { PaginatedTable } from '../components/table/PaginatedTable';
+import { SortableHeaderButton } from '../components/table/SortableHeaderButton';
 
 const PAGE_SIZE = 20;
+const ALBUM_COLUMN_WIDTHS = {
+  cover: '76px',
+  album: '24%',
+  artists: '22%',
+  tracks: '90px',
+  size: '110px',
+  dateAdded: '176px',
+  actions: '160px',
+} as const;
 
 type SortBy = 'album_name' | 'track_count' | 'total_size' | 'date_added';
 type SortDirection = 'asc' | 'desc';
@@ -113,18 +124,13 @@ export function AlbumsPage() {
   };
 
   const renderSortHeader = (column: SortBy, label: string) => {
-    const isActive = sortBy === column;
-    const indicator = sortDirection === 'asc' ? '↑' : '↓';
-
     return (
-      <button
-        type="button"
-        className={`library-sort-button ${isActive ? 'active' : ''}`}
+      <SortableHeaderButton
+        label={label}
+        isActive={sortBy === column}
+        sortDirection={sortDirection}
         onClick={() => handleSortClick(column)}
-      >
-        <span>{label}</span>
-        {isActive && <span className="library-sort-indicator" aria-hidden="true">{indicator}</span>}
-      </button>
+      />
     );
   };
 
@@ -155,86 +161,71 @@ export function AlbumsPage() {
       {albums.length === 0 ? (
         <p>No albums found yet. Add album metadata to your tracks.</p>
       ) : (
-        <div>
-          <div className="library-table-wrap">
-            <table className="library-table albums-table">
-              <thead>
-                <tr>
-                  <th>Cover</th>
-                  <th>{renderSortHeader('album_name', 'Album')}</th>
-                  <th>Artists</th>
-                  <th>{renderSortHeader('track_count', 'Tracks')}</th>
-                  <th>{renderSortHeader('total_size', 'Size')}</th>
-                  <th>{renderSortHeader('date_added', 'Date Added')}</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pagedAlbums.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="library-empty-row">
-                      No results for this search.
-                    </td>
-                  </tr>
-                ) : (
-                  pagedAlbums.map((album) => (
-                    <tr key={album.album_key}>
-                      <td>
-                        <div className="library-cover-sm">
-                          {album.has_cover ? (
-                            <img src={mp3Api.getAlbumCoverUrl(album.album_key)} alt="Album cover" />
-                          ) : (
-                            <div className="no-cover">🎵</div>
-                          )}
-                        </div>
-                      </td>
-                      <td>{album.album_name || '(No Album)'}</td>
-                      <td>{album.artists.length > 0 ? album.artists.join(', ') : '-'}</td>
-                      <td>{album.track_count}</td>
-                      <td>{formatSize(album.total_size)}</td>
-                      <td className="library-date">{formatDateAdded(album.date_added)}</td>
-                      <td>
-                        <div className="table-actions">
-                          <button
-                            className="btn-secondary btn-small"
-                            onClick={() => navigate(`/albums/${encodeURIComponent(album.album_key)}`)}
-                          >
-                            Edit Album
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="library-pagination">
-            <p>
-              Showing {shownStart}-{shownEnd} of {sortedAlbums.length}
-            </p>
-            <div className="pagination-buttons">
-              <button
-                className="btn-secondary"
-                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                disabled={currentPage <= 1}
-              >
-                Previous
-              </button>
-              <span>
-                Page {currentPage} / {totalPages}
-              </span>
-              <button
-                className="btn-secondary"
-                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                disabled={currentPage >= totalPages}
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        </div>
+        <PaginatedTable
+          tableClassName="albums-table"
+          colGroup={(
+            <colgroup>
+              <col style={{ width: ALBUM_COLUMN_WIDTHS.cover }} />
+              <col style={{ width: ALBUM_COLUMN_WIDTHS.album }} />
+              <col style={{ width: ALBUM_COLUMN_WIDTHS.artists }} />
+              <col style={{ width: ALBUM_COLUMN_WIDTHS.tracks }} />
+              <col style={{ width: ALBUM_COLUMN_WIDTHS.size }} />
+              <col style={{ width: ALBUM_COLUMN_WIDTHS.dateAdded }} />
+              <col style={{ width: ALBUM_COLUMN_WIDTHS.actions }} />
+            </colgroup>
+          )}
+          emptyColSpan={7}
+          hasRows={pagedAlbums.length > 0}
+          emptyMessage="No results for this search."
+          headerRow={(
+            <tr>
+              <th>Cover</th>
+              <th>{renderSortHeader('album_name', 'Album')}</th>
+              <th>Artists</th>
+              <th>{renderSortHeader('track_count', 'Tracks')}</th>
+              <th>{renderSortHeader('total_size', 'Size')}</th>
+              <th>{renderSortHeader('date_added', 'Date Added')}</th>
+              <th>Actions</th>
+            </tr>
+          )}
+          rowContent={pagedAlbums.map((album) => (
+            <tr key={album.album_key}>
+              <td>
+                <div className="library-cover-sm">
+                  {album.has_cover ? (
+                    <img src={mp3Api.getAlbumCoverUrl(album.album_key)} alt="Album cover" />
+                  ) : (
+                    <div className="no-cover">🎵</div>
+                  )}
+                </div>
+              </td>
+              <td><span className="table-cell-ellipsis" title={album.album_name || '(No Album)'}>{album.album_name || '(No Album)'}</span></td>
+              <td><span className="table-cell-ellipsis" title={album.artists.length > 0 ? album.artists.join(', ') : '-'}>{album.artists.length > 0 ? album.artists.join(', ') : '-'}</span></td>
+              <td><span className="table-cell-ellipsis" title={String(album.track_count)}>{album.track_count}</span></td>
+              <td><span className="table-cell-ellipsis" title={formatSize(album.total_size)}>{formatSize(album.total_size)}</span></td>
+              <td><span className="library-date" title={formatDateAdded(album.date_added)}>{formatDateAdded(album.date_added)}</span></td>
+              <td>
+                <div className="table-actions">
+                  <button
+                    className="btn-secondary btn-small"
+                    onClick={() => navigate(`/albums/${encodeURIComponent(album.album_key)}`)}
+                  >
+                    Edit Album
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+          shownStart={shownStart}
+          shownEnd={shownEnd}
+          totalItems={sortedAlbums.length}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPrevious={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+          onNext={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+          previousDisabled={currentPage <= 1}
+          nextDisabled={currentPage >= totalPages}
+        />
       )}
     </div>
   );
