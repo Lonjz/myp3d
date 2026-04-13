@@ -4,6 +4,7 @@ import { mp3Api } from '../api/mp3Api';
 import type { AlbumDetail, AlbumInfo } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
 import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
+import { useToast } from '../components/messages/ToastProvider';
 
 interface AlbumEditPageProps {
   albumKey: string;
@@ -17,9 +18,9 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
   const [albumDetail, setAlbumDetail] = useState<AlbumDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [albums, setAlbums] = useState<AlbumInfo[]>([]);
   const [albumSearch, setAlbumSearch] = useState('');
+  const { showSuccess, showError, showInfo, clearToast } = useToast();
 
   const [albumName, setAlbumName] = useState('');
   const [existingCoverPreview, setExistingCoverPreview] = useState<string | null>(null);
@@ -42,8 +43,8 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
     handleCancelCrop,
     resetCoverState,
   } = useCoverImageCrop({
-    onError: (text) => setMessage({ type: 'error', text }),
-    onClearError: () => setMessage(null),
+    onError: showError,
+    onClearError: clearToast,
     outputFilename: 'album-cover.jpg',
   });
 
@@ -56,10 +57,12 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
     }
   };
 
-  const loadAlbum = async (targetKey: string) => {
+  const loadAlbum = async (targetKey: string, options?: { clearToast?: boolean }) => {
     try {
       setLoading(true);
-      setMessage(null);
+      if (options?.clearToast ?? true) {
+        clearToast();
+      }
       const detail = await mp3Api.getAlbum(targetKey);
       setAlbumDetail(detail);
 
@@ -73,7 +76,7 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
         setExistingCoverPreview(null);
       }
     } catch (err) {
-      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to load album' });
+      showError(err instanceof Error ? err.message : 'Failed to load album');
       setAlbumDetail(null);
     } finally {
       setLoading(false);
@@ -104,7 +107,7 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
     }
 
     setSaving(true);
-    setMessage(null);
+    showInfo('Saving album changes...');
 
     try {
       const renameResult = await mp3Api.updateAlbum(albumKey, { album_name: albumName });
@@ -114,17 +117,16 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
         await mp3Api.updateAlbumCover(targetAlbumKey, coverFile);
       }
 
-      setMessage({ type: 'success', text: 'Album updated successfully!' });
-
       if (targetAlbumKey !== albumKey) {
         navigate(`/albums/${encodeURIComponent(targetAlbumKey)}`, { replace: true });
         return;
       }
 
-      await loadAlbum(targetAlbumKey);
+      await loadAlbum(targetAlbumKey, { clearToast: false });
       await loadAlbums();
+      showSuccess('Album updated successfully!');
     } catch (err) {
-      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to save album' });
+      showError(err instanceof Error ? err.message : 'Failed to save album');
     } finally {
       setSaving(false);
     }
@@ -250,14 +252,8 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
               </div>
 
               <button onClick={handleSave} disabled={saving} className="btn-primary">
-                {saving ? 'Saving...' : 'Save Album Changes'}
+                Save Album Changes
               </button>
-
-              {message && (
-                <div className={`message ${message.type}`}>
-                  {message.text}
-                </div>
-              )}
             </div>
           </div>
 

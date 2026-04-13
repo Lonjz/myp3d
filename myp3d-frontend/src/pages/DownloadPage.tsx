@@ -4,6 +4,7 @@ import type { DownloadRequest } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
 import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
 import { DownloadConfigSection } from '../components/download/DownloadConfigSection';
+import { useToast } from '../components/messages/ToastProvider';
 
 export function DownloadPage() {
   const [url, setUrl] = useState('');
@@ -12,7 +13,7 @@ export function DownloadPage() {
   const [artist, setArtist] = useState('');
   const [album, setAlbum] = useState('');
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const { showSuccess, showError, clearToast } = useToast();
 
   const {
     coverImageBase64,
@@ -31,19 +32,19 @@ export function DownloadPage() {
     handleRemoveCover,
     resetCoverState,
   } = useCoverImageCrop({
-    onError: (text) => setMessage({ type: 'error', text }),
-    onClearError: () => setMessage(null),
+    onError: showError,
+    onClearError: clearToast,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim()) {
-      setMessage({ type: 'error', text: 'Please enter a YouTube URL' });
+      showError('Please enter a YouTube URL');
       return;
     }
 
     setLoading(true);
-    setMessage(null);
+    clearToast();
 
     try {
       const request: DownloadRequest = {
@@ -56,7 +57,7 @@ export function DownloadPage() {
       };
 
       const result = await mp3Api.download(request);
-      setMessage({ type: 'success', text: `Downloaded: ${result.filename}` });
+      showSuccess(`Downloaded: ${result.filename}`);
 
       // Clear form
       setUrl('');
@@ -66,7 +67,7 @@ export function DownloadPage() {
       setAlbum('');
       resetCoverState();
     } catch (err) {
-      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Download failed' });
+      showError(err instanceof Error ? err.message : 'Download failed');
     } finally {
       setLoading(false);
     }
@@ -96,12 +97,6 @@ export function DownloadPage() {
         <button type="submit" disabled={loading} className="btn-primary">
           {loading ? 'Downloading...' : 'Download MP3'}
         </button>
-
-        {message && (
-          <div className={`message ${message.type}`}>
-            {message.text}
-          </div>
-        )}
       </form>
 
       <CoverCropModal

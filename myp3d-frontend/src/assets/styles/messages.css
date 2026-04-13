@@ -15,6 +15,109 @@
   color: var(--theme-text-primary);
 }
 
+.drop-message-layer {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(90vw, 620px);
+  z-index: 1200;
+  pointer-events: none;
+}
+
+.drop-message {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  padding: 0.8rem 0.9rem;
+  box-shadow: 0 12px 34px var(--theme-toast-shadow);
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+  animation: drop-message-enter 220ms ease-out;
+}
+
+.drop-message--success {
+  background: var(--theme-toast-success-bg);
+  border-color: var(--theme-toast-success-border);
+  color: var(--theme-toast-success-text);
+}
+
+.drop-message--error {
+  background: var(--theme-toast-error-bg);
+  border-color: var(--theme-toast-error-border);
+  color: var(--theme-toast-error-text);
+}
+
+.drop-message--info {
+  background: var(--theme-toast-info-bg);
+  border-color: var(--theme-toast-info-border);
+  color: var(--theme-toast-info-text);
+}
+
+.drop-message__label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.drop-message__text {
+  min-width: 0;
+}
+
+.drop-message__close {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  opacity: 0.85;
+  cursor: pointer;
+  width: 1.1rem;
+  height: 1.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.drop-message__close:hover,
+.drop-message__close:focus-visible {
+  opacity: 1;
+}
+
+@keyframes drop-message-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 640px) {
+  .drop-message-layer {
+    top: 0.7rem;
+    width: calc(100vw - 1.2rem);
+  }
+
+  .drop-message {
+    grid-template-columns: 1fr auto;
+    row-gap: 0.35rem;
+  }
+
+  .drop-message__label {
+    grid-column: 1 / -1;
+  }
+}
+
 /* Error */
 .error {
   color: var(--theme-brand-500);

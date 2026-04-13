@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import AlbumRoundedIcon from '@mui/icons-material/AlbumRounded';
-import AlignHorizontalLeftRoundedIcon from '@mui/icons-material/AlignHorizontalLeftRounded';
+import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
+import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
 import LibraryMusicRoundedIcon from '@mui/icons-material/LibraryMusicRounded';
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
@@ -14,6 +15,7 @@ import { LibraryPage } from './pages/LibraryPage';
 import { EditPage } from './pages/EditPage';
 import { AlbumsPage } from './pages/AlbumsPage';
 import { AlbumEditPage } from './pages/AlbumEditPage';
+import { ToastProvider } from './components/messages/ToastProvider';
 import './App.css';
 
 function EditRoute() {
@@ -112,80 +114,83 @@ function App() {
   }>;
 
   return (
-    <div className="app-shell">
-      <aside
-        className={`sidebar ${isSidebarExpanded ? 'expanded' : 'collapsed'} ${
-          isMobileSidebarOpen ? 'mobile-open' : ''
-        }`}
-      >
-        <div className="sidebar-header">
-          <h2 className="sidebar-brand">
-            <MusicNoteRoundedIcon fontSize="small" className="sidebar-brand-icon" />
-            <span>MP3D</span>
-          </h2>
-          <button
-            type="button"
-            className="sidebar-collapse-btn"
-            onClick={() => setIsSidebarExpanded((value) => !value)}
-            aria-label={isSidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
-            title={isSidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
-          >
-            <AlignHorizontalLeftRoundedIcon
-              fontSize="small"
-              className={`sidebar-collapse-icon ${isSidebarExpanded ? '' : 'collapsed'}`}
-            />
-          </button>
-        </div>
-
-        <nav className="sidebar-nav" aria-label="Primary navigation">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={item.className}
+    <ToastProvider>
+      <div className="app-shell">
+        <aside
+          className={`sidebar ${isSidebarExpanded ? 'expanded' : 'collapsed'} ${
+            isMobileSidebarOpen ? 'mobile-open' : ''
+          }`}
+        >
+          <div className="sidebar-header">
+            <h2 className="sidebar-brand">
+              <MusicNoteRoundedIcon fontSize="small" className="sidebar-brand-icon" />
+              <span>MP3D</span>
+            </h2>
+            <button
+              type="button"
+              className="sidebar-collapse-btn"
+              onClick={() => setIsSidebarExpanded((value) => !value)}
+              aria-label={isSidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
+              title={isSidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
             >
-              <span className="sidebar-icon" aria-hidden="true">{item.icon}</span>
-              <span className="sidebar-label">{item.label}</span>
-            </NavLink>
-          ))}
-        </nav>
-      </aside>
+              {isSidebarExpanded ? (
+                <ArrowBackIosNewIcon fontSize="small" className="sidebar-collapse-icon" />
+              ) : (
+                <ArrowForwardIosIcon fontSize="small" className="sidebar-collapse-icon" />
+              )}
+            </button>
+          </div>
 
-      {isMobileSidebarOpen && (
-        <button
-          type="button"
-          aria-label="Close navigation"
-          className="sidebar-overlay"
-          onClick={() => setIsMobileSidebarOpen(false)}
-        />
-      )}
+          <nav className="sidebar-nav" aria-label="Primary navigation">
+            {navItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={item.className}
+              >
+                <span className="sidebar-icon" aria-hidden="true">{item.icon}</span>
+                <span className="sidebar-label">{item.label}</span>
+              </NavLink>
+            ))}
+          </nav>
+        </aside>
 
-      <section className="app-content">
-        <header className="content-header">
+        {isMobileSidebarOpen && (
           <button
             type="button"
-            className="sidebar-mobile-btn"
-            onClick={() => setIsMobileSidebarOpen(true)}
-            aria-label="Open navigation"
-          >
-            <MenuRoundedIcon fontSize="small" />
-          </button>
-        </header>
+            aria-label="Close navigation"
+            className="sidebar-overlay"
+            onClick={() => setIsMobileSidebarOpen(false)}
+          />
+        )}
 
-        <main className="content-main">
-        <Routes>
-          <Route path="/" element={<Navigate to="/download" replace />} />
-          <Route path="/download" element={<DownloadPage />} />
-          <Route path="/query" element={<QueryPage />} />
-          <Route path="/library" element={<LibraryPage />} />
-          <Route path="/details/:songName" element={<EditRoute />} />
-          <Route path="/albums" element={<AlbumsPage />} />
-          <Route path="/albums/:albumKey" element={<AlbumEditRoute />} />
-          <Route path="*" element={<Navigate to="/download" replace />} />
-        </Routes>
-        </main>
-      </section>
-    </div>
+        <section className="app-content">
+          <header className="content-header">
+            <button
+              type="button"
+              className="sidebar-mobile-btn"
+              onClick={() => setIsMobileSidebarOpen(true)}
+              aria-label="Open navigation"
+            >
+              <MenuRoundedIcon fontSize="small" />
+            </button>
+          </header>
+
+          <main className="content-main">
+          <Routes>
+            <Route path="/" element={<Navigate to="/download" replace />} />
+            <Route path="/download" element={<DownloadPage />} />
+            <Route path="/query" element={<QueryPage />} />
+            <Route path="/library" element={<LibraryPage />} />
+            <Route path="/details/:songName" element={<EditRoute />} />
+            <Route path="/albums" element={<AlbumsPage />} />
+            <Route path="/albums/:albumKey" element={<AlbumEditRoute />} />
+            <Route path="*" element={<Navigate to="/download" replace />} />
+          </Routes>
+          </main>
+        </section>
+      </div>
+    </ToastProvider>
   );
 }
 

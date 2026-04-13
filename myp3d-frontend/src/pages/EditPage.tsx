@@ -4,6 +4,7 @@ import { mp3Api } from '../api/mp3Api';
 import type { MP3Info } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
 import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
+import { useToast } from '../components/messages/ToastProvider';
 
 interface EditPageProps {
   filename: string;
@@ -19,9 +20,9 @@ export function EditPage({ filename, onBack }: EditPageProps) {
   const [mp3, setMp3] = useState<MP3Info | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [librarySongs, setLibrarySongs] = useState<MP3Info[]>([]);
   const [songSearch, setSongSearch] = useState('');
+  const { showSuccess, showError, clearToast } = useToast();
 
   const [title, setTitle] = useState('');
   const [artist, setArtist] = useState('');
@@ -49,8 +50,8 @@ export function EditPage({ filename, onBack }: EditPageProps) {
     handleCancelCrop,
     resetCoverState,
   } = useCoverImageCrop({
-    onError: (text) => setMessage({ type: 'error', text }),
-    onClearError: () => setMessage(null),
+    onError: showError,
+    onClearError: clearToast,
     outputFilename: 'cover.jpg',
   });
 
@@ -95,7 +96,7 @@ export function EditPage({ filename, onBack }: EditPageProps) {
   const loadMp3 = async () => {
     try {
       setLoading(true);
-      setMessage(null);
+      clearToast();
       resetCoverState();
       const info = await mp3Api.getInfo(filename);
       setMp3(info);
@@ -109,7 +110,7 @@ export function EditPage({ filename, onBack }: EditPageProps) {
         setExistingCoverPreview(null);
       }
     } catch {
-      setMessage({ type: 'error', text: 'Failed to load MP3 info' });
+      showError('Failed to load MP3 info');
     } finally {
       setLoading(false);
     }
@@ -136,7 +137,7 @@ export function EditPage({ filename, onBack }: EditPageProps) {
 
   const handleSave = async () => {
     setSaving(true);
-    setMessage(null);
+    clearToast();
 
     try {
       // Update metadata
@@ -152,14 +153,14 @@ export function EditPage({ filename, onBack }: EditPageProps) {
         await mp3Api.updateCover(result.filename, coverFile);
       }
 
-      setMessage({ type: 'success', text: 'Saved successfully!' });
+      showSuccess('Saved successfully!');
       
       // If filename changed, go back to library
       if (result.filename !== filename) {
         setTimeout(() => onBack(), 1000);
       }
     } catch (err) {
-      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Save failed' });
+      showError(err instanceof Error ? err.message : 'Save failed');
     } finally {
       setSaving(false);
     }
@@ -330,12 +331,6 @@ export function EditPage({ filename, onBack }: EditPageProps) {
               <button onClick={handleSave} disabled={saving} className="btn-primary">
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>
-
-              {message && (
-                <div className={`message ${message.type}`}>
-                  {message.text}
-                </div>
-              )}
             </div>
           </div>
 

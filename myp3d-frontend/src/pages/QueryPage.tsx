@@ -4,6 +4,7 @@ import type { DownloadRequest, YouTubeSearchResult } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
 import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
 import { DownloadConfigSection } from '../components/download/DownloadConfigSection';
+import { useToast } from '../components/messages/ToastProvider';
 
 const getVideoIdFromUrl = (url: string): string => {
   try {
@@ -33,7 +34,6 @@ export function QueryPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<YouTubeSearchResult[]>([]);
-  const [searchError, setSearchError] = useState<string | null>(null);
 
   const [selectedResult, setSelectedResult] = useState<YouTubeSearchResult | null>(null);
   const [selectedVideoId, setSelectedVideoId] = useState('');
@@ -45,7 +45,7 @@ export function QueryPage() {
   const [album, setAlbum] = useState('');
 
   const [downloading, setDownloading] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const { showSuccess, showError, clearToast } = useToast();
 
   const {
     coverImageBase64,
@@ -64,8 +64,8 @@ export function QueryPage() {
     handleRemoveCover,
     resetCoverState,
   } = useCoverImageCrop({
-    onError: (text) => setMessage({ type: 'error', text }),
-    onClearError: () => setMessage(null),
+    onError: showError,
+    onClearError: clearToast,
   });
 
   const hasResults = useMemo(() => searchResults.length > 0, [searchResults.length]);
@@ -80,19 +80,19 @@ export function QueryPage() {
     setArtist(result.artist || '');
     setAlbum(result.album || '');
 
-    setMessage(null);
+    clearToast();
   };
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     const normalized = searchQuery.trim();
     if (!normalized) {
-      setSearchError('Please enter a search query');
+      showError('Please enter a search query');
       return;
     }
 
     setSearching(true);
-    setSearchError(null);
+    clearToast();
 
     try {
       const results = await mp3Api.searchYouTube(normalized, 20);
@@ -101,10 +101,10 @@ export function QueryPage() {
       if (results.length === 0) {
         setSelectedResult(null);
         setSelectedVideoId('');
-        setSearchError('No videos found. Try another search.');
+        showError('No videos found. Try another search.');
       }
     } catch (err) {
-      setSearchError(err instanceof Error ? err.message : 'YouTube search failed');
+      showError(err instanceof Error ? err.message : 'YouTube search failed');
     } finally {
       setSearching(false);
     }
@@ -113,12 +113,12 @@ export function QueryPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim()) {
-      setMessage({ type: 'error', text: 'Please select a YouTube video or enter a URL' });
+      showError('Please select a YouTube video or enter a URL');
       return;
     }
 
     setDownloading(true);
-    setMessage(null);
+    clearToast();
 
     try {
       const request: DownloadRequest = {
@@ -131,7 +131,7 @@ export function QueryPage() {
       };
 
       const result = await mp3Api.download(request);
-      setMessage({ type: 'success', text: `Downloaded: ${result.filename}` });
+      showSuccess(`Downloaded: ${result.filename}`);
 
       setUrl('');
       setCustomFilename('');
@@ -142,7 +142,7 @@ export function QueryPage() {
       setSelectedResult(null);
       setSelectedVideoId('');
     } catch (err) {
-      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Download failed' });
+      showError(err instanceof Error ? err.message : 'Download failed');
     } finally {
       setDownloading(false);
     }
@@ -170,8 +170,6 @@ export function QueryPage() {
               {searching ? 'Searching...' : 'Search'}
             </button>
           </form>
-
-          {searchError && <p className="query-error">{searchError}</p>}
 
           <div className="query-results-header">
             <h3>Results</h3>
@@ -256,12 +254,6 @@ export function QueryPage() {
             <button type="submit" disabled={downloading} className="btn-primary">
               {downloading ? 'Downloading...' : 'Download MP3'}
             </button>
-
-            {message && (
-              <div className={`message ${message.type}`}>
-                {message.text}
-              </div>
-            )}
           </form>
         </section>
       </div>

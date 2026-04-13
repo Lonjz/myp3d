@@ -1,3 +1,5 @@
+@import './assets/styles/messages.css';
+
 :root {
   --theme-bg-root: #1a1a2e;
   --theme-text-root: #eee;
@@ -47,6 +49,17 @@
   --theme-danger-400: #e74c3c;
 
   --theme-success-500: #27ae60;
+
+  --theme-toast-shadow: rgba(0, 0, 0, 0.28);
+  --theme-toast-success-bg: rgba(39, 174, 96, 0.2);
+  --theme-toast-success-border: rgba(39, 174, 96, 0.7);
+  --theme-toast-success-text: #dfffe8;
+  --theme-toast-error-bg: rgba(231, 76, 60, 0.24);
+  --theme-toast-error-border: rgba(231, 76, 60, 0.75);
+  --theme-toast-error-text: #ffe6e2;
+  --theme-toast-info-bg: rgba(143, 163, 216, 0.22);
+  --theme-toast-info-border: rgba(143, 163, 216, 0.7);
+  --theme-toast-info-text: #edf3ff;
 
   --theme-overlay-nav: rgba(2, 7, 20, 0.58);
   --theme-overlay-border-soft: rgba(255, 255, 255, 0.2);
