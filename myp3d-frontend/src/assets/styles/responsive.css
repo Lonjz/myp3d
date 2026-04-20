@@ -3,6 +3,12 @@
     display: block;
   }
 
+  .app-content {
+    margin-left: 0;
+    width: 100%;
+    min-height: auto;
+  }
+
   .sidebar {
     position: fixed;
     top: 0;
@@ -30,19 +36,27 @@
 
   .sidebar.collapsed .sidebar-brand {
     display: inline-flex;
+    gap: 0.45rem;
+    max-width: 145px;
     opacity: 1;
-    width: auto;
+    transform: none;
+    pointer-events: auto;
+  }
+
+  .sidebar.collapsed .sidebar-brand span {
+    max-width: 120px;
+    opacity: 1;
+    transform: none;
   }
 
   .sidebar.collapsed .sidebar-label {
-    display: inline;
+    max-width: 130px;
     opacity: 1;
-    width: auto;
+    transform: none;
   }
 
   .sidebar.collapsed .sidebar-link {
-    justify-content: flex-start;
-    padding: 0.65rem 0.7rem;
+    gap: 0.7rem;
   }
 
   .sidebar-collapse-btn {

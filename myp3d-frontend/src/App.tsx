@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import AlbumRoundedIcon from '@mui/icons-material/AlbumRounded';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
-import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
 import LibraryMusicRoundedIcon from '@mui/icons-material/LibraryMusicRounded';
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
@@ -133,11 +132,10 @@ function App() {
               aria-label={isSidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
               title={isSidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
             >
-              {isSidebarExpanded ? (
-                <ArrowBackIosNewIcon fontSize="small" className="sidebar-collapse-icon" />
-              ) : (
-                <ArrowForwardIosIcon fontSize="small" className="sidebar-collapse-icon" />
-              )}
+              <ArrowBackIosNewIcon
+                fontSize="small"
+                className={`sidebar-collapse-icon ${isSidebarExpanded ? '' : 'collapsed'}`.trim()}
+              />
             </button>
           </div>
 
