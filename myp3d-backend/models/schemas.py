@@ -50,6 +50,14 @@ class MP3Info(BaseModel):
     date_added: Optional[datetime] = None
 
 
+class PaginationMeta(BaseModel):
+    total: int
+    page: int
+    limit: int
+    total_pages: int
+    returned: int
+
+
 class AlbumInfo(BaseModel):
     album_key: str
     album_name: str
@@ -64,6 +72,16 @@ class AlbumInfo(BaseModel):
 class AlbumDetail(BaseModel):
     album: AlbumInfo
     tracks: list[MP3Info]
+
+
+class PaginatedMP3Response(BaseModel):
+    items: list[MP3Info]
+    meta: PaginationMeta
+
+
+class PaginatedAlbumResponse(BaseModel):
+    items: list[AlbumInfo]
+    meta: PaginationMeta
 
 
 class AlbumUpdate(BaseModel):

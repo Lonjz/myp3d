@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from io import BytesIO
-from typing import Optional
+from typing import Literal, Optional
 
 import eyed3
 from eyed3.id3 import frames as id3_frames
@@ -117,6 +117,111 @@ def list_albums() -> list[AlbumInfo]:
     groups = build_album_groups()
     albums = [group.to_info() for group in groups.values()]
     return sorted(albums, key=lambda album: (album.album_name or "").lower())
+
+
+def query_mp3_infos(
+    page: int,
+    limit: int,
+    search: str,
+    filter_by: Literal["all", "title", "artist", "filename", "album"],
+    sort_by: Literal["date_added", "filename", "size", "artist", "title", "album"],
+    sort_direction: Literal["asc", "desc"],
+) -> tuple[list[MP3Info], int]:
+    mp3s = list_mp3_infos()
+    search_query = search.strip().casefold()
+
+    if search_query:
+        def matches_query(track: MP3Info) -> bool:
+            title = (track.title or "").casefold()
+            artist = (track.artist or "").casefold()
+            album = (track.album or "").casefold()
+            filename = track.filename.casefold()
+
+            if filter_by == "title":
+                return search_query in title
+            if filter_by == "artist":
+                return search_query in artist
+            if filter_by == "album":
+                return search_query in album
+            if filter_by == "filename":
+                return search_query in filename
+            return (
+                search_query in title
+                or search_query in artist
+                or search_query in album
+                or search_query in filename
+            )
+
+        mp3s = [track for track in mp3s if matches_query(track)]
+
+    if sort_by == "date_added":
+        mp3s.sort(
+            key=lambda track: (
+                track.date_added or datetime.min.replace(tzinfo=timezone.utc),
+                track.filename.casefold(),
+            )
+        )
+    elif sort_by == "size":
+        mp3s.sort(key=lambda track: (track.file_size, track.filename.casefold()))
+    elif sort_by == "artist":
+        mp3s.sort(key=lambda track: ((track.artist or "").casefold(), track.filename.casefold()))
+    elif sort_by == "title":
+        mp3s.sort(key=lambda track: ((track.title or "").casefold(), track.filename.casefold()))
+    elif sort_by == "album":
+        mp3s.sort(key=lambda track: ((track.album or "").casefold(), track.filename.casefold()))
+    else:
+        mp3s.sort(key=lambda track: track.filename.casefold())
+
+    if sort_direction == "desc":
+        mp3s.reverse()
+
+    total = len(mp3s)
+    start = (page - 1) * limit
+    end = start + limit
+    return mp3s[start:end], total
+
+
+def query_albums(
+    page: int,
+    limit: int,
+    search: str,
+    sort_by: Literal["album_name", "track_count", "total_size", "date_added"],
+    sort_direction: Literal["asc", "desc"],
+) -> tuple[list[AlbumInfo], int]:
+    albums = list_albums()
+    search_query = search.strip().casefold()
+
+    if search_query:
+        albums = [
+            album
+            for album in albums
+            if (
+                search_query in (album.album_name or "").casefold()
+                or search_query in " ".join(album.artists).casefold()
+            )
+        ]
+
+    if sort_by == "track_count":
+        albums.sort(key=lambda album: (album.track_count, (album.album_name or "").casefold()))
+    elif sort_by == "total_size":
+        albums.sort(key=lambda album: (album.total_size, (album.album_name or "").casefold()))
+    elif sort_by == "date_added":
+        albums.sort(
+            key=lambda album: (
+                album.date_added or datetime.min.replace(tzinfo=timezone.utc),
+                (album.album_name or "").casefold(),
+            )
+        )
+    else:
+        albums.sort(key=lambda album: (album.album_name or "").casefold())
+
+    if sort_direction == "desc":
+        albums.reverse()
+
+    total = len(albums)
+    start = (page - 1) * limit
+    end = start + limit
+    return albums[start:end], total
 
 
 def get_album_group(album_key: str) -> Optional[AlbumGroup]:

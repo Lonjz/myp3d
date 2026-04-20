@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { mp3Api } from '../api/mp3Api';
-import type { AlbumInfo } from '../api/mp3Api';
+import type { AlbumInfo, AlbumSortBy, SortDirection } from '../api/mp3Api';
 import { PaginatedTable } from '../components/table/PaginatedTable';
 import { SortableHeaderButton } from '../components/table/SortableHeaderButton';
 
@@ -16,35 +16,63 @@ const ALBUM_COLUMN_WIDTHS = {
   actions: '160px',
 } as const;
 
-type SortBy = 'album_name' | 'track_count' | 'total_size' | 'date_added';
-type SortDirection = 'asc' | 'desc';
-
 export function AlbumsPage() {
   const navigate = useNavigate();
   const [albums, setAlbums] = useState<AlbumInfo[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<SortBy>('album_name');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<AlbumSortBy>('album_name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [currentPage, setCurrentPage] = useState(1);
+  const latestRequestIdRef = useRef(0);
 
-  const loadAlbums = async () => {
+  const loadAlbums = useCallback(async () => {
+    const requestId = latestRequestIdRef.current + 1;
+    latestRequestIdRef.current = requestId;
+
     try {
       setLoading(true);
-      const list = await mp3Api.listAlbums();
-      setAlbums(list);
+      const response = await mp3Api.listAlbumsPaged({
+        page: currentPage,
+        limit: PAGE_SIZE,
+        search: debouncedSearchQuery,
+        sortBy,
+        sortDirection,
+      });
+
+      if (requestId !== latestRequestIdRef.current) {
+        return;
+      }
+
+      setAlbums(response.items);
+      setTotalItems(response.meta.total);
       setError(null);
     } catch {
+      if (requestId !== latestRequestIdRef.current) {
+        return;
+      }
       setError('Failed to load albums');
     } finally {
-      setLoading(false);
+      if (requestId === latestRequestIdRef.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, [currentPage, debouncedSearchQuery, sortBy, sortDirection]);
 
   useEffect(() => {
-    loadAlbums();
-  }, []);
+    const timerId = window.setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+
+    return () => window.clearTimeout(timerId);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    void loadAlbums();
+  }, [loadAlbums]);
 
   const formatSize = (bytes: number) => {
     if (bytes < 1024) return bytes + ' B';
@@ -59,47 +87,11 @@ export function AlbumsPage() {
     return parsed.toLocaleString();
   };
 
-  const filteredAlbums = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return albums;
-
-    return albums.filter((album) => {
-      const albumName = (album.album_name || '').toLowerCase();
-      const artistList = album.artists.join(' ').toLowerCase();
-      return albumName.includes(query) || artistList.includes(query);
-    });
-  }, [albums, searchQuery]);
-
-  const sortedAlbums = useMemo(() => {
-    const list = [...filteredAlbums];
-    list.sort((a, b) => {
-      let comparison = 0;
-      if (sortBy === 'track_count') {
-        comparison = a.track_count - b.track_count;
-      } else if (sortBy === 'total_size') {
-        comparison = a.total_size - b.total_size;
-      } else if (sortBy === 'date_added') {
-        const aDate = a.date_added ? new Date(a.date_added).getTime() : 0;
-        const bDate = b.date_added ? new Date(b.date_added).getTime() : 0;
-        comparison = aDate - bDate;
-      } else {
-        comparison = (a.album_name || '').toLowerCase().localeCompare((b.album_name || '').toLowerCase());
-      }
-
-      if (comparison === 0) {
-        comparison = (a.album_name || '').toLowerCase().localeCompare((b.album_name || '').toLowerCase());
-      }
-
-      return sortDirection === 'asc' ? comparison : -comparison;
-    });
-    return list;
-  }, [filteredAlbums, sortBy, sortDirection]);
-
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, sortBy, sortDirection]);
 
-  const totalPages = Math.max(1, Math.ceil(sortedAlbums.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -107,13 +99,10 @@ export function AlbumsPage() {
     }
   }, [currentPage, totalPages]);
 
-  const pageStart = (currentPage - 1) * PAGE_SIZE;
-  const pageEnd = pageStart + PAGE_SIZE;
-  const pagedAlbums = sortedAlbums.slice(pageStart, pageEnd);
-  const shownStart = sortedAlbums.length === 0 ? 0 : pageStart + 1;
-  const shownEnd = Math.min(pageEnd, sortedAlbums.length);
+  const shownStart = totalItems === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const shownEnd = totalItems === 0 ? 0 : shownStart + albums.length - 1;
 
-  const handleSortClick = (column: SortBy) => {
+  const handleSortClick = (column: AlbumSortBy) => {
     if (column === sortBy) {
       setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
       return;
@@ -123,7 +112,7 @@ export function AlbumsPage() {
     setSortDirection(column === 'album_name' ? 'asc' : 'desc');
   };
 
-  const renderSortHeader = (column: SortBy, label: string) => {
+  const renderSortHeader = (column: AlbumSortBy, label: string) => {
     return (
       <SortableHeaderButton
         label={label}
@@ -141,7 +130,7 @@ export function AlbumsPage() {
     <div className="page">
       <h1>Albums</h1>
       <div className="library-toolbar">
-        <button onClick={loadAlbums} className="btn-secondary">
+        <button onClick={() => void loadAlbums()} className="btn-secondary">
           Refresh
         </button>
         <div className="library-filters albums-filters">
@@ -158,7 +147,7 @@ export function AlbumsPage() {
         </div>
       </div>
 
-      {albums.length === 0 ? (
+      {totalItems === 0 ? (
         <p>No albums found yet. Add album metadata to your tracks.</p>
       ) : (
         <PaginatedTable
@@ -175,7 +164,7 @@ export function AlbumsPage() {
             </colgroup>
           )}
           emptyColSpan={7}
-          hasRows={pagedAlbums.length > 0}
+          hasRows={albums.length > 0}
           emptyMessage="No results for this search."
           headerRow={(
             <tr>
@@ -188,7 +177,7 @@ export function AlbumsPage() {
               <th>Actions</th>
             </tr>
           )}
-          rowContent={pagedAlbums.map((album) => (
+          rowContent={albums.map((album) => (
             <tr key={album.album_key}>
               <td>
                 <div className="library-cover-sm">
@@ -218,13 +207,13 @@ export function AlbumsPage() {
           ))}
           shownStart={shownStart}
           shownEnd={shownEnd}
-          totalItems={sortedAlbums.length}
+          totalItems={totalItems}
           currentPage={currentPage}
           totalPages={totalPages}
           onPrevious={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
           onNext={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-          previousDisabled={currentPage <= 1}
-          nextDisabled={currentPage >= totalPages}
+          previousDisabled={currentPage <= 1 || loading}
+          nextDisabled={currentPage >= totalPages || loading}
         />
       )}
     </div>

@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { mp3Api } from '../api/mp3Api';
-import type { MP3Info } from '../api/mp3Api';
+import type { MP3FilterBy, MP3Info, MP3SortBy, SortDirection } from '../api/mp3Api';
 import { PaginatedTable } from '../components/table/PaginatedTable';
 import { SortableHeaderButton } from '../components/table/SortableHeaderButton';
 
@@ -17,22 +17,21 @@ const LIBRARY_COLUMN_WIDTHS = {
   actions: '210px',
 } as const;
 
-type FilterBy = 'all' | 'title' | 'artist' | 'filename' | 'album';
-type SortBy = 'date_added' | 'filename' | 'size' | 'artist' | 'title' | 'album';
-type SortDirection = 'asc' | 'desc';
-
 export function LibraryPage() {
   const navigate = useNavigate();
   const [mp3s, setMp3s] = useState<MP3Info[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterBy, setFilterBy] = useState<FilterBy>('all');
-  const [sortBy, setSortBy] = useState<SortBy>('date_added');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [filterBy, setFilterBy] = useState<MP3FilterBy>('all');
+  const [sortBy, setSortBy] = useState<MP3SortBy>('date_added');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [currentPage, setCurrentPage] = useState(1);
+  const latestRequestIdRef = useRef(0);
 
-  const sortColumnLabels: Record<SortBy, string> = {
+  const sortColumnLabels: Record<MP3SortBy, string> = {
     title: 'Title',
     artist: 'Artist',
     album: 'Album',
@@ -41,28 +40,57 @@ export function LibraryPage() {
     date_added: 'Date Added',
   };
 
-  const loadMp3s = async () => {
+  const loadMp3s = useCallback(async () => {
+    const requestId = latestRequestIdRef.current + 1;
+    latestRequestIdRef.current = requestId;
+
     try {
       setLoading(true);
-      const list = await mp3Api.listAll();
-      setMp3s(list);
+      const response = await mp3Api.listAllPaged({
+        page: currentPage,
+        limit: PAGE_SIZE,
+        search: debouncedSearchQuery,
+        filterBy,
+        sortBy,
+        sortDirection,
+      });
+
+      if (requestId !== latestRequestIdRef.current) {
+        return;
+      }
+
+      setMp3s(response.items);
+      setTotalItems(response.meta.total);
       setError(null);
-    } catch (err) {
+    } catch {
+      if (requestId !== latestRequestIdRef.current) {
+        return;
+      }
       setError('Failed to load MP3 library');
     } finally {
-      setLoading(false);
+      if (requestId === latestRequestIdRef.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, [currentPage, debouncedSearchQuery, filterBy, sortBy, sortDirection]);
 
   useEffect(() => {
-    loadMp3s();
-  }, []);
+    const timerId = window.setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+
+    return () => window.clearTimeout(timerId);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    void loadMp3s();
+  }, [loadMp3s]);
 
   const handleDelete = async (filename: string) => {
     if (!confirm(`Delete "${filename}"?`)) return;
     try {
       await mp3Api.delete(filename);
-      loadMp3s();
+      await loadMp3s();
     } catch {
       alert('Failed to delete file');
     }
@@ -74,68 +102,11 @@ export function LibraryPage() {
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
-  const filteredMp3s = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) {
-      return mp3s;
-    }
-
-    return mp3s.filter((mp3) => {
-      const title = (mp3.title || '').toLowerCase();
-      const artist = (mp3.artist || '').toLowerCase();
-      const album = (mp3.album || '').toLowerCase();
-      const filename = mp3.filename.toLowerCase();
-
-      if (filterBy === 'title') return title.includes(query);
-      if (filterBy === 'artist') return artist.includes(query);
-      if (filterBy === 'filename') return filename.includes(query);
-      if (filterBy === 'album') return album.includes(query);
-      return (
-        title.includes(query) ||
-        artist.includes(query) ||
-        album.includes(query) ||
-        filename.includes(query)
-      );
-    });
-  }, [mp3s, searchQuery, filterBy]);
-
-  const sortedMp3s = useMemo(() => {
-    const sorted = [...filteredMp3s];
-    sorted.sort((a, b) => {
-      const normalizeText = (value: string | null | undefined) => (value || '').toLowerCase();
-
-      let comparison = 0;
-      if (sortBy === 'date_added') {
-        const aDate = a.date_added ? new Date(a.date_added).getTime() : 0;
-        const bDate = b.date_added ? new Date(b.date_added).getTime() : 0;
-        comparison = aDate - bDate;
-      } else if (sortBy === 'size') {
-        comparison = a.file_size - b.file_size;
-      } else if (sortBy === 'artist') {
-        comparison = normalizeText(a.artist).localeCompare(normalizeText(b.artist));
-      } else if (sortBy === 'title') {
-        comparison = normalizeText(a.title).localeCompare(normalizeText(b.title));
-      } else if (sortBy === 'album') {
-        comparison = normalizeText(a.album).localeCompare(normalizeText(b.album));
-      } else {
-        comparison = normalizeText(a.filename).localeCompare(normalizeText(b.filename));
-      }
-
-      if (comparison === 0) {
-        comparison = normalizeText(a.filename).localeCompare(normalizeText(b.filename));
-      }
-
-      return sortDirection === 'asc' ? comparison : -comparison;
-    });
-
-    return sorted;
-  }, [filteredMp3s, sortBy, sortDirection]);
-
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, filterBy, sortBy, sortDirection]);
 
-  const totalPages = Math.max(1, Math.ceil(sortedMp3s.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -143,11 +114,8 @@ export function LibraryPage() {
     }
   }, [currentPage, totalPages]);
 
-  const pageStart = (currentPage - 1) * PAGE_SIZE;
-  const pageEnd = pageStart + PAGE_SIZE;
-  const pagedMp3s = sortedMp3s.slice(pageStart, pageEnd);
-  const shownStart = sortedMp3s.length === 0 ? 0 : pageStart + 1;
-  const shownEnd = Math.min(pageEnd, sortedMp3s.length);
+  const shownStart = totalItems === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const shownEnd = totalItems === 0 ? 0 : shownStart + mp3s.length - 1;
 
   const formatDateAdded = (dateAdded: string | null | undefined) => {
     if (!dateAdded) return '-';
@@ -156,7 +124,7 @@ export function LibraryPage() {
     return parsed.toLocaleString();
   };
 
-  const handleSortClick = (column: SortBy) => {
+  const handleSortClick = (column: MP3SortBy) => {
     if (column === sortBy) {
       setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
       return;
@@ -166,7 +134,7 @@ export function LibraryPage() {
     setSortDirection(column === 'date_added' ? 'desc' : 'asc');
   };
 
-  const renderSortHeader = (column: SortBy) => {
+  const renderSortHeader = (column: MP3SortBy) => {
     return (
       <SortableHeaderButton
         label={sortColumnLabels[column]}
@@ -184,7 +152,7 @@ export function LibraryPage() {
     <div className="page">
       <h1>MP3 Library</h1>
       <div className="library-toolbar">
-        <button onClick={loadMp3s} className="btn-secondary">
+        <button onClick={() => void loadMp3s()} className="btn-secondary">
           Refresh
         </button>
 
@@ -194,7 +162,7 @@ export function LibraryPage() {
             <select
               id="libraryFilterBy"
               value={filterBy}
-              onChange={(e) => setFilterBy(e.target.value as FilterBy)}
+              onChange={(e) => setFilterBy(e.target.value as MP3FilterBy)}
             >
               <option value="all">All</option>
               <option value="title">Title</option>
@@ -218,7 +186,7 @@ export function LibraryPage() {
         </div>
       </div>
 
-      {mp3s.length === 0 ? (
+      {totalItems === 0 ? (
         <p>No MP3 files yet. Download some!</p>
       ) : (
         <PaginatedTable
@@ -235,7 +203,7 @@ export function LibraryPage() {
             </colgroup>
           )}
           emptyColSpan={8}
-          hasRows={pagedMp3s.length > 0}
+          hasRows={mp3s.length > 0}
           emptyMessage="No results for this search."
           headerRow={(
             <tr>
@@ -249,7 +217,7 @@ export function LibraryPage() {
               <th>Actions</th>
             </tr>
           )}
-          rowContent={pagedMp3s.map((mp3) => (
+          rowContent={mp3s.map((mp3) => (
             <tr key={mp3.filename}>
               <td>
                 <div className="library-cover-sm">
@@ -286,13 +254,13 @@ export function LibraryPage() {
           ))}
           shownStart={shownStart}
           shownEnd={shownEnd}
-          totalItems={sortedMp3s.length}
+          totalItems={totalItems}
           currentPage={currentPage}
           totalPages={totalPages}
           onPrevious={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
           onNext={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-          previousDisabled={currentPage <= 1}
-          nextDisabled={currentPage >= totalPages}
+          previousDisabled={currentPage <= 1 || loading}
+          nextDisabled={currentPage >= totalPages || loading}
         />
       )}
     </div>

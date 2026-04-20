@@ -34,6 +34,19 @@
   gap: 0.45rem;
 }
 
+.details-sidebar-meta {
+  margin-top: 0;
+  margin-bottom: 0.6rem;
+}
+
+.details-sidebar-loading {
+  text-align: center;
+}
+
+.details-sidebar-sentinel {
+  height: 1px;
+}
+
 .details-song-item {
   width: 100%;
   text-align: left;

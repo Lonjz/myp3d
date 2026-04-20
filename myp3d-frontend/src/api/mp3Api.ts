@@ -64,6 +64,46 @@ export interface AlbumUpdateResponse {
   message: string;
 }
 
+export interface PaginationMeta {
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+  returned: number;
+}
+
+export interface PaginatedMP3Response {
+  items: MP3Info[];
+  meta: PaginationMeta;
+}
+
+export interface PaginatedAlbumResponse {
+  items: AlbumInfo[];
+  meta: PaginationMeta;
+}
+
+export type MP3FilterBy = 'all' | 'title' | 'artist' | 'filename' | 'album';
+export type MP3SortBy = 'date_added' | 'filename' | 'size' | 'artist' | 'title' | 'album';
+export type AlbumSortBy = 'album_name' | 'track_count' | 'total_size' | 'date_added';
+export type SortDirection = 'asc' | 'desc';
+
+export interface MP3ListPagedParams {
+  page: number;
+  limit: number;
+  search?: string;
+  filterBy?: MP3FilterBy;
+  sortBy?: MP3SortBy;
+  sortDirection?: SortDirection;
+}
+
+export interface AlbumListPagedParams {
+  page: number;
+  limit: number;
+  search?: string;
+  sortBy?: AlbumSortBy;
+  sortDirection?: SortDirection;
+}
+
 export const mp3Api = {
   // Download a YouTube video as MP3
   async download(request: DownloadRequest): Promise<{ success: boolean; filename: string; message: string }> {
@@ -79,10 +119,22 @@ export const mp3Api = {
     return res.json();
   },
 
-  // List all MP3 files
-  async listAll(): Promise<MP3Info[]> {
-    const res = await fetch(`${API_BASE}/mp3s`);
-    if (!res.ok) throw new Error('Failed to fetch MP3 list');
+  // List MP3 files with server-side pagination/filter/sort
+  async listAllPaged(params: MP3ListPagedParams): Promise<PaginatedMP3Response> {
+    const query = new URLSearchParams({
+      page: String(params.page),
+      limit: String(params.limit),
+      search: params.search || '',
+      filter_by: params.filterBy || 'all',
+      sort_by: params.sortBy || 'date_added',
+      sort_direction: params.sortDirection || 'desc',
+    });
+
+    const res = await fetch(`${API_BASE}/mp3s/paged?${query.toString()}`);
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(error.detail || 'Failed to fetch paged MP3 list');
+    }
     return res.json();
   },
 
@@ -156,10 +208,21 @@ export const mp3Api = {
     return res.json();
   },
 
-  // List all albums
-  async listAlbums(): Promise<AlbumInfo[]> {
-    const res = await fetch(`${API_BASE}/albums`);
-    if (!res.ok) throw new Error('Failed to fetch album list');
+  // List albums with server-side pagination/filter/sort
+  async listAlbumsPaged(params: AlbumListPagedParams): Promise<PaginatedAlbumResponse> {
+    const query = new URLSearchParams({
+      page: String(params.page),
+      limit: String(params.limit),
+      search: params.search || '',
+      sort_by: params.sortBy || 'album_name',
+      sort_direction: params.sortDirection || 'asc',
+    });
+
+    const res = await fetch(`${API_BASE}/albums/paged?${query.toString()}`);
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(error.detail || 'Failed to fetch paged album list');
+    }
     return res.json();
   },
 

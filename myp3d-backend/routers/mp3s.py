@@ -1,18 +1,50 @@
 import eyed3
-from fastapi import APIRouter, HTTPException, UploadFile, File, Response
+from typing import Literal
+
+from fastapi import APIRouter, HTTPException, UploadFile, File, Query, Response
 from fastapi.responses import FileResponse
 
-from models.schemas import MP3Info, MetadataUpdate
+from models.schemas import MP3Info, MetadataUpdate, PaginatedMP3Response, PaginationMeta
 from services.config import OUTPUT_DIR
-from services.mp3_service import get_mp3_info, list_mp3_infos, make_square_cover, set_cover_images
+from services.mp3_service import (
+    get_mp3_info,
+    make_square_cover,
+    query_mp3_infos,
+    set_cover_images,
+)
 
 router = APIRouter(prefix="/mp3s", tags=["MP3s"])
 
 
-@router.get("", response_model=list[MP3Info])
-async def list_mp3s():
-    """List all downloaded MP3 files."""
-    return list_mp3_infos()
+@router.get("/paged", response_model=PaginatedMP3Response)
+async def list_mp3s_paged(
+    page: int = Query(1, ge=1),
+    limit: int = Query(25, ge=1, le=200),
+    search: str = Query(""),
+    filter_by: Literal["all", "title", "artist", "filename", "album"] = Query("all"),
+    sort_by: Literal["date_added", "filename", "size", "artist", "title", "album"] = Query("date_added"),
+    sort_direction: Literal["asc", "desc"] = Query("desc"),
+):
+    """List MP3 files using server-side pagination, filtering, and sorting."""
+    items, total = query_mp3_infos(
+        page=page,
+        limit=limit,
+        search=search,
+        filter_by=filter_by,
+        sort_by=sort_by,
+        sort_direction=sort_direction,
+    )
+    total_pages = max(1, (total + limit - 1) // limit)
+    return PaginatedMP3Response(
+        items=items,
+        meta=PaginationMeta(
+            total=total,
+            page=page,
+            limit=limit,
+            total_pages=total_pages,
+            returned=len(items),
+        ),
+    )
 
 
 @router.get("/{filename}")

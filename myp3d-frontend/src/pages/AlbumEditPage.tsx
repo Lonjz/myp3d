@@ -1,10 +1,11 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { mp3Api } from '../api/mp3Api';
 import type { AlbumDetail, AlbumInfo } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
 import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
 import { useToast } from '../components/messages/ToastProvider';
+import { InfiniteSidebarList } from '../components/sidebar/InfiniteSidebarList';
 
 interface AlbumEditPageProps {
   albumKey: string;
@@ -12,14 +13,13 @@ interface AlbumEditPageProps {
 }
 
 const NO_ALBUM_LABEL = '(No Album)';
+const ALBUM_SIDEBAR_PAGE_SIZE = 25;
 
 export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
   const navigate = useNavigate();
   const [albumDetail, setAlbumDetail] = useState<AlbumDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [albums, setAlbums] = useState<AlbumInfo[]>([]);
-  const [albumSearch, setAlbumSearch] = useState('');
   const { showSuccess, showError, showInfo, clearToast } = useToast();
 
   const [albumName, setAlbumName] = useState('');
@@ -47,15 +47,6 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
     onClearError: clearToast,
     outputFilename: 'album-cover.jpg',
   });
-
-  const loadAlbums = async () => {
-    try {
-      const list = await mp3Api.listAlbums();
-      setAlbums(list);
-    } catch {
-      setAlbums([]);
-    }
-  };
 
   const loadAlbum = async (targetKey: string, options?: { clearToast?: boolean }) => {
     try {
@@ -88,10 +79,6 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
     loadAlbum(albumKey);
   }, [albumKey]);
 
-  useEffect(() => {
-    loadAlbums();
-  }, []);
-
   const handleCoverChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) {
@@ -123,7 +110,6 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
       }
 
       await loadAlbum(targetAlbumKey, { clearToast: false });
-      await loadAlbums();
       showSuccess('Album updated successfully!');
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Failed to save album');
@@ -141,61 +127,49 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
   if (loading && !albumDetail) return <div className="page"><p>Loading album...</p></div>;
   if (!albumDetail) return <div className="page"><p>Album not found</p></div>;
 
-  const normalizedAlbumSearch = albumSearch.trim().toLowerCase();
   const effectiveCoverPreview = coverPreview || existingCoverPreview;
-  const visibleAlbums = albums.filter((album) => {
-    if (!normalizedAlbumSearch) return true;
-    return (
-      (album.album_name || '').toLowerCase().includes(normalizedAlbumSearch) ||
-      album.artists.join(' ').toLowerCase().includes(normalizedAlbumSearch)
-    );
-  });
+  const getAlbumSubtitle = (album: AlbumInfo) => {
+    const subtitleParts = [
+      `${album.track_count} track${album.track_count === 1 ? '' : 's'}`,
+      album.artists.length > 0 ? album.artists.slice(0, 2).join(', ') : '',
+    ].filter(Boolean);
+
+    return subtitleParts.join(' • ');
+  };
 
   return (
     <div className="page">
       <div className="details-layout">
-        <aside className="details-sidebar">
-          <button onClick={onBack} className="btn-secondary details-back-btn">
-            ← Back to Albums
-          </button>
+        <InfiniteSidebarList<AlbumInfo>
+          title="Edit Another Album"
+          backLabel="← Back to Albums"
+          onBack={onBack}
+          searchPlaceholder="Search album or artist"
+          activeKey={albumKey}
+          getItemKey={(album) => album.album_key}
+          getItemTitle={(album) => album.album_name || NO_ALBUM_LABEL}
+          getItemSubtitle={getAlbumSubtitle}
+          onSelect={(album) => navigate(`/albums/${encodeURIComponent(album.album_key)}`)}
+          fetchPage={async ({ page, limit, search }) => {
+            const response = await mp3Api.listAlbumsPaged({
+              page,
+              limit,
+              search,
+              sortBy: 'album_name',
+              sortDirection: 'asc',
+            });
 
-          <h3>Edit Another Album</h3>
-          <div className="form-group" style={{ marginBottom: '0.75rem' }}>
-            <input
-              type="text"
-              value={albumSearch}
-              onChange={(e) => setAlbumSearch(e.target.value)}
-              placeholder="Search album or artist"
-            />
-          </div>
-
-          <div className="details-song-list">
-            {visibleAlbums.map((album) => {
-              const isActive = album.album_key === albumKey;
-              const subtitleParts = [
-                `${album.track_count} track${album.track_count === 1 ? '' : 's'}`,
-                album.artists.length > 0 ? album.artists.slice(0, 2).join(', ') : '',
-              ].filter(Boolean);
-
-              return (
-                <button
-                  key={album.album_key}
-                  type="button"
-                  className={`details-song-item ${isActive ? 'active' : ''}`}
-                  onClick={() => navigate(`/albums/${encodeURIComponent(album.album_key)}`)}
-                  disabled={isActive}
-                >
-                  <span className="details-song-title">{album.album_name || NO_ALBUM_LABEL}</span>
-                  <span className="details-song-subtitle">{subtitleParts.join(' • ')}</span>
-                </button>
-              );
-            })}
-
-            {visibleAlbums.length === 0 && (
-              <p className="input-help">No matching albums.</p>
-            )}
-          </div>
-        </aside>
+            return {
+              items: response.items,
+              total: response.meta.total,
+              totalPages: response.meta.total_pages,
+            };
+          }}
+          emptyMessage="No matching albums."
+          pinnedItem={albumDetail.album}
+          pageSize={ALBUM_SIDEBAR_PAGE_SIZE}
+          searchDebounceMs={300}
+        />
 
         <section className="details-main">
           <h1>Edit Album: {albumDetail.album.album_name}</h1>

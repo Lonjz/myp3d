@@ -1,10 +1,11 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { mp3Api } from '../api/mp3Api';
 import type { MP3Info } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
 import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
 import { useToast } from '../components/messages/ToastProvider';
+import { InfiniteSidebarList } from '../components/sidebar/InfiniteSidebarList';
 
 interface EditPageProps {
   filename: string;
@@ -14,14 +15,13 @@ interface EditPageProps {
 const SIDEBAR_SCROLL_KEY = 'edit-sidebar-scroll-top';
 const EDIT_AUDIO_VOLUME_KEY = 'edit-audio-volume';
 const EDIT_AUDIO_MUTED_KEY = 'edit-audio-muted';
+const SIDEBAR_PAGE_SIZE = 25;
 
 export function EditPage({ filename, onBack }: EditPageProps) {
   const navigate = useNavigate();
   const [mp3, setMp3] = useState<MP3Info | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [librarySongs, setLibrarySongs] = useState<MP3Info[]>([]);
-  const [songSearch, setSongSearch] = useState('');
   const { showSuccess, showError, clearToast } = useToast();
 
   const [title, setTitle] = useState('');
@@ -30,8 +30,6 @@ export function EditPage({ filename, onBack }: EditPageProps) {
   const [newFilename, setNewFilename] = useState('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const detailsSongListRef = useRef<HTMLDivElement>(null);
-  const hasRestoredSidebarScrollRef = useRef(false);
   const [existingCoverPreview, setExistingCoverPreview] = useState<string | null>(null);
 
   const {
@@ -59,40 +57,6 @@ export function EditPage({ filename, onBack }: EditPageProps) {
     loadMp3();
   }, [filename]);
 
-  useEffect(() => {
-    loadLibrarySongs();
-  }, []);
-
-  useEffect(() => {
-    if (hasRestoredSidebarScrollRef.current) {
-      return;
-    }
-
-    if (!detailsSongListRef.current || typeof window === 'undefined') {
-      return;
-    }
-
-    const storedScrollTop = window.sessionStorage.getItem(SIDEBAR_SCROLL_KEY);
-    const scrollTop = storedScrollTop ? Number(storedScrollTop) : 0;
-
-    if (Number.isFinite(scrollTop) && scrollTop > 0) {
-      detailsSongListRef.current.scrollTop = scrollTop;
-    }
-
-    hasRestoredSidebarScrollRef.current = true;
-  }, [librarySongs.length]);
-
-  const persistSidebarScroll = () => {
-    if (typeof window === 'undefined' || !detailsSongListRef.current) {
-      return;
-    }
-
-    window.sessionStorage.setItem(
-      SIDEBAR_SCROLL_KEY,
-      String(detailsSongListRef.current.scrollTop),
-    );
-  };
-
   const loadMp3 = async () => {
     try {
       setLoading(true);
@@ -113,16 +77,6 @@ export function EditPage({ filename, onBack }: EditPageProps) {
       showError('Failed to load MP3 info');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadLibrarySongs = async () => {
-    try {
-      const list = await mp3Api.listAll();
-      setLibrarySongs(list);
-    } catch {
-      // Keep editor available even if list cannot be loaded.
-      setLibrarySongs([]);
     }
   };
 
@@ -157,7 +111,7 @@ export function EditPage({ filename, onBack }: EditPageProps) {
       
       // If filename changed, go back to library
       if (result.filename !== filename) {
-        setTimeout(() => onBack(), 1000);
+        window.setTimeout(() => onBack(), 1000);
       }
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Save failed');
@@ -169,16 +123,7 @@ export function EditPage({ filename, onBack }: EditPageProps) {
   if (loading && !mp3) return <div className="page"><p>Loading...</p></div>;
   if (!mp3) return <div className="page"><p>MP3 not found</p></div>;
 
-  const normalizedSongSearch = songSearch.trim().toLowerCase();
   const effectiveCoverPreview = coverPreview || existingCoverPreview;
-  const visibleSongs = librarySongs.filter((song) => {
-    if (!normalizedSongSearch) return true;
-    return (
-      (song.title || '').toLowerCase().includes(normalizedSongSearch) ||
-      (song.artist || '').toLowerCase().includes(normalizedSongSearch) ||
-      song.filename.toLowerCase().includes(normalizedSongSearch)
-    );
-  });
 
   const restoreAudioState = (audio: HTMLAudioElement) => {
     if (typeof window === 'undefined') {
@@ -212,50 +157,38 @@ export function EditPage({ filename, onBack }: EditPageProps) {
   return (
     <div className="page">
       <div className="details-layout">
-        <aside className="details-sidebar">
-          <button
-            onClick={() => {
-              persistSidebarScroll();
-              onBack();
-            }}
-            className="btn-secondary details-back-btn"
-          >
-            ← Back to Library
-          </button>
+        <InfiniteSidebarList<MP3Info>
+          title="Edit Another Song"
+          backLabel="← Back to Library"
+          onBack={onBack}
+          searchPlaceholder="Search title, artist, filename"
+          activeKey={filename}
+          getItemKey={(song) => song.filename}
+          getItemTitle={(song) => song.title || song.filename}
+          getItemSubtitle={(song) => song.artist || 'Unknown Artist'}
+          onSelect={(song) => navigate(`/details/${encodeURIComponent(song.filename)}`)}
+          fetchPage={async ({ page, limit, search }) => {
+            const response = await mp3Api.listAllPaged({
+              page,
+              limit,
+              search,
+              filterBy: 'all',
+              sortBy: 'date_added',
+              sortDirection: 'desc',
+            });
 
-          <h3>Edit Another Song</h3>
-          <div className="form-group" style={{ marginBottom: '0.75rem' }}>
-            <input
-              type="text"
-              value={songSearch}
-              onChange={(e) => setSongSearch(e.target.value)}
-              placeholder="Search title, artist, filename"
-            />
-          </div>
-
-          <div className="details-song-list" ref={detailsSongListRef} onScroll={persistSidebarScroll}>
-            {visibleSongs.map((song) => {
-              const isActive = song.filename === filename;
-              return (
-                <button
-                  key={song.filename}
-                  type="button"
-                  className={`details-song-item ${isActive ? 'active' : ''}`}
-                  onClick={() => {
-                    persistSidebarScroll();
-                    navigate(`/details/${encodeURIComponent(song.filename)}`);
-                  }}
-                  disabled={isActive}
-                >
-                  <span className="details-song-title">{song.title || song.filename}</span>
-                  <span className="details-song-subtitle">
-                    {song.artist || 'Unknown Artist'}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </aside>
+            return {
+              items: response.items,
+              total: response.meta.total,
+              totalPages: response.meta.total_pages,
+            };
+          }}
+          emptyMessage="No matching songs."
+          pinnedItem={mp3}
+          pageSize={SIDEBAR_PAGE_SIZE}
+          searchDebounceMs={300}
+          scrollStorageKey={SIDEBAR_SCROLL_KEY}
+        />
 
         <section className="details-main">
           <h1>Edit: {mp3.filename}</h1>

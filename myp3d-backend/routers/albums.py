@@ -1,12 +1,20 @@
-from fastapi import APIRouter, File, HTTPException, Response, UploadFile
+from typing import Literal
 
-from models.schemas import AlbumDetail, AlbumInfo, AlbumUpdate, AlbumUpdateResponse
+from fastapi import APIRouter, File, HTTPException, Query, Response, UploadFile
+
+from models.schemas import (
+    AlbumDetail,
+    AlbumUpdate,
+    AlbumUpdateResponse,
+    PaginatedAlbumResponse,
+    PaginationMeta,
+)
 from services.mp3_service import (
     get_album_cover,
     get_album_group,
-    list_albums,
     make_album_key,
     make_square_cover,
+    query_albums,
     set_album_cover,
     set_album_name,
 )
@@ -22,10 +30,33 @@ def _get_album_group_or_404(album_key: str):
     return album_group
 
 
-@router.get("", response_model=list[AlbumInfo])
-async def list_album_groups():
-    """List all albums grouped by normalized album metadata."""
-    return list_albums()
+@router.get("/paged", response_model=PaginatedAlbumResponse)
+async def list_album_groups_paged(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=200),
+    search: str = Query(""),
+    sort_by: Literal["album_name", "track_count", "total_size", "date_added"] = Query("album_name"),
+    sort_direction: Literal["asc", "desc"] = Query("asc"),
+):
+    """List albums using server-side pagination, filtering, and sorting."""
+    items, total = query_albums(
+        page=page,
+        limit=limit,
+        search=search,
+        sort_by=sort_by,
+        sort_direction=sort_direction,
+    )
+    total_pages = max(1, (total + limit - 1) // limit)
+    return PaginatedAlbumResponse(
+        items=items,
+        meta=PaginationMeta(
+            total=total,
+            page=page,
+            limit=limit,
+            total_pages=total_pages,
+            returned=len(items),
+        ),
+    )
 
 
 @router.get("/{album_key}", response_model=AlbumDetail)
