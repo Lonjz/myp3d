@@ -122,8 +122,9 @@ function App() {
         >
           <div className="sidebar-header">
             <h2 className="sidebar-brand">
+              {/* <MusicNoteRoundedIcon fontSize="small" className="sidebar-brand-icon" /> */}
+              <span>MYP3D</span>
               <MusicNoteRoundedIcon fontSize="small" className="sidebar-brand-icon" />
-              <span>MP3D</span>
             </h2>
             <button
               type="button"

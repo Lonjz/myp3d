@@ -156,16 +156,59 @@
 
 .library-pagination {
   margin-top: 0.9rem;
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 1rem;
   color: var(--theme-text-muted);
   font-size: 0.9rem;
 }
 
+.pagination-summary {
+  margin: 0;
+}
+
+.pagination-jump-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 .pagination-buttons {
   display: flex;
   align-items: center;
   gap: 0.6rem;
+  justify-self: end;
+}
+
+.pagination-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.pagination-jump label {
+  color: var(--theme-text-muted);
+  font-size: 0.86rem;
+}
+
+.pagination-jump input {
+  width: 4.6rem;
+  min-width: 4.6rem;
+  padding: 0.36rem 0.5rem;
+  border: 1px solid var(--theme-border-soft);
+  border-radius: 8px;
+  background: var(--theme-surface-2);
+  color: var(--theme-text-primary);
+}
+
+.pagination-jump input[type='number'] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.pagination-jump input[type='number']::-webkit-outer-spin-button,
+.pagination-jump input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }

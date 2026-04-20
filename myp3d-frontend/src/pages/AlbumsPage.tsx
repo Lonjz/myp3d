@@ -214,6 +214,7 @@ export function AlbumsPage() {
           totalPages={totalPages}
           onPrevious={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
           onNext={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+          onGoToPage={(page) => setCurrentPage(page)}
           previousDisabled={currentPage <= 1 || loading}
           nextDisabled={currentPage >= totalPages || loading}
         />
