@@ -145,8 +145,8 @@ export function LibraryPage() {
     );
   };
 
-  if (loading) return <div className="page"><p>Loading...</p></div>;
-  if (error) return <div className="page"><p className="error">{error}</p></div>;
+  if (loading && mp3s.length === 0) return <div className="page"><p>Loading...</p></div>;
+  if (error && mp3s.length === 0) return <div className="page"><p className="error">{error}</p></div>;
 
   return (
     <div className="page">
@@ -185,6 +185,8 @@ export function LibraryPage() {
 
         </div>
       </div>
+
+      {error && <p className="error">{error}</p>}
 
       {totalItems === 0 ? (
         <p>No MP3 files yet. Download some!</p>

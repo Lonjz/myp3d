@@ -123,8 +123,8 @@ export function AlbumsPage() {
     );
   };
 
-  if (loading) return <div className="page"><p>Loading albums...</p></div>;
-  if (error) return <div className="page"><p className="error">{error}</p></div>;
+  if (loading && albums.length === 0) return <div className="page"><p>Loading albums...</p></div>;
+  if (error && albums.length === 0) return <div className="page"><p className="error">{error}</p></div>;
 
   return (
     <div className="page">
@@ -146,6 +146,8 @@ export function AlbumsPage() {
           </div>
         </div>
       </div>
+
+      {error && <p className="error">{error}</p>}
 
       {totalItems === 0 ? (
         <p>No albums found yet. Add album metadata to your tracks.</p>
