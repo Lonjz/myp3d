@@ -1,4 +1,5 @@
 import eyed3
+from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Query, Response
@@ -8,12 +9,28 @@ from models.schemas import MP3Info, MetadataUpdate, PaginatedMP3Response, Pagina
 from services.config import OUTPUT_DIR
 from services.mp3_service import (
     get_mp3_info,
+    invalidate_library_cache,
     make_square_cover,
     query_mp3_infos,
     set_cover_images,
 )
 
 router = APIRouter(prefix="/mp3s", tags=["MP3s"])
+
+
+CACHE_CONTROL_HEADER = {"Cache-Control": "public, max-age=300"}
+
+
+def _sanitize_filename(filename: str) -> str:
+    safe_name = Path(filename).name
+    if not safe_name or safe_name != filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    return safe_name
+
+
+def _resolve_mp3_path(filename: str) -> Path:
+    safe_name = _sanitize_filename(filename)
+    return OUTPUT_DIR / safe_name
 
 
 @router.get("/paged", response_model=PaginatedMP3Response)
@@ -50,16 +67,21 @@ async def list_mp3s_paged(
 @router.get("/{filename}")
 async def get_mp3(filename: str):
     """Get a specific MP3 file for download."""
-    filepath = OUTPUT_DIR / filename
+    filepath = _resolve_mp3_path(filename)
     if not filepath.exists() or filepath.suffix.lower() != ".mp3":
         raise HTTPException(status_code=404, detail="MP3 file not found")
-    return FileResponse(filepath, media_type="audio/mpeg", filename=filename)
+    return FileResponse(
+        filepath,
+        media_type="audio/mpeg",
+        filename=filename,
+        headers=CACHE_CONTROL_HEADER,
+    )
 
 
 @router.get("/{filename}/info", response_model=MP3Info)
 async def get_mp3_metadata(filename: str):
     """Get metadata for a specific MP3 file."""
-    filepath = OUTPUT_DIR / filename
+    filepath = _resolve_mp3_path(filename)
     if not filepath.exists() or filepath.suffix.lower() != ".mp3":
         raise HTTPException(status_code=404, detail="MP3 file not found")
     return get_mp3_info(filepath)
@@ -68,7 +90,7 @@ async def get_mp3_metadata(filename: str):
 @router.put("/{filename}/metadata")
 async def update_metadata(filename: str, metadata: MetadataUpdate):
     """Update MP3 metadata (title, artist, album, filename)."""
-    filepath = OUTPUT_DIR / filename
+    filepath = _resolve_mp3_path(filename)
     if not filepath.exists() or filepath.suffix.lower() != ".mp3":
         raise HTTPException(status_code=404, detail="MP3 file not found")
 
@@ -88,7 +110,7 @@ async def update_metadata(filename: str, metadata: MetadataUpdate):
     # Handle filename change
     new_filename = filename
     if metadata.new_filename and metadata.new_filename != filename:
-        new_name = metadata.new_filename
+        new_name = _sanitize_filename(metadata.new_filename)
         if not new_name.lower().endswith(".mp3"):
             new_name += ".mp3"
         new_path = OUTPUT_DIR / new_name
@@ -97,13 +119,15 @@ async def update_metadata(filename: str, metadata: MetadataUpdate):
         filepath.rename(new_path)
         new_filename = new_name
 
+    invalidate_library_cache()
+
     return {"success": True, "filename": new_filename, "message": "Metadata updated successfully"}
 
 
 @router.post("/{filename}/cover")
 async def update_cover(filename: str, cover: UploadFile = File(...)):
     """Update the cover image for an MP3 file."""
-    filepath = OUTPUT_DIR / filename
+    filepath = _resolve_mp3_path(filename)
     if not filepath.exists() or filepath.suffix.lower() != ".mp3":
         raise HTTPException(status_code=404, detail="MP3 file not found")
 
@@ -124,13 +148,15 @@ async def update_cover(filename: str, cover: UploadFile = File(...)):
     set_cover_images(audio.tag, processed_cover, mime_type)
     audio.tag.save(version=(2, 3, 0))
 
+    invalidate_library_cache()
+
     return {"success": True, "message": "Cover image updated successfully (500x500 center crop)"}
 
 
 @router.get("/{filename}/cover")
 async def get_cover(filename: str):
     """Get the cover image from an MP3 file."""
-    filepath = OUTPUT_DIR / filename
+    filepath = _resolve_mp3_path(filename)
     if not filepath.exists() or filepath.suffix.lower() != ".mp3":
         raise HTTPException(status_code=404, detail="MP3 file not found")
 
@@ -141,33 +167,40 @@ async def get_cover(filename: str):
     image = audio.tag.images[0]
     return Response(
         content=image.image_data,
-        media_type=image.mime_type or "image/jpeg"
+        media_type=image.mime_type or "image/jpeg",
+        headers=CACHE_CONTROL_HEADER,
     )
 
 
 @router.delete("/{filename}")
 async def delete_mp3(filename: str):
     """Delete an MP3 file."""
-    filepath = OUTPUT_DIR / filename
+    filepath = _resolve_mp3_path(filename)
     if not filepath.exists() or filepath.suffix.lower() != ".mp3":
         raise HTTPException(status_code=404, detail="MP3 file not found")
     
     filepath.unlink()
+    invalidate_library_cache()
     return {"success": True, "message": f"Deleted: {filename}"}
 
 
 @router.post("/upload")
 async def upload_mp3(file: UploadFile = File(...)):
     """Upload an MP3 file to the library."""
-    if not file.filename.lower().endswith(".mp3"):
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Missing filename")
+
+    safe_name = _sanitize_filename(file.filename)
+    if not safe_name.lower().endswith(".mp3"):
         raise HTTPException(status_code=400, detail="Only MP3 files are allowed")
-    
-    filepath = OUTPUT_DIR / file.filename
+
+    filepath = OUTPUT_DIR / safe_name
     if filepath.exists():
         raise HTTPException(status_code=400, detail="A file with that name already exists")
     
     with open(filepath, "wb") as f:
         content = await file.read()
         f.write(content)
-    
-    return {"success": True, "filename": file.filename, "message": "File uploaded successfully"}
+
+    invalidate_library_cache()
+    return {"success": True, "filename": safe_name, "message": "File uploaded successfully"}

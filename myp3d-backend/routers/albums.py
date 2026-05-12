@@ -23,6 +23,9 @@ from services.mp3_service import (
 router = APIRouter(prefix="/albums", tags=["Albums"])
 
 
+CACHE_CONTROL_HEADER = {"Cache-Control": "public, max-age=300"}
+
+
 def _get_album_group_or_404(album_key: str):
     album_group = get_album_group(album_key)
     if album_group is None:
@@ -119,4 +122,4 @@ async def get_album_cover_image(album_key: str):
         raise HTTPException(status_code=404, detail="No cover image found")
 
     image_data, mime_type = cover
-    return Response(content=image_data, media_type=mime_type)
+    return Response(content=image_data, media_type=mime_type, headers=CACHE_CONTROL_HEADER)
