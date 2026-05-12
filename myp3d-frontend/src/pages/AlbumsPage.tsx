@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { mp3Api } from '../api/mp3Api';
-import type { AlbumInfo, AlbumSortBy, SortDirection } from '../api/mp3Api';
+import type { AlbumSortBy, SortDirection } from '../api/mp3Api';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { usePagedData } from '../hooks/usePagedData';
+import { formatBytes, formatDateTime } from '../utils/formatters';
 import { PaginatedTable } from '../components/table/PaginatedTable';
 import { SortableHeaderButton } from '../components/table/SortableHeaderButton';
 
@@ -18,74 +21,38 @@ const ALBUM_COLUMN_WIDTHS = {
 
 export function AlbumsPage() {
   const navigate = useNavigate();
-  const [albums, setAlbums] = useState<AlbumInfo[]>([]);
-  const [totalItems, setTotalItems] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<AlbumSortBy>('album_name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [currentPage, setCurrentPage] = useState(1);
-  const latestRequestIdRef = useRef(0);
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
+  const queryParams = useMemo(
+    () => ({
+      search: debouncedSearchQuery,
+      sortBy,
+      sortDirection,
+    }),
+    [debouncedSearchQuery, sortBy, sortDirection],
+  );
 
-  const loadAlbums = useCallback(async () => {
-    const requestId = latestRequestIdRef.current + 1;
-    latestRequestIdRef.current = requestId;
-
-    try {
-      setLoading(true);
-      const response = await mp3Api.listAlbumsPaged({
-        page: currentPage,
-        limit: PAGE_SIZE,
-        search: debouncedSearchQuery,
-        sortBy,
-        sortDirection,
-      });
-
-      if (requestId !== latestRequestIdRef.current) {
-        return;
-      }
-
-      setAlbums(response.items);
-      setTotalItems(response.meta.total);
-      setError(null);
-    } catch {
-      if (requestId !== latestRequestIdRef.current) {
-        return;
-      }
-      setError('Failed to load albums');
-    } finally {
-      if (requestId === latestRequestIdRef.current) {
-        setLoading(false);
-      }
-    }
-  }, [currentPage, debouncedSearchQuery, sortBy, sortDirection]);
-
-  useEffect(() => {
-    const timerId = window.setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
-    }, 300);
-
-    return () => window.clearTimeout(timerId);
-  }, [searchQuery]);
+  const {
+    items: albums,
+    total: totalItems,
+    loading,
+    error,
+    loadPage: loadAlbums,
+  } = usePagedData({
+    page: currentPage,
+    pageSize: PAGE_SIZE,
+    params: queryParams,
+    fetchPage: mp3Api.listAlbumsPaged,
+    errorMessage: 'Failed to load albums',
+    cacheKeyPrefix: 'albums',
+  });
 
   useEffect(() => {
     void loadAlbums();
   }, [loadAlbums]);
-
-  const formatSize = (bytes: number) => {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-  };
-
-  const formatDateAdded = (dateAdded: string | null | undefined) => {
-    if (!dateAdded) return '-';
-    const parsed = new Date(dateAdded);
-    if (Number.isNaN(parsed.getTime())) return '-';
-    return parsed.toLocaleString();
-  };
 
   useEffect(() => {
     setCurrentPage(1);
@@ -130,7 +97,7 @@ export function AlbumsPage() {
     <div className="page">
       <h1>Albums</h1>
       <div className="library-toolbar">
-        <button onClick={() => void loadAlbums()} className="btn-secondary">
+        <button onClick={() => void loadAlbums({ force: true })} className="btn-secondary">
           Refresh
         </button>
         <div className="library-filters albums-filters">
@@ -193,8 +160,8 @@ export function AlbumsPage() {
               <td><span className="table-cell-ellipsis" title={album.album_name || '(No Album)'}>{album.album_name || '(No Album)'}</span></td>
               <td><span className="table-cell-ellipsis" title={album.artists.length > 0 ? album.artists.join(', ') : '-'}>{album.artists.length > 0 ? album.artists.join(', ') : '-'}</span></td>
               <td><span className="table-cell-ellipsis" title={String(album.track_count)}>{album.track_count}</span></td>
-              <td><span className="table-cell-ellipsis" title={formatSize(album.total_size)}>{formatSize(album.total_size)}</span></td>
-              <td><span className="library-date" title={formatDateAdded(album.date_added)}>{formatDateAdded(album.date_added)}</span></td>
+              <td><span className="table-cell-ellipsis" title={formatBytes(album.total_size)}>{formatBytes(album.total_size)}</span></td>
+              <td><span className="library-date" title={formatDateTime(album.date_added)}>{formatDateTime(album.date_added)}</span></td>
               <td>
                 <div className="table-actions">
                   <button
