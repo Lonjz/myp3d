@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { mp3Api } from '../api/mp3Api';
-import type { MP3FilterBy, MP3Info, MP3SortBy, SortDirection } from '../api/mp3Api';
+import type { MP3FilterBy, MP3SortBy, SortDirection } from '../api/mp3Api';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { usePagedData } from '../hooks/usePagedData';
+import { formatBytes, formatDateTime } from '../utils/formatters';
 import { PaginatedTable } from '../components/table/PaginatedTable';
 import { SortableHeaderButton } from '../components/table/SortableHeaderButton';
 
@@ -19,17 +22,37 @@ const LIBRARY_COLUMN_WIDTHS = {
 
 export function LibraryPage() {
   const navigate = useNavigate();
-  const [mp3s, setMp3s] = useState<MP3Info[]>([]);
-  const [totalItems, setTotalItems] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [filterBy, setFilterBy] = useState<MP3FilterBy>('all');
   const [sortBy, setSortBy] = useState<MP3SortBy>('date_added');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [currentPage, setCurrentPage] = useState(1);
-  const latestRequestIdRef = useRef(0);
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
+  const queryParams = useMemo(
+    () => ({
+      search: debouncedSearchQuery,
+      filterBy,
+      sortBy,
+      sortDirection,
+    }),
+    [debouncedSearchQuery, filterBy, sortBy, sortDirection],
+  );
+
+  const {
+    items: mp3s,
+    total: totalItems,
+    loading,
+    error,
+    loadPage: loadMp3s,
+    invalidateCache: invalidateMp3Cache,
+  } = usePagedData({
+    page: currentPage,
+    pageSize: PAGE_SIZE,
+    params: queryParams,
+    fetchPage: mp3Api.listAllPaged,
+    errorMessage: 'Failed to load MP3 library',
+    cacheKeyPrefix: 'library',
+  });
 
   const sortColumnLabels: Record<MP3SortBy, string> = {
     title: 'Title',
@@ -40,48 +63,6 @@ export function LibraryPage() {
     date_added: 'Date Added',
   };
 
-  const loadMp3s = useCallback(async () => {
-    const requestId = latestRequestIdRef.current + 1;
-    latestRequestIdRef.current = requestId;
-
-    try {
-      setLoading(true);
-      const response = await mp3Api.listAllPaged({
-        page: currentPage,
-        limit: PAGE_SIZE,
-        search: debouncedSearchQuery,
-        filterBy,
-        sortBy,
-        sortDirection,
-      });
-
-      if (requestId !== latestRequestIdRef.current) {
-        return;
-      }
-
-      setMp3s(response.items);
-      setTotalItems(response.meta.total);
-      setError(null);
-    } catch {
-      if (requestId !== latestRequestIdRef.current) {
-        return;
-      }
-      setError('Failed to load MP3 library');
-    } finally {
-      if (requestId === latestRequestIdRef.current) {
-        setLoading(false);
-      }
-    }
-  }, [currentPage, debouncedSearchQuery, filterBy, sortBy, sortDirection]);
-
-  useEffect(() => {
-    const timerId = window.setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
-    }, 300);
-
-    return () => window.clearTimeout(timerId);
-  }, [searchQuery]);
-
   useEffect(() => {
     void loadMp3s();
   }, [loadMp3s]);
@@ -90,16 +71,11 @@ export function LibraryPage() {
     if (!confirm(`Delete "${filename}"?`)) return;
     try {
       await mp3Api.delete(filename);
-      await loadMp3s();
+      invalidateMp3Cache();
+      await loadMp3s({ force: true });
     } catch {
       alert('Failed to delete file');
     }
-  };
-
-  const formatSize = (bytes: number) => {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
   useEffect(() => {
@@ -116,13 +92,6 @@ export function LibraryPage() {
 
   const shownStart = totalItems === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const shownEnd = totalItems === 0 ? 0 : shownStart + mp3s.length - 1;
-
-  const formatDateAdded = (dateAdded: string | null | undefined) => {
-    if (!dateAdded) return '-';
-    const parsed = new Date(dateAdded);
-    if (Number.isNaN(parsed.getTime())) return '-';
-    return parsed.toLocaleString();
-  };
 
   const handleSortClick = (column: MP3SortBy) => {
     if (column === sortBy) {
@@ -152,7 +121,7 @@ export function LibraryPage() {
     <div className="page">
       <h1>MP3 Library</h1>
       <div className="library-toolbar">
-        <button onClick={() => void loadMp3s()} className="btn-secondary">
+        <button onClick={() => void loadMp3s({ force: true })} className="btn-secondary">
           Refresh
         </button>
 
@@ -234,8 +203,8 @@ export function LibraryPage() {
               <td><span className="table-cell-ellipsis" title={mp3.artist || '-'}>{mp3.artist || '-'}</span></td>
               <td><span className="table-cell-ellipsis" title={mp3.album || '-'}>{mp3.album || '-'}</span></td>
               <td><span className="library-filename" title={mp3.filename}>{mp3.filename}</span></td>
-              <td><span className="table-cell-ellipsis" title={formatSize(mp3.file_size)}>{formatSize(mp3.file_size)}</span></td>
-              <td><span className="library-date" title={formatDateAdded(mp3.date_added)}>{formatDateAdded(mp3.date_added)}</span></td>
+              <td><span className="table-cell-ellipsis" title={formatBytes(mp3.file_size)}>{formatBytes(mp3.file_size)}</span></td>
+              <td><span className="library-date" title={formatDateTime(mp3.date_added)}>{formatDateTime(mp3.date_added)}</span></td>
               <td>
                 <div className="table-actions">
                   <button

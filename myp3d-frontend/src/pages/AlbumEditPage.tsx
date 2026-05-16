@@ -6,6 +6,7 @@ import { CoverCropModal } from '../components/cover/CoverCropModal';
 import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
 import { useToast } from '../components/messages/ToastProvider';
 import { InfiniteSidebarList } from '../components/sidebar/InfiniteSidebarList';
+import { getCachedAlbumDetail, invalidateAlbumDetail, setCachedAlbumDetail } from '../utils/detailCache';
 
 interface AlbumEditPageProps {
   albumKey: string;
@@ -48,24 +49,40 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
     outputFilename: 'album-cover.jpg',
   });
 
-  const loadAlbum = async (targetKey: string, options?: { clearToast?: boolean }) => {
+  const applyAlbumDetail = (detail: AlbumDetail, targetKey: string) => {
+    setAlbumDetail(detail);
+
+    const editableName = detail.album.album_name === NO_ALBUM_LABEL ? '' : detail.album.album_name;
+    setAlbumName(editableName);
+
+    if (detail.album.has_cover) {
+      const cacheBuster = Date.now();
+      setExistingCoverPreview(`${mp3Api.getAlbumCoverUrl(targetKey)}?t=${cacheBuster}`);
+    } else {
+      setExistingCoverPreview(null);
+    }
+  };
+
+  const loadAlbum = async (targetKey: string, options?: { clearToast?: boolean; force?: boolean }) => {
+    const force = options?.force ?? false;
+    if (options?.clearToast ?? true) {
+      clearToast();
+    }
+
+    if (!force) {
+      const cached = getCachedAlbumDetail(targetKey);
+      if (cached) {
+        applyAlbumDetail(cached, targetKey);
+        setLoading(false);
+        return;
+      }
+    }
+
     try {
       setLoading(true);
-      if (options?.clearToast ?? true) {
-        clearToast();
-      }
       const detail = await mp3Api.getAlbum(targetKey);
-      setAlbumDetail(detail);
-
-      const editableName = detail.album.album_name === NO_ALBUM_LABEL ? '' : detail.album.album_name;
-      setAlbumName(editableName);
-
-      if (detail.album.has_cover) {
-        const cacheBuster = Date.now();
-        setExistingCoverPreview(`${mp3Api.getAlbumCoverUrl(targetKey)}?t=${cacheBuster}`);
-      } else {
-        setExistingCoverPreview(null);
-      }
+      setCachedAlbumDetail(targetKey, detail);
+      applyAlbumDetail(detail, targetKey);
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Failed to load album');
       setAlbumDetail(null);
@@ -105,11 +122,13 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
       }
 
       if (targetAlbumKey !== albumKey) {
+        invalidateAlbumDetail(albumKey);
         navigate(`/albums/${encodeURIComponent(targetAlbumKey)}`, { replace: true });
         return;
       }
 
-      await loadAlbum(targetAlbumKey, { clearToast: false });
+      invalidateAlbumDetail(targetAlbumKey);
+      await loadAlbum(targetAlbumKey, { clearToast: false, force: true });
       showSuccess('Album updated successfully!');
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Failed to save album');

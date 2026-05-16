@@ -6,6 +6,7 @@ import { CoverCropModal } from '../components/cover/CoverCropModal';
 import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
 import { useToast } from '../components/messages/ToastProvider';
 import { InfiniteSidebarList } from '../components/sidebar/InfiniteSidebarList';
+import { getCachedMp3Info, invalidateMp3Info, setCachedMp3Info } from '../utils/detailCache';
 
 interface EditPageProps {
   filename: string;
@@ -53,32 +54,48 @@ export function EditPage({ filename, onBack }: EditPageProps) {
     outputFilename: 'cover.jpg',
   });
 
-  useEffect(() => {
-    loadMp3();
-  }, [filename]);
+  const applyMp3Info = (info: MP3Info) => {
+    setMp3(info);
+    setTitle(info.title || '');
+    setArtist(info.artist || '');
+    setAlbum(info.album || '');
+    setNewFilename(info.filename);
+    if (info.has_cover) {
+      setExistingCoverPreview(mp3Api.getCoverUrl(info.filename));
+    } else {
+      setExistingCoverPreview(null);
+    }
+  };
 
-  const loadMp3 = async () => {
+  const loadMp3 = async (options?: { force?: boolean }) => {
+    const force = options?.force ?? false;
+    clearToast();
+    resetCoverState();
+
+    if (!force) {
+      const cached = getCachedMp3Info(filename);
+      if (cached) {
+        applyMp3Info(cached);
+        setLoading(false);
+        return;
+      }
+    }
+
     try {
       setLoading(true);
-      clearToast();
-      resetCoverState();
       const info = await mp3Api.getInfo(filename);
-      setMp3(info);
-      setTitle(info.title || '');
-      setArtist(info.artist || '');
-      setAlbum(info.album || '');
-      setNewFilename(info.filename);
-      if (info.has_cover) {
-        setExistingCoverPreview(mp3Api.getCoverUrl(filename));
-      } else {
-        setExistingCoverPreview(null);
-      }
+      setCachedMp3Info(filename, info);
+      applyMp3Info(info);
     } catch {
       showError('Failed to load MP3 info');
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    void loadMp3();
+  }, [filename]);
 
   const handleCoverChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -108,6 +125,11 @@ export function EditPage({ filename, onBack }: EditPageProps) {
       }
 
       showSuccess('Saved successfully!');
+
+      invalidateMp3Info(filename);
+      if (result.filename === filename) {
+        await loadMp3({ force: true });
+      }
       
       // If filename changed, go back to library
       if (result.filename !== filename) {

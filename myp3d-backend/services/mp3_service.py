@@ -3,6 +3,8 @@ import base64
 import binascii
 import hashlib
 import importlib
+import threading
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -17,6 +19,7 @@ from models.schemas import AlbumInfo, MP3Info
 from services.config import OUTPUT_DIR, get_ffmpeg_path
 
 
+CACHE_TTL_SECONDS = 120.0
 COVER_SIZE = (500, 500)
 NO_ALBUM_LABEL = "(No Album)"
 
@@ -47,6 +50,30 @@ class AlbumGroup:
         )
 
 
+@dataclass
+class _LibraryCache:
+    mp3_infos: Optional[list[MP3Info]] = None
+    album_groups: Optional[dict[str, "AlbumGroup"]] = None
+    built_at: float = 0.0
+    dirty: bool = True
+
+
+_cache_lock = threading.Lock()
+_library_cache = _LibraryCache()
+
+
+def invalidate_library_cache() -> None:
+    with _cache_lock:
+        _library_cache.mp3_infos = None
+        _library_cache.album_groups = None
+        _library_cache.built_at = 0.0
+        _library_cache.dirty = True
+
+
+def _should_rebuild_cache(now: float) -> bool:
+    return _library_cache.dirty or (now - _library_cache.built_at) > CACHE_TTL_SECONDS
+
+
 def _normalize_album_value(album_name: Optional[str]) -> str:
     return (album_name or "").strip()
 
@@ -68,14 +95,34 @@ def list_mp3_filepaths() -> list[Path]:
 
 
 def list_mp3_infos() -> list[MP3Info]:
-    return [get_mp3_info(filepath) for filepath in list_mp3_filepaths()]
+    now = time.monotonic()
+    with _cache_lock:
+        if _library_cache.mp3_infos is not None and not _should_rebuild_cache(now):
+            return list(_library_cache.mp3_infos)
+
+    mp3_infos = [get_mp3_info(filepath) for filepath in list_mp3_filepaths()]
+
+    with _cache_lock:
+        _library_cache.mp3_infos = mp3_infos
+        _library_cache.album_groups = None
+        _library_cache.built_at = time.monotonic()
+        _library_cache.dirty = False
+
+    return list(mp3_infos)
 
 
 def build_album_groups() -> dict[str, AlbumGroup]:
+    now = time.monotonic()
+    with _cache_lock:
+        if _library_cache.album_groups is not None and not _should_rebuild_cache(now):
+            return _library_cache.album_groups
+
     groups: dict[str, AlbumGroup] = {}
 
-    for filepath in list_mp3_filepaths():
-        track = get_mp3_info(filepath)
+    for track in list_mp3_infos():
+        filepath = OUTPUT_DIR / track.filename
+        if not filepath.exists():
+            continue
         album_value = _normalize_album_value(track.album)
         normalized_album = album_value.casefold()
         album_key = _album_key(normalized_album)
@@ -109,6 +156,9 @@ def build_album_groups() -> dict[str, AlbumGroup]:
 
         if album_value and group.album_name == NO_ALBUM_LABEL:
             group.album_name = album_value
+
+    with _cache_lock:
+        _library_cache.album_groups = groups
 
     return groups
 
@@ -242,6 +292,8 @@ def set_album_name(filepaths: list[Path], album_name: str) -> None:
         audio.tag.album = tag_album_value
         audio.tag.save(version=(2, 3, 0))
 
+    invalidate_library_cache()
+
 
 def set_album_cover(filepaths: list[Path], image_data: bytes, mime_type: str) -> None:
     for filepath in filepaths:
@@ -252,6 +304,8 @@ def set_album_cover(filepaths: list[Path], image_data: bytes, mime_type: str) ->
             audio.initTag()
         set_cover_images(audio.tag, image_data, mime_type)
         audio.tag.save(version=(2, 3, 0))
+
+    invalidate_library_cache()
 
 
 def get_album_cover(filepaths: list[Path]) -> Optional[tuple[bytes, str]]:
@@ -392,4 +446,5 @@ def download_as_mp3(url: str, metadata: Optional[dict] = None, custom_name: Opti
             set_cover_images(audio.tag, processed_cover, mime_type)
         audio.tag.save(version=(2, 3, 0))
 
+    invalidate_library_cache()
     return os.path.basename(mp3_file)
