@@ -14,6 +14,7 @@ from typing import Literal, Optional
 import eyed3
 from eyed3.id3 import frames as id3_frames
 from yt_dlp import YoutubeDL
+from yt_dlp.utils import download_range_func
 
 from models.schemas import AlbumInfo, MP3Info
 from services.config import OUTPUT_DIR, get_ffmpeg_path
@@ -392,8 +393,14 @@ def get_mp3_info(filepath: Path) -> MP3Info:
     return info
 
 
-def download_as_mp3(url: str, metadata: Optional[dict] = None, custom_name: Optional[str] = None) -> str:
-    """Download YouTube video as MP3."""
+def download_as_mp3(
+    url: str,
+    metadata: Optional[dict] = None,
+    custom_name: Optional[str] = None,
+    start_time: Optional[float] = None,
+    end_time: Optional[float] = None,
+) -> str:
+    """Download YouTube video as MP3, optionally using yt-dlp download sections."""
     ffmpeg_path = get_ffmpeg_path()
     
     # Output template
@@ -418,7 +425,11 @@ def download_as_mp3(url: str, metadata: Optional[dict] = None, custom_name: Opti
         "quiet": True,
         "noplaylist": True,
     }
-    
+
+    if start_time is not None and end_time is not None:
+        ydl_opts["download_ranges"] = download_range_func(None, [(start_time, end_time)])
+        ydl_opts["force_keyframes_at_cuts"] = True
+
     if ffmpeg_path:
         ydl_opts["ffmpeg_location"] = ffmpeg_path
 
