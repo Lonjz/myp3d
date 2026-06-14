@@ -6,12 +6,9 @@ BACKEND_DIR="$ROOT_DIR/myp3d-backend"
 FRONTEND_DIR="$ROOT_DIR/myp3d-frontend"
 
 PYTHON_BIN="$BACKEND_DIR/venv/bin/python"
-if [[ ! -x "$PYTHON_BIN" ]]; then
-    PYTHON_BIN="$BACKEND_DIR/.venv/bin/python"
-fi
 
 if [[ ! -x "$PYTHON_BIN" ]]; then
-    echo "Backend venv Python not found. Expected venv/bin/python or .venv/bin/python under myp3d-backend."
+    echo "Backend venv Python not found. Expected venv/bin/python under myp3d-backend."
     exit 1
 fi
 
