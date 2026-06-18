@@ -60,6 +60,16 @@ export function InfiniteSidebarList<T>({
   const inflightKeysRef = useRef<Set<string>>(new Set());
   const hasRestoredScrollRef = useRef(false);
 
+  // Mirror props/state that change identity every render into refs so the
+  // fetch callback below stays stable and doesn't tear down the
+  // IntersectionObserver on each parent re-render.
+  const fetchPageRef = useRef(fetchPage);
+  fetchPageRef.current = fetchPage;
+  const getItemKeyRef = useRef(getItemKey);
+  getItemKeyRef.current = getItemKey;
+  const cacheRef = useRef(cacheByQuery);
+  cacheRef.current = cacheByQuery;
+
   const normalizedQuery = debouncedSearch.trim();
   const currentEntry = cacheByQuery[normalizedQuery];
   const loadedItems = currentEntry?.items ?? [];
@@ -70,21 +80,19 @@ export function InfiniteSidebarList<T>({
     : 0;
   const hasMore = currentEntry ? maxLoadedPage < currentEntry.totalPages : false;
 
-  const mergeUniqueItems = useCallback(
-    (base: T[], incoming: T[]) => {
-      const seenKeys = new Set(base.map((item) => getItemKey(item)));
-      const merged = [...base];
-      for (const item of incoming) {
-        const key = getItemKey(item);
-        if (!seenKeys.has(key)) {
-          seenKeys.add(key);
-          merged.push(item);
-        }
+  const mergeUniqueItems = useCallback((base: T[], incoming: T[]) => {
+    const getKey = getItemKeyRef.current;
+    const seenKeys = new Set(base.map((item) => getKey(item)));
+    const merged = [...base];
+    for (const item of incoming) {
+      const key = getKey(item);
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key);
+        merged.push(item);
       }
-      return merged;
-    },
-    [getItemKey],
-  );
+    }
+    return merged;
+  }, []);
 
   const fetchQueryPage = useCallback(
     async (query: string, page: number) => {
@@ -93,7 +101,7 @@ export function InfiniteSidebarList<T>({
         return;
       }
 
-      const existingEntry = cacheByQuery[query];
+      const existingEntry = cacheRef.current[query];
       if (existingEntry?.loadedPages.includes(page)) {
         return;
       }
@@ -106,7 +114,7 @@ export function InfiniteSidebarList<T>({
       }
 
       try {
-        const response = await fetchPage({
+        const response = await fetchPageRef.current({
           page,
           limit: pageSize,
           search: query,
@@ -148,7 +156,7 @@ export function InfiniteSidebarList<T>({
         setIsLoadingMore(false);
       }
     },
-    [cacheByQuery, fetchPage, mergeUniqueItems, pageSize],
+    [mergeUniqueItems, pageSize],
   );
 
   useEffect(() => {
