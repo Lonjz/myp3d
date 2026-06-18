@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { mp3Api } from '../api/mp3Api';
-import type { AlbumSortBy, SortDirection } from '../api/mp3Api';
+import type { AlbumSortBy } from '../api/mp3Api';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
-import { usePagedData } from '../hooks/usePagedData';
+import { usePagedList } from '../hooks/usePagedList';
+import { useSortState } from '../hooks/useSortState';
 import { formatBytes, formatDateTime } from '../utils/formatters';
 import { PaginatedTable } from '../components/table/PaginatedTable';
 import { SortableHeaderButton } from '../components/table/SortableHeaderButton';
@@ -22,10 +23,14 @@ const ALBUM_COLUMN_WIDTHS = {
 export function AlbumsPage() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<AlbumSortBy>('album_name');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
-  const [currentPage, setCurrentPage] = useState(1);
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
+
+  const { sortBy, sortDirection, handleSortClick } = useSortState<AlbumSortBy>({
+    initialSortBy: 'album_name',
+    initialDirection: 'asc',
+    getDefaultDirection: (column) => (column === 'album_name' ? 'asc' : 'desc'),
+  });
+
   const queryParams = useMemo(
     () => ({
       search: debouncedSearchQuery,
@@ -41,43 +46,23 @@ export function AlbumsPage() {
     loading,
     error,
     loadPage: loadAlbums,
-  } = usePagedData({
-    page: currentPage,
+    currentPage,
+    totalPages,
+    shownStart,
+    shownEnd,
+    onPrevious,
+    onNext,
+    onGoToPage,
+    previousDisabled,
+    nextDisabled,
+  } = usePagedList({
     pageSize: PAGE_SIZE,
     params: queryParams,
     fetchPage: mp3Api.listAlbumsPaged,
     errorMessage: 'Failed to load albums',
     cacheKeyPrefix: 'albums',
+    resetKey: `${searchQuery}|${sortBy}|${sortDirection}`,
   });
-
-  useEffect(() => {
-    void loadAlbums();
-  }, [loadAlbums]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, sortBy, sortDirection]);
-
-  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
-
-  const shownStart = totalItems === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
-  const shownEnd = totalItems === 0 ? 0 : shownStart + albums.length - 1;
-
-  const handleSortClick = (column: AlbumSortBy) => {
-    if (column === sortBy) {
-      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-      return;
-    }
-
-    setSortBy(column);
-    setSortDirection(column === 'album_name' ? 'asc' : 'desc');
-  };
 
   const renderSortHeader = (column: AlbumSortBy, label: string) => {
     return (
@@ -179,11 +164,11 @@ export function AlbumsPage() {
           totalItems={totalItems}
           currentPage={currentPage}
           totalPages={totalPages}
-          onPrevious={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-          onNext={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-          onGoToPage={(page) => setCurrentPage(page)}
-          previousDisabled={currentPage <= 1 || loading}
-          nextDisabled={currentPage >= totalPages || loading}
+          onPrevious={onPrevious}
+          onNext={onNext}
+          onGoToPage={onGoToPage}
+          previousDisabled={previousDisabled}
+          nextDisabled={nextDisabled}
         />
       )}
     </div>
