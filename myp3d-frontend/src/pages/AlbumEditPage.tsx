@@ -7,6 +7,7 @@ import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
 import { useToast } from '../components/messages/ToastProvider';
 import { InfiniteSidebarList } from '../components/sidebar/InfiniteSidebarList';
 import { getCachedAlbumDetail, invalidateAlbumDetail, setCachedAlbumDetail } from '../utils/detailCache';
+import { formatBytes } from '../utils/formatters';
 
 interface AlbumEditPageProps {
   albumKey: string;
@@ -137,12 +138,6 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
     }
   };
 
-  const formatSize = (bytes: number) => {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-  };
-
   if (loading && !albumDetail) return <div className="page"><p>Loading album...</p></div>;
   if (!albumDetail) return <div className="page"><p>Album not found</p></div>;
 
@@ -236,7 +231,7 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
                 </div>
                 <div className="album-stat-card">
                   <span className="album-stat-label">Total Size</span>
-                  <strong>{formatSize(albumDetail.album.total_size)}</strong>
+                  <strong>{formatBytes(albumDetail.album.total_size)}</strong>
                 </div>
                 <div className="album-stat-card album-stat-card-wide">
                   <span className="album-stat-label">Artists</span>
@@ -268,7 +263,7 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
                       <td>{track.title || '-'}</td>
                       <td>{track.artist || '-'}</td>
                       <td className="library-filename">{track.filename}</td>
-                      <td>{formatSize(track.file_size)}</td>
+                      <td>{formatBytes(track.file_size)}</td>
                     </tr>
                   ))}
                 </tbody>
