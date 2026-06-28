@@ -17,6 +17,14 @@ import { AlbumEditPage } from './pages/AlbumEditPage';
 import { ToastProvider } from './components/messages/ToastProvider';
 import './App.css';
 
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 function EditRoute() {
   const { songName } = useParams();
   const navigate = useNavigate();
@@ -25,17 +33,9 @@ function EditRoute() {
     return <Navigate to="/library" replace />;
   }
 
-  const filename = (() => {
-    try {
-      return decodeURIComponent(songName);
-    } catch {
-      return songName;
-    }
-  })();
-
   return (
     <EditPage
-      filename={filename}
+      filename={safeDecode(songName)}
       onBack={() => navigate('/library')}
     />
   );
@@ -49,17 +49,9 @@ function AlbumEditRoute() {
     return <Navigate to="/albums" replace />;
   }
 
-  const albumKey = (() => {
-    try {
-      return decodeURIComponent(encodedAlbumKey);
-    } catch {
-      return encodedAlbumKey;
-    }
-  })();
-
   return (
     <AlbumEditPage
-      albumKey={albumKey}
+      albumKey={safeDecode(encodedAlbumKey)}
       onBack={() => navigate('/albums')}
     />
   );

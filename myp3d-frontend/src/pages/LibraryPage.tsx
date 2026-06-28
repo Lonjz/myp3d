@@ -1,14 +1,23 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { mp3Api } from '../api/mp3Api';
-import type { MP3FilterBy, MP3SortBy, SortDirection } from '../api/mp3Api';
+import type { MP3FilterBy, MP3SortBy } from '../api/mp3Api';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
-import { usePagedData } from '../hooks/usePagedData';
+import { usePagedList } from '../hooks/usePagedList';
+import { useSortState } from '../hooks/useSortState';
 import { formatBytes, formatDateTime } from '../utils/formatters';
 import { PaginatedTable } from '../components/table/PaginatedTable';
 import { SortableHeaderButton } from '../components/table/SortableHeaderButton';
 
 const PAGE_SIZE = 25;
+const SORT_COLUMN_LABELS: Record<MP3SortBy, string> = {
+  title: 'Title',
+  artist: 'Artist',
+  album: 'Album',
+  filename: 'File Name',
+  size: 'Size',
+  date_added: 'Date Added',
+};
 const LIBRARY_COLUMN_WIDTHS = {
   cover: '76px',
   title: '18%',
@@ -24,10 +33,14 @@ export function LibraryPage() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterBy, setFilterBy] = useState<MP3FilterBy>('all');
-  const [sortBy, setSortBy] = useState<MP3SortBy>('date_added');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [currentPage, setCurrentPage] = useState(1);
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
+
+  const { sortBy, sortDirection, handleSortClick } = useSortState<MP3SortBy>({
+    initialSortBy: 'date_added',
+    initialDirection: 'desc',
+    getDefaultDirection: (column) => (column === 'date_added' ? 'desc' : 'asc'),
+  });
+
   const queryParams = useMemo(
     () => ({
       search: debouncedSearchQuery,
@@ -45,27 +58,23 @@ export function LibraryPage() {
     error,
     loadPage: loadMp3s,
     invalidateCache: invalidateMp3Cache,
-  } = usePagedData({
-    page: currentPage,
+    currentPage,
+    totalPages,
+    shownStart,
+    shownEnd,
+    onPrevious,
+    onNext,
+    onGoToPage,
+    previousDisabled,
+    nextDisabled,
+  } = usePagedList({
     pageSize: PAGE_SIZE,
     params: queryParams,
     fetchPage: mp3Api.listAllPaged,
     errorMessage: 'Failed to load MP3 library',
     cacheKeyPrefix: 'library',
+    resetKey: `${searchQuery}|${filterBy}|${sortBy}|${sortDirection}`,
   });
-
-  const sortColumnLabels: Record<MP3SortBy, string> = {
-    title: 'Title',
-    artist: 'Artist',
-    album: 'Album',
-    filename: 'File Name',
-    size: 'Size',
-    date_added: 'Date Added',
-  };
-
-  useEffect(() => {
-    void loadMp3s();
-  }, [loadMp3s]);
 
   const handleDelete = async (filename: string) => {
     if (!confirm(`Delete "${filename}"?`)) return;
@@ -78,35 +87,10 @@ export function LibraryPage() {
     }
   };
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, filterBy, sortBy, sortDirection]);
-
-  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
-
-  const shownStart = totalItems === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
-  const shownEnd = totalItems === 0 ? 0 : shownStart + mp3s.length - 1;
-
-  const handleSortClick = (column: MP3SortBy) => {
-    if (column === sortBy) {
-      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-      return;
-    }
-
-    setSortBy(column);
-    setSortDirection(column === 'date_added' ? 'desc' : 'asc');
-  };
-
   const renderSortHeader = (column: MP3SortBy) => {
     return (
       <SortableHeaderButton
-        label={sortColumnLabels[column]}
+        label={SORT_COLUMN_LABELS[column]}
         isActive={sortBy === column}
         sortDirection={sortDirection}
         onClick={() => handleSortClick(column)}
@@ -228,11 +212,11 @@ export function LibraryPage() {
           totalItems={totalItems}
           currentPage={currentPage}
           totalPages={totalPages}
-          onPrevious={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-          onNext={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-          onGoToPage={(page) => setCurrentPage(page)}
-          previousDisabled={currentPage <= 1 || loading}
-          nextDisabled={currentPage >= totalPages || loading}
+          onPrevious={onPrevious}
+          onNext={onNext}
+          onGoToPage={onGoToPage}
+          previousDisabled={previousDisabled}
+          nextDisabled={nextDisabled}
         />
       )}
     </div>
