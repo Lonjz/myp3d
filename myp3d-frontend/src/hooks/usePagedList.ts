@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePagedData, type PagedResponse } from './usePagedData';
 
 type UsePagedListOptions<TParams extends Record<string, unknown>, TItem> = {
@@ -19,6 +19,7 @@ export function usePagedList<TParams extends Record<string, unknown>, TItem>({
   resetKey,
 }: UsePagedListOptions<TParams, TItem>) {
   const [currentPage, setCurrentPage] = useState(1);
+  const prevResetKeyRef = useRef(resetKey);
 
   const { items, total, loading, error, loadPage, invalidateCache } = usePagedData({
     page: currentPage,
@@ -30,12 +31,15 @@ export function usePagedList<TParams extends Record<string, unknown>, TItem>({
   });
 
   useEffect(() => {
+    if (prevResetKeyRef.current !== resetKey) {
+      prevResetKeyRef.current = resetKey;
+      if (currentPage !== 1) {
+        setCurrentPage(1);
+        return;
+      }
+    }
     void loadPage();
-  }, [loadPage]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [resetKey]);
+  }, [loadPage, currentPage, resetKey]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
