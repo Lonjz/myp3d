@@ -31,7 +31,7 @@ export interface YouTubeSearchResult {
   duration: number | null;
 }
 
-export interface MetadataUpdate {
+interface MetadataUpdate {
   title?: string;
   artist?: string;
   album?: string;
@@ -54,11 +54,11 @@ export interface AlbumDetail {
   tracks: MP3Info[];
 }
 
-export interface AlbumUpdateRequest {
+interface AlbumUpdateRequest {
   album_name: string;
 }
 
-export interface AlbumUpdateResponse {
+interface AlbumUpdateResponse {
   success: boolean;
   album_key: string;
   album_name: string;
@@ -66,7 +66,7 @@ export interface AlbumUpdateResponse {
   message: string;
 }
 
-export interface PaginationMeta {
+interface PaginationMeta {
   total: number;
   page: number;
   limit: number;
@@ -74,12 +74,12 @@ export interface PaginationMeta {
   returned: number;
 }
 
-export interface PaginatedMP3Response {
+interface PaginatedMP3Response {
   items: MP3Info[];
   meta: PaginationMeta;
 }
 
-export interface PaginatedAlbumResponse {
+interface PaginatedAlbumResponse {
   items: AlbumInfo[];
   meta: PaginationMeta;
 }
@@ -89,7 +89,7 @@ export type MP3SortBy = 'date_added' | 'filename' | 'size' | 'artist' | 'title' 
 export type AlbumSortBy = 'album_name' | 'track_count' | 'total_size' | 'date_added';
 export type SortDirection = 'asc' | 'desc';
 
-export interface MP3ListPagedParams {
+interface MP3ListPagedParams {
   page: number;
   limit: number;
   search?: string;
@@ -98,7 +98,7 @@ export interface MP3ListPagedParams {
   sortDirection?: SortDirection;
 }
 
-export interface AlbumListPagedParams {
+interface AlbumListPagedParams {
   page: number;
   limit: number;
   search?: string;
@@ -106,89 +106,80 @@ export interface AlbumListPagedParams {
   sortDirection?: SortDirection;
 }
 
+// Shared fetch wrapper: resolves JSON on success, throws error.detail (or a
+// fallback) on failure. Tolerates non-JSON error bodies.
+async function apiFetch<T>(path: string, init: RequestInit | undefined, fallbackError: string): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, init);
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.detail || fallbackError);
+  }
+  return res.json() as Promise<T>;
+}
+
+const jsonInit = (method: string, body: unknown): RequestInit => ({
+  method,
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(body),
+});
+
+// Shared page/limit/search/sort serialization for the paged list endpoints.
+function pagedQuery(
+  params: { page: number; limit: number; search?: string; sortBy?: string; sortDirection?: string },
+  defaults: { sortBy: string; sortDirection: string },
+): URLSearchParams {
+  return new URLSearchParams({
+    page: String(params.page),
+    limit: String(params.limit),
+    search: params.search || '',
+    sort_by: params.sortBy || defaults.sortBy,
+    sort_direction: params.sortDirection || defaults.sortDirection,
+  });
+}
+
 export const mp3Api = {
   // Download a YouTube video as MP3
-  async download(request: DownloadRequest): Promise<{ success: boolean; filename: string; message: string }> {
-    const res = await fetch(`${API_BASE}/download`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(request),
-    });
-    if (!res.ok) {
-      const error = await res.json();
-      throw new Error(error.detail || 'Download failed');
-    }
-    return res.json();
+  download(request: DownloadRequest): Promise<{ success: boolean; filename: string; message: string }> {
+    return apiFetch('/download', jsonInit('POST', request), 'Download failed');
   },
 
   // List MP3 files with server-side pagination/filter/sort
-  async listAllPaged(params: MP3ListPagedParams): Promise<PaginatedMP3Response> {
-    const query = new URLSearchParams({
-      page: String(params.page),
-      limit: String(params.limit),
-      search: params.search || '',
-      filter_by: params.filterBy || 'all',
-      sort_by: params.sortBy || 'date_added',
-      sort_direction: params.sortDirection || 'desc',
-    });
-
-    const res = await fetch(`${API_BASE}/mp3s/paged?${query.toString()}`);
-    if (!res.ok) {
-      const error = await res.json().catch(() => ({}));
-      throw new Error(error.detail || 'Failed to fetch paged MP3 list');
-    }
-    return res.json();
+  listAllPaged(params: MP3ListPagedParams): Promise<PaginatedMP3Response> {
+    const query = pagedQuery(params, { sortBy: 'date_added', sortDirection: 'desc' });
+    query.set('filter_by', params.filterBy || 'all');
+    return apiFetch(`/mp3s/paged?${query.toString()}`, undefined, 'Failed to fetch paged MP3 list');
   },
 
   // Search YouTube through backend yt-dlp integration
   async searchYouTube(query: string, limit = 12): Promise<YouTubeSearchResult[]> {
-    const params = new URLSearchParams({
-      query,
-      limit: String(limit),
-    });
-    const res = await fetch(`${API_BASE}/youtube/search?${params.toString()}`);
-    if (!res.ok) {
-      const error = await res.json().catch(() => ({}));
-      throw new Error(error.detail || 'Failed to search YouTube');
-    }
-    const payload = await res.json();
+    const params = new URLSearchParams({ query, limit: String(limit) });
+    const payload = await apiFetch<{ results?: YouTubeSearchResult[] }>(
+      `/youtube/search?${params.toString()}`,
+      undefined,
+      'Failed to search YouTube',
+    );
     return payload.results || [];
   },
 
   // Get MP3 metadata
-  async getInfo(filename: string): Promise<MP3Info> {
-    const res = await fetch(`${API_BASE}/mp3s/${encodeURIComponent(filename)}/info`);
-    if (!res.ok) throw new Error('Failed to fetch MP3 info');
-    return res.json();
+  getInfo(filename: string): Promise<MP3Info> {
+    return apiFetch(`/mp3s/${encodeURIComponent(filename)}/info`, undefined, 'Failed to fetch MP3 info');
   },
 
   // Update metadata
-  async updateMetadata(filename: string, metadata: MetadataUpdate): Promise<{ success: boolean; filename: string }> {
-    const res = await fetch(`${API_BASE}/mp3s/${encodeURIComponent(filename)}/metadata`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(metadata),
-    });
-    if (!res.ok) {
-      const error = await res.json();
-      throw new Error(error.detail || 'Update failed');
-    }
-    return res.json();
+  updateMetadata(filename: string, metadata: MetadataUpdate): Promise<{ success: boolean; filename: string }> {
+    return apiFetch(`/mp3s/${encodeURIComponent(filename)}/metadata`, jsonInit('PUT', metadata), 'Update failed');
   },
 
   // Update cover image
-  async updateCover(filename: string, file: File): Promise<{ success: boolean }> {
+  updateCover(filename: string, file: File): Promise<{ success: boolean }> {
     const formData = new FormData();
     formData.append('cover', file);
-    const res = await fetch(`${API_BASE}/mp3s/${encodeURIComponent(filename)}/cover`, {
-      method: 'POST',
-      body: formData,
-    });
-    if (!res.ok) {
-      const error = await res.json();
-      throw new Error(error.detail || 'Cover update failed');
-    }
-    return res.json();
+    return apiFetch(
+      `/mp3s/${encodeURIComponent(filename)}/cover`,
+      { method: 'POST', body: formData },
+      'Cover update failed',
+    );
   },
 
   // Get cover image URL
@@ -202,70 +193,35 @@ export const mp3Api = {
   },
 
   // Delete MP3
-  async delete(filename: string): Promise<{ success: boolean }> {
-    const res = await fetch(`${API_BASE}/mp3s/${encodeURIComponent(filename)}`, {
-      method: 'DELETE',
-    });
-    if (!res.ok) throw new Error('Delete failed');
-    return res.json();
+  delete(filename: string): Promise<{ success: boolean }> {
+    return apiFetch(`/mp3s/${encodeURIComponent(filename)}`, { method: 'DELETE' }, 'Delete failed');
   },
 
   // List albums with server-side pagination/filter/sort
-  async listAlbumsPaged(params: AlbumListPagedParams): Promise<PaginatedAlbumResponse> {
-    const query = new URLSearchParams({
-      page: String(params.page),
-      limit: String(params.limit),
-      search: params.search || '',
-      sort_by: params.sortBy || 'album_name',
-      sort_direction: params.sortDirection || 'asc',
-    });
-
-    const res = await fetch(`${API_BASE}/albums/paged?${query.toString()}`);
-    if (!res.ok) {
-      const error = await res.json().catch(() => ({}));
-      throw new Error(error.detail || 'Failed to fetch paged album list');
-    }
-    return res.json();
+  listAlbumsPaged(params: AlbumListPagedParams): Promise<PaginatedAlbumResponse> {
+    const query = pagedQuery(params, { sortBy: 'album_name', sortDirection: 'asc' });
+    return apiFetch(`/albums/paged?${query.toString()}`, undefined, 'Failed to fetch paged album list');
   },
 
   // Get album details and tracks
-  async getAlbum(albumKey: string): Promise<AlbumDetail> {
-    const res = await fetch(`${API_BASE}/albums/${encodeURIComponent(albumKey)}`);
-    if (!res.ok) {
-      const error = await res.json().catch(() => ({}));
-      throw new Error(error.detail || 'Failed to fetch album details');
-    }
-    return res.json();
+  getAlbum(albumKey: string): Promise<AlbumDetail> {
+    return apiFetch(`/albums/${encodeURIComponent(albumKey)}`, undefined, 'Failed to fetch album details');
   },
 
   // Update album metadata for all tracks in album
-  async updateAlbum(albumKey: string, payload: AlbumUpdateRequest): Promise<AlbumUpdateResponse> {
-    const res = await fetch(`${API_BASE}/albums/${encodeURIComponent(albumKey)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
-      const error = await res.json().catch(() => ({}));
-      throw new Error(error.detail || 'Album update failed');
-    }
-    return res.json();
+  updateAlbum(albumKey: string, payload: AlbumUpdateRequest): Promise<AlbumUpdateResponse> {
+    return apiFetch(`/albums/${encodeURIComponent(albumKey)}`, jsonInit('PUT', payload), 'Album update failed');
   },
 
   // Update album cover for all tracks in album
-  async updateAlbumCover(albumKey: string, file: File): Promise<{ success: boolean; updated_tracks: number; message: string }> {
+  updateAlbumCover(albumKey: string, file: File): Promise<{ success: boolean; updated_tracks: number; message: string }> {
     const formData = new FormData();
     formData.append('cover', file);
-
-    const res = await fetch(`${API_BASE}/albums/${encodeURIComponent(albumKey)}/cover`, {
-      method: 'POST',
-      body: formData,
-    });
-    if (!res.ok) {
-      const error = await res.json().catch(() => ({}));
-      throw new Error(error.detail || 'Album cover update failed');
-    }
-    return res.json();
+    return apiFetch(
+      `/albums/${encodeURIComponent(albumKey)}/cover`,
+      { method: 'POST', body: formData },
+      'Album cover update failed',
+    );
   },
 
   // Get album cover URL
