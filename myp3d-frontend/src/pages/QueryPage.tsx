@@ -1,11 +1,11 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { mp3Api } from '../api/mp3Api';
-import type { DownloadRequest, YouTubeSearchResult } from '../api/mp3Api';
+import type { YouTubeSearchResult } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
-import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
 import { DownloadConfigSection } from '../components/download/DownloadConfigSection';
 import { TrimRangeSection } from '../components/download/TrimRangeSection';
 import { useToast } from '../components/messages/ToastProvider';
+import { useDownloadForm } from '../hooks/useDownloadForm';
 import { formatDuration } from '../utils/formatters';
 
 type YouTubePlayer = any;
@@ -76,11 +76,6 @@ export function QueryPage() {
   const [selectedResult, setSelectedResult] = useState<YouTubeSearchResult | null>(null);
   const [selectedVideoId, setSelectedVideoId] = useState('');
 
-  const [url, setUrl] = useState('');
-  const [customFilename, setCustomFilename] = useState('');
-  const [title, setTitle] = useState('');
-  const [artist, setArtist] = useState('');
-  const [album, setAlbum] = useState('');
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(0);
@@ -99,28 +94,34 @@ export function QueryPage() {
   const isSamplePlayingRef = useRef(isSamplePlaying);
   const loopEnabledRef = useRef(loopEnabled);
 
-  const [downloading, setDownloading] = useState(false);
-  const { showSuccess, showError, clearToast } = useToast();
+  const { showError, clearToast } = useToast();
 
   const {
-    coverImageBase64,
+    url,
+    setUrl,
+    customFilename,
+    setCustomFilename,
+    title,
+    setTitle,
+    artist,
+    setArtist,
+    album,
+    setAlbum,
+    loading: downloading,
     coverPreview,
-    cropSource,
-    crop,
-    zoom,
-    isCropModalOpen,
-    isApplyingCrop,
-    setCrop,
-    setZoom,
-    handleCropComplete,
     handleCoverFileSelect,
-    handleApplyCrop,
-    handleCancelCrop,
     handleRemoveCover,
-    resetCoverState,
-  } = useCoverImageCrop({
-    onError: showError,
-    onClearError: clearToast,
+    cropModalProps,
+    submitDownload,
+  } = useDownloadForm({
+    zoomInputId: 'queryCropZoom',
+    onDownloaded: () => {
+      setVideoDuration(null);
+      setTrimStart(0);
+      setTrimEnd(0);
+      setSelectedResult(null);
+      setSelectedVideoId('');
+    },
   });
 
   const hasResults = useMemo(() => searchResults.length > 0, [searchResults.length]);
@@ -344,45 +345,16 @@ export function QueryPage() {
       return;
     }
 
-    setDownloading(true);
     if (playerRef.current) {
       playerRef.current.pauseVideo?.();
     }
     stopMonitor();
     setIsSamplePlaying(false);
-    clearToast();
 
-    try {
-      const request: DownloadRequest = {
-        url: url.trim(),
-        custom_filename: customFilename.trim() || undefined,
-        title: title.trim() || undefined,
-        artist: artist.trim() || undefined,
-        album: album.trim() || undefined,
-        cover_image_base64: coverImageBase64,
-        start_time: shouldTrim ? trimStart : undefined,
-        end_time: shouldTrim ? trimEnd : undefined,
-      };
-
-      const result = await mp3Api.download(request);
-      showSuccess(`Downloaded: ${result.filename}`);
-
-      setUrl('');
-      setCustomFilename('');
-      setTitle('');
-      setArtist('');
-      setAlbum('');
-      setVideoDuration(null);
-      setTrimStart(0);
-      setTrimEnd(0);
-      resetCoverState();
-      setSelectedResult(null);
-      setSelectedVideoId('');
-    } catch (err) {
-      showError(err instanceof Error ? err.message : 'Download failed');
-    } finally {
-      setDownloading(false);
-    }
+    await submitDownload({
+      start_time: shouldTrim ? trimStart : undefined,
+      end_time: shouldTrim ? trimEnd : undefined,
+    });
   };
 
   const handleToggleSample = () => {
@@ -548,19 +520,7 @@ export function QueryPage() {
         </section>
       </div>
 
-      <CoverCropModal
-        isOpen={isCropModalOpen}
-        cropSource={cropSource}
-        crop={crop}
-        zoom={zoom}
-        isApplyingCrop={isApplyingCrop}
-        zoomInputId="queryCropZoom"
-        onCropChange={setCrop}
-        onZoomChange={setZoom}
-        onCropComplete={handleCropComplete}
-        onCancel={handleCancelCrop}
-        onApply={handleApplyCrop}
-      />
+      <CoverCropModal {...cropModalProps} />
     </div>
   );
 }
