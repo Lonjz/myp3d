@@ -44,7 +44,7 @@ export function EditPage({ filename, onBack }: EditPageProps) {
     setCrop,
     setZoom,
     handleCropComplete,
-    handleCoverFileSelect,
+    handleCoverChange,
     handleApplyCrop,
     handleCancelCrop,
     resetCoverState,
@@ -96,15 +96,6 @@ export function EditPage({ filename, onBack }: EditPageProps) {
   useEffect(() => {
     void loadMp3();
   }, [filename]);
-
-  const handleCoverChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) {
-      return;
-    }
-    await handleCoverFileSelect(file);
-    e.target.value = '';
-  };
 
   const handleSave = async () => {
     setSaving(true);

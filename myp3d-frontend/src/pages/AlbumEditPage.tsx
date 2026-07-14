@@ -40,7 +40,7 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
     setCrop,
     setZoom,
     handleCropComplete,
-    handleCoverFileSelect,
+    handleCoverChange,
     handleApplyCrop,
     handleCancelCrop,
     resetCoverState,
@@ -96,15 +96,6 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
     resetCoverState();
     loadAlbum(albumKey);
   }, [albumKey]);
-
-  const handleCoverChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) {
-      return;
-    }
-    await handleCoverFileSelect(file);
-    e.target.value = '';
-  };
 
   const handleSave = async () => {
     if (!albumDetail) {

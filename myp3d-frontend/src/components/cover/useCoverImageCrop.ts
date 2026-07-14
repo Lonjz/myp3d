@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ChangeEvent } from 'react';
 import type { Area, Point } from 'react-easy-crop';
 
 const COVER_SIZE = 500;
@@ -136,6 +137,15 @@ export function useCoverImageCrop({
     setCroppedAreaPixels(areaPixels);
   };
 
+  const handleCoverChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    await handleCoverFileSelect(file);
+    e.target.value = '';
+  };
+
   return {
     coverImageBase64,
     coverFile,
@@ -149,6 +159,7 @@ export function useCoverImageCrop({
     setZoom,
     handleCropComplete,
     handleCoverFileSelect,
+    handleCoverChange,
     handleApplyCrop,
     handleCancelCrop,
     handleRemoveCover,
