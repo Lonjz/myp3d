@@ -7,6 +7,7 @@ export interface MP3Info {
   album: string | null;
   has_cover: boolean;
   file_size: number;
+  duration?: number | null;
   date_added?: string | null;
 }
 
@@ -52,6 +53,34 @@ export interface AlbumInfo {
 export interface AlbumDetail {
   album: AlbumInfo;
   tracks: MP3Info[];
+}
+
+export interface LibraryStats {
+  total_tracks: number;
+  total_albums: number;
+  total_artists: number;
+  total_size: number;
+  total_duration: number;
+  average_size: number;
+  average_duration: number;
+  tracks_with_cover: number;
+  health: {
+    missing_title: number;
+    missing_artist: number;
+    missing_album: number;
+    missing_cover: number;
+  };
+  top_artists: Array<{ name: string; track_count: number }>;
+  top_albums: Array<{
+    album_key: string;
+    album_name: string;
+    track_count: number;
+    total_size: number;
+    has_cover: boolean;
+  }>;
+  additions_by_month: Array<{ month: string; track_count: number; total_size: number }>;
+  duration_histogram: Array<{ label: string; track_count: number }>;
+  recent_tracks: MP3Info[];
 }
 
 interface AlbumUpdateRequest {
@@ -227,5 +256,9 @@ export const mp3Api = {
   // Get album cover URL
   getAlbumCoverUrl(albumKey: string): string {
     return `${API_BASE}/albums/${encodeURIComponent(albumKey)}/cover`;
+  },
+
+  getStats(): Promise<LibraryStats> {
+    return apiFetch('/stats', undefined, 'Failed to fetch library stats');
   },
 };

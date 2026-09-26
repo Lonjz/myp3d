@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import AlbumRoundedIcon from '@mui/icons-material/AlbumRounded';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
-import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
 import LibraryMusicRoundedIcon from '@mui/icons-material/LibraryMusicRounded';
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
 import MusicNoteRoundedIcon from '@mui/icons-material/MusicNoteRounded';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
+import SpaceDashboardRoundedIcon from '@mui/icons-material/SpaceDashboardRounded';
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { DownloadPage } from './pages/DownloadPage';
+import { DashboardPage } from './pages/DashboardPage';
 import { QueryPage } from './pages/QueryPage';
 import { LibraryPage } from './pages/LibraryPage';
 import { EditPage } from './pages/EditPage';
@@ -73,9 +73,9 @@ function App() {
 
   const navItems = [
     {
-      to: '/download',
-      label: 'Download',
-      icon: <DownloadRoundedIcon fontSize="small" />,
+      to: '/dashboard',
+      label: 'Dashboard',
+      icon: <SpaceDashboardRoundedIcon fontSize="small" />,
       className: ({ isActive }: { isActive: boolean }) => getLinkClass(isActive),
     },
     {
@@ -168,14 +168,15 @@ function App() {
 
           <main className="content-main">
           <Routes>
-            <Route path="/" element={<Navigate to="/download" replace />} />
-            <Route path="/download" element={<DownloadPage />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/download" element={<Navigate to="/query" replace />} />
             <Route path="/query" element={<QueryPage />} />
             <Route path="/library" element={<LibraryPage />} />
             <Route path="/details/:songName" element={<EditRoute />} />
             <Route path="/albums" element={<AlbumsPage />} />
             <Route path="/albums/:albumKey" element={<AlbumEditRoute />} />
-            <Route path="*" element={<Navigate to="/download" replace />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
           </main>
         </section>
