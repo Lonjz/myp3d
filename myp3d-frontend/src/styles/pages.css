@@ -1,0 +1,17 @@
+/* Pages */
+.page {
+  padding: var(--space-6) var(--space-7);
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+.page h1 {
+  margin-bottom: var(--space-6);
+  color: var(--color-text);
+}
+
+@media (max-width: 980px) {
+  .page {
+    padding: var(--space-5);
+  }
+}

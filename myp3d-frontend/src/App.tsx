@@ -15,7 +15,6 @@ import { EditPage } from './pages/EditPage';
 import { AlbumsPage } from './pages/AlbumsPage';
 import { AlbumEditPage } from './pages/AlbumEditPage';
 import { ToastProvider } from './components/messages/ToastProvider';
-import './App.css';
 
 function safeDecode(value: string): string {
   try {

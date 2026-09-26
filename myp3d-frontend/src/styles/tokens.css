@@ -1,0 +1,73 @@
+:root {
+  color-scheme: dark;
+
+  --color-bg: #1a1a2e;
+  --color-surface: #16213e;
+  --color-surface-sunken: #111a35;
+  --color-surface-hover: #1a284b;
+  --color-surface-selected: #2b1f3d;
+  --color-sidebar-from: #17264a;
+  --color-sidebar-to: #111a35;
+
+  --color-border: #0f3460;
+  --color-border-emphasis: #2b4b84;
+  --color-border-hover: #5c77b5;
+
+  --color-text: #f4f6ff;
+  --color-text-secondary: #b6c2e7;
+  --color-text-muted: #8f9bc4;
+
+  --color-accent: #e94560;
+  --color-accent-hover: #ff6b81;
+  --color-accent-alt: #d23b74;
+
+  --color-success: #27ae60;
+  --color-danger: #c0392b;
+  --color-danger-hover: #e74c3c;
+  --color-danger-text: #ff9a9a;
+  --color-warning: #fab219;
+  --color-info: #8fa3d8;
+
+  --color-scrim: rgba(0, 0, 0, 0.7);
+  --color-scrim-nav: rgba(2, 7, 20, 0.58);
+
+  --chart-series: #5b8def;
+  --chart-series-active: color-mix(in srgb, var(--chart-series) 75%, white);
+  --chart-grid: var(--color-border);
+  --chart-axis: var(--color-text-muted);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 12px 34px rgba(0, 0, 0, 0.28);
+  --shadow-lg: 0 12px 34px rgba(0, 0, 0, 0.45);
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-7: 2rem;
+  --space-8: 3rem;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 999px;
+
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 2rem;
+  --text-display: 2.75rem;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --ease-standard: ease;
+}
