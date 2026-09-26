@@ -390,6 +390,8 @@ def get_mp3_info(filepath: Path) -> MP3Info:
         info.artist = audio.tag.artist
         info.album = audio.tag.album
         info.has_cover = bool(audio.tag.images)
+    if audio and audio.info:
+        info.duration = audio.info.time_secs
     return info
 
 

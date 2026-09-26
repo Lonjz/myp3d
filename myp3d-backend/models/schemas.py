@@ -49,6 +49,7 @@ class MP3Info(BaseModel):
     album: Optional[str] = None
     has_cover: bool = False
     file_size: int = 0
+    duration: Optional[float] = None
     date_added: Optional[datetime] = None
 
 
@@ -96,3 +97,51 @@ class AlbumUpdateResponse(BaseModel):
     album_name: str
     updated_tracks: int
     message: str
+
+
+class ArtistStat(BaseModel):
+    name: str
+    track_count: int
+
+
+class AlbumStat(BaseModel):
+    album_key: str
+    album_name: str
+    track_count: int
+    total_size: int
+    has_cover: bool = False
+
+
+class MonthBucket(BaseModel):
+    month: str
+    track_count: int
+    total_size: int
+
+
+class DurationBucket(BaseModel):
+    label: str
+    track_count: int
+
+
+class LibraryHealth(BaseModel):
+    missing_title: int
+    missing_artist: int
+    missing_album: int
+    missing_cover: int
+
+
+class LibraryStats(BaseModel):
+    total_tracks: int
+    total_albums: int
+    total_artists: int
+    total_size: int
+    total_duration: float
+    average_size: float
+    average_duration: float
+    tracks_with_cover: int
+    health: LibraryHealth
+    top_artists: list[ArtistStat]
+    top_albums: list[AlbumStat]
+    additions_by_month: list[MonthBucket]
+    duration_histogram: list[DurationBucket]
+    recent_tracks: list[MP3Info]
