@@ -77,6 +77,11 @@ class AlbumDetail(BaseModel):
     tracks: list[MP3Info]
 
 
+class SearchResults(BaseModel):
+    tracks: list[MP3Info]
+    albums: list[AlbumInfo]
+
+
 class PaginatedMP3Response(BaseModel):
     items: list[MP3Info]
     meta: PaginationMeta
