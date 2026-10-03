@@ -87,6 +87,7 @@ export function QueryPage() {
   const trimEndRef = useRef(trimEnd);
   const isSamplePlayingRef = useRef(isSamplePlaying);
   const loopEnabledRef = useRef(loopEnabled);
+  const videoDurationRef = useRef(videoDuration);
 
   const { showError, clearToast } = useToast();
 
@@ -110,9 +111,7 @@ export function QueryPage() {
   } = useDownloadForm({
     zoomInputId: 'queryCropZoom',
     onDownloaded: () => {
-      setVideoDuration(null);
-      setTrimStart(0);
-      setTrimEnd(0);
+      resetTiming(null);
       setSelectedResult(null);
       setSelectedVideoId('');
     },
@@ -136,6 +135,17 @@ export function QueryPage() {
   useEffect(() => {
     loopEnabledRef.current = loopEnabled;
   }, [loopEnabled]);
+
+  useEffect(() => {
+    videoDurationRef.current = videoDuration;
+  }, [videoDuration]);
+
+  const resetTiming = (duration: number | null) => {
+    setVideoDuration(duration);
+    setTrimStart(0);
+    setTrimEnd(duration && duration > 0 ? duration : 0);
+    setPlayheadTime(0);
+  };
 
   const stopMonitor = () => {
     if (monitorRef.current) {
@@ -180,18 +190,6 @@ export function QueryPage() {
         : !hasTrimRange
           ? 'Select a trim range to enable playback.'
           : undefined;
-
-  useEffect(() => {
-    if (videoDuration && videoDuration > 0) {
-      setTrimStart(0);
-      setTrimEnd(videoDuration);
-      setPlayheadTime(0);
-    } else {
-      setTrimStart(0);
-      setTrimEnd(0);
-      setPlayheadTime(0);
-    }
-  }, [videoDuration]);
 
   useEffect(() => {
     if (!selectedVideoId || !playerContainerRef.current) {
@@ -242,8 +240,9 @@ export function QueryPage() {
               if (cancelled) return;
               setIsPlayerReady(true);
               const duration = playerRef.current?.getDuration?.() ?? 0;
-              if (duration > 0) {
-                setVideoDuration((prev) => (prev && prev > 0 ? prev : duration));
+              const knownDuration = videoDurationRef.current;
+              if (duration > 0 && !(knownDuration && knownDuration > 0)) {
+                resetTiming(duration);
               }
               playerRef.current?.seekTo?.(trimStart || 0, true);
               playerRef.current?.pauseVideo?.();
@@ -295,10 +294,7 @@ export function QueryPage() {
     setTitle(result.title || '');
     setArtist(result.artist || '');
     setAlbum(result.album || '');
-    setVideoDuration(nextDuration);
-    setTrimStart(0);
-    setTrimEnd(nextDuration ?? 0);
-    setPlayheadTime(0);
+    resetTiming(nextDuration);
 
     clearToast();
   };
@@ -320,7 +316,7 @@ export function QueryPage() {
       if (results.length === 0) {
         setSelectedResult(null);
         setSelectedVideoId('');
-        setVideoDuration(null);
+        resetTiming(null);
         showError('No videos found. Try another search.');
       }
     } catch (err) {
@@ -341,8 +337,7 @@ export function QueryPage() {
     setSelectedVideoId(nextVideoId);
     if (!nextVideoId || nextVideoId !== selectedResult?.video_id) {
       setSelectedResult(null);
-      setVideoDuration(null);
-      setPlayheadTime(0);
+      resetTiming(null);
     }
   };
 

@@ -10,6 +10,8 @@ import { AlbumEditPage } from './pages/AlbumEditPage';
 import { ToastProvider } from './components/messages/ToastProvider';
 import { IconButton } from './components/ui/IconButton';
 import { AppBackdrop } from './components/shell/AppBackdrop';
+import { KeepAliveRoutes } from './components/shell/KeepAliveRoutes';
+import type { KeepAlivePage } from './components/shell/KeepAliveRoutes';
 import { NAV_ITEMS } from './components/shell/navItems';
 import { SpotlightProvider } from './components/spotlight/SpotlightProvider';
 import { useSpotlight } from './components/spotlight/spotlightContext';
@@ -54,6 +56,13 @@ function AlbumEditRoute() {
     />
   );
 }
+
+const KEEP_ALIVE_PAGES: KeepAlivePage[] = [
+  { path: '/dashboard', element: <DashboardPage /> },
+  { path: '/query', element: <QueryPage /> },
+  { path: '/library', element: <LibraryPage /> },
+  { path: '/albums', element: <AlbumsPage /> },
+];
 
 function SidebarSearchButton() {
   const { open } = useSpotlight();
@@ -159,17 +168,15 @@ function App() {
             </header>
 
             <main className="content-main">
-            <Routes>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/download" element={<Navigate to="/query" replace />} />
-              <Route path="/query" element={<QueryPage />} />
-              <Route path="/library" element={<LibraryPage />} />
-              <Route path="/details/:songName" element={<EditRoute />} />
-              <Route path="/albums" element={<AlbumsPage />} />
-              <Route path="/albums/:albumKey" element={<AlbumEditRoute />} />
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
+              <KeepAliveRoutes pages={KEEP_ALIVE_PAGES}>
+                <Routes>
+                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/download" element={<Navigate to="/query" replace />} />
+                  <Route path="/details/:songName" element={<EditRoute />} />
+                  <Route path="/albums/:albumKey" element={<AlbumEditRoute />} />
+                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                </Routes>
+              </KeepAliveRoutes>
             </main>
           </section>
         </div>
