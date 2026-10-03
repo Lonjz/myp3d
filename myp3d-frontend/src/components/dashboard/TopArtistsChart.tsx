@@ -1,3 +1,4 @@
+import { MicVocal } from 'lucide-react';
 import { Bar, BarChart, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { LibraryStats } from '../../api/mp3Api';
 import { ChartCard } from './ChartCard';
@@ -19,7 +20,7 @@ export function TopArtistsChart({ artists }: TopArtistsChartProps) {
   return (
     <ChartCard
       title="Top artists"
-      subtitle="By track count"
+      icon={MicVocal}
       table={{
         columns: ['Artist', 'Tracks'],
         rows: artists.map((artist) => [artist.name, artist.track_count]),

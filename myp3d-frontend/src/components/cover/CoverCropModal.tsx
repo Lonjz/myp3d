@@ -1,5 +1,7 @@
 import Cropper from 'react-easy-crop';
 import type { Area, Point } from 'react-easy-crop';
+import { Check, X, ZoomIn } from 'lucide-react';
+import { IconButton } from '../ui/IconButton';
 
 interface CoverCropModalProps {
   isOpen: boolean;
@@ -34,8 +36,7 @@ export function CoverCropModal({
 
   return (
     <div className="crop-modal-backdrop">
-      <div className="crop-modal">
-        <h3>Crop Cover</h3>
+      <div className="crop-modal glass" role="dialog" aria-label="Crop cover">
         <div className="cropper-wrap">
           <Cropper
             image={cropSource}
@@ -50,26 +51,22 @@ export function CoverCropModal({
             objectFit="contain"
           />
         </div>
-        <label className="crop-zoom-label" htmlFor={zoomInputId}>
-          Zoom: {zoom.toFixed(2)}x
+        <label className="crop-zoom" htmlFor={zoomInputId} title="Zoom">
+          <ZoomIn aria-hidden="true" />
+          <input
+            id={zoomInputId}
+            type="range"
+            min={1}
+            max={3}
+            step={0.01}
+            value={zoom}
+            onChange={(event) => onZoomChange(Number(event.target.value))}
+            aria-label="Zoom"
+          />
         </label>
-        <input
-          id={zoomInputId}
-          type="range"
-          min={1}
-          max={3}
-          step={0.01}
-          value={zoom}
-          onChange={(event) => onZoomChange(Number(event.target.value))}
-          className="crop-zoom-slider"
-        />
         <div className="crop-actions">
-          <button type="button" className="btn-secondary" onClick={onCancel} disabled={isApplyingCrop}>
-            Cancel
-          </button>
-          <button type="button" className="btn-primary" onClick={onApply} disabled={isApplyingCrop}>
-            {isApplyingCrop ? 'Applying...' : 'Use Crop'}
-          </button>
+          <IconButton icon={X} label="Cancel" onClick={onCancel} disabled={isApplyingCrop} />
+          <IconButton icon={Check} label="Apply crop" variant="primary" onClick={onApply} disabled={isApplyingCrop} />
         </div>
       </div>
     </div>

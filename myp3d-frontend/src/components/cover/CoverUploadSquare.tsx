@@ -1,25 +1,21 @@
 import { useRef } from 'react';
+import { ImagePlus, X } from 'lucide-react';
+import { IconButton } from '../ui/IconButton';
 
 interface CoverUploadSquareProps {
   inputId: string;
-  label: string;
   previewUrl: string | null;
   disabled?: boolean;
   onSelectFile: (file: File) => void;
   onClear: () => void;
-  emptyText?: string;
-  helpText?: string;
 }
 
 export function CoverUploadSquare({
   inputId,
-  label,
   previewUrl,
   disabled = false,
   onSelectFile,
   onClear,
-  emptyText = 'Click to upload cover',
-  helpText,
 }: CoverUploadSquareProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -34,8 +30,7 @@ export function CoverUploadSquare({
   };
 
   return (
-    <div className="cover-upload-panel">
-      <label htmlFor={inputId}>{label}</label>
+    <div className="cover-upload-square-wrap">
       <input
         id={inputId}
         ref={inputRef}
@@ -46,39 +41,30 @@ export function CoverUploadSquare({
         className="hidden-file-input"
       />
 
-      <div className="cover-upload-square-wrap">
-        <button
-          type="button"
-          className={`cover-upload-square ${previewUrl ? 'has-image' : ''}`}
-          onClick={() => inputRef.current?.click()}
+      <button
+        type="button"
+        className={`cover-upload-square ${previewUrl ? 'has-image' : ''}`}
+        onClick={() => inputRef.current?.click()}
+        disabled={disabled}
+        aria-label={previewUrl ? 'Change cover' : 'Add cover'}
+        title={previewUrl ? 'Change cover' : 'Add cover'}
+      >
+        {previewUrl ? <img src={previewUrl} alt="" /> : <ImagePlus aria-hidden="true" />}
+      </button>
+
+      {previewUrl && (
+        <IconButton
+          icon={X}
+          label="Remove cover"
+          size="sm"
+          className="cover-clear-btn"
+          onClick={(event) => {
+            event.stopPropagation();
+            onClear();
+          }}
           disabled={disabled}
-          aria-label={previewUrl ? 'Change cover image' : 'Upload cover image'}
-        >
-          {previewUrl ? (
-            <img src={previewUrl} alt="Selected cover" />
-          ) : (
-            <span className="cover-upload-placeholder">{emptyText}</span>
-          )}
-        </button>
-
-        {previewUrl && (
-          <button
-            type="button"
-            className="cover-clear-btn"
-            onClick={(event) => {
-              event.stopPropagation();
-              onClear();
-            }}
-            disabled={disabled}
-            aria-label="Clear selected cover"
-            title="Clear cover"
-          >
-            ×
-          </button>
-        )}
-      </div>
-
-      {helpText && <p className="input-help cover-upload-help">{helpText}</p>}
+        />
+      )}
     </div>
   );
 }

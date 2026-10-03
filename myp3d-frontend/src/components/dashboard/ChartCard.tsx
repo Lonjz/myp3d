@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
+import { ChartColumn, Table2 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { IconButton } from '../ui/IconButton';
 
 export interface ChartTable {
   columns: [string, string];
@@ -8,31 +11,31 @@ export interface ChartTable {
 
 interface ChartCardProps {
   title: string;
-  subtitle?: string;
+  icon: LucideIcon;
   table?: ChartTable;
   className?: string;
   children: ReactNode;
 }
 
-export function ChartCard({ title, subtitle, table, className, children }: ChartCardProps) {
+export function ChartCard({ title, icon: Icon, table, className, children }: ChartCardProps) {
   const [showTable, setShowTable] = useState(false);
 
   return (
-    <section className={`chart-card ${className ?? ''}`.trim()}>
+    <section className={`chart-card glass ${className ?? ''}`.trim()}>
       <header className="chart-card__header">
-        <div>
-          <h2 className="chart-card__title">{title}</h2>
-          {subtitle && <p className="chart-card__subtitle">{subtitle}</p>}
-        </div>
+        <h2 className="chart-card__title">
+          <Icon aria-hidden="true" />
+          {title}
+        </h2>
         {table && (
-          <button
-            type="button"
-            className="chart-card__toggle"
-            onClick={() => setShowTable((value) => !value)}
+          <IconButton
+            icon={showTable ? ChartColumn : Table2}
+            label={showTable ? 'Show chart' : 'Show table'}
+            variant="ghost"
+            size="sm"
             aria-pressed={showTable}
-          >
-            {showTable ? 'Chart' : 'Table'}
-          </button>
+            onClick={() => setShowTable((value) => !value)}
+          />
         )}
       </header>
 

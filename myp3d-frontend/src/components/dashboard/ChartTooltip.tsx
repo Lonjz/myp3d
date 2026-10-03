@@ -12,7 +12,7 @@ export function ChartTooltip({ active, payload, label, unit, formatLabel }: Char
   const category = String(label ?? '');
 
   return (
-    <div className="chart-tooltip">
+    <div className="chart-tooltip glass">
       <div className="chart-tooltip__value">
         <span className="chart-tooltip__key" aria-hidden="true" />
         <strong>{value.toLocaleString()}</strong>

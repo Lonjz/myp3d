@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { DiscAlbum, FileAudio, ImagePlus, MicVocal, Save, Type } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { MP3Info } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
 import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
 import { useToast } from '../components/messages/ToastProvider';
 import { InfiniteSidebarList } from '../components/sidebar/InfiniteSidebarList';
+import { IconField } from '../components/ui/IconField';
+import { Spinner } from '../components/ui/Spinner';
 import { getCachedMp3Info, invalidateMp3Info, setCachedMp3Info } from '../utils/detailCache';
 
 interface EditPageProps {
@@ -133,8 +136,8 @@ export function EditPage({ filename, onBack }: EditPageProps) {
     }
   };
 
-  if (loading && !mp3) return <div className="page"><p>Loading...</p></div>;
-  if (!mp3) return <div className="page"><p>MP3 not found</p></div>;
+  if (loading && !mp3) return <div className="page"><Spinner /></div>;
+  if (!mp3) return <div className="page"><p className="page-empty">Track not found</p></div>;
 
   const effectiveCoverPreview = coverPreview || existingCoverPreview;
 
@@ -171,10 +174,8 @@ export function EditPage({ filename, onBack }: EditPageProps) {
     <div className="page">
       <div className="details-layout">
         <InfiniteSidebarList<MP3Info>
-          title="Edit Another Song"
-          backLabel="← Back to Library"
+          backLabel="Back to library"
           onBack={onBack}
-          searchPlaceholder="Search title, artist, filename"
           activeKey={filename}
           getItemKey={(song) => song.filename}
           getItemTitle={(song) => song.title || song.filename}
@@ -196,7 +197,7 @@ export function EditPage({ filename, onBack }: EditPageProps) {
               totalPages: response.meta.total_pages,
             };
           }}
-          emptyMessage="No matching songs."
+          emptyMessage="No matches"
           pinnedItem={mp3}
           pageSize={SIDEBAR_PAGE_SIZE}
           searchDebounceMs={300}
@@ -204,84 +205,71 @@ export function EditPage({ filename, onBack }: EditPageProps) {
         />
 
         <section className="details-main">
-          <h1>Edit: {mp3.filename}</h1>
-          {loading && <p className="input-help">Loading selected song...</p>}
+          <h1 className="details-title">{mp3.title || mp3.filename}</h1>
 
-          <div className="edit-container">
-            <div className="cover-section">
-              <div className="cover-preview">
-                {effectiveCoverPreview ? (
-                  <img src={effectiveCoverPreview} alt="Cover" />
-                ) : (
-                  <div className="no-cover-large">🎵</div>
-                )}
-              </div>
-              <input
-                type="file"
-                accept="image/*"
-                ref={fileInputRef}
-                onChange={handleCoverChange}
-                style={{ display: 'none' }}
-              />
-              <button onClick={() => fileInputRef.current?.click()} className="btn-secondary">
-                Change Cover
-              </button>
-              <p className="input-help">Choose image, crop/zoom, then save as 500x500 cover.</p>
-            </div>
+          <div className="edit-container glass">
+            <input
+              type="file"
+              accept="image/*"
+              ref={fileInputRef}
+              onChange={handleCoverChange}
+              className="hidden-file-input"
+            />
+            <button
+              type="button"
+              className="cover-preview"
+              onClick={() => fileInputRef.current?.click()}
+              aria-label="Change cover"
+              title="Change cover"
+            >
+              {effectiveCoverPreview ? (
+                <img src={effectiveCoverPreview} alt="" />
+              ) : (
+                <div className="no-cover-large">🎵</div>
+              )}
+              <span className="cover-preview__overlay" aria-hidden="true">
+                <ImagePlus />
+              </span>
+            </button>
 
             <div className="metadata-section">
-              <div className="form-group">
-                <label htmlFor="filename">Filename</label>
-                <input
-                  id="filename"
-                  type="text"
-                  value={newFilename}
-                  onChange={(e) => setNewFilename(e.target.value)}
-                  disabled={saving}
-                />
-              </div>
+              <IconField
+                icon={FileAudio}
+                label="File name"
+                value={newFilename}
+                onChange={(e) => setNewFilename(e.target.value)}
+                disabled={saving}
+              />
+              <IconField
+                icon={Type}
+                label="Title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                disabled={saving}
+              />
+              <IconField
+                icon={MicVocal}
+                label="Artist"
+                value={artist}
+                onChange={(e) => setArtist(e.target.value)}
+                disabled={saving}
+              />
+              <IconField
+                icon={DiscAlbum}
+                label="Album"
+                value={album}
+                onChange={(e) => setAlbum(e.target.value)}
+                disabled={saving}
+              />
 
-              <div className="form-group">
-                <label htmlFor="title">Title</label>
-                <input
-                  id="title"
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  disabled={saving}
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="artist">Artist</label>
-                <input
-                  id="artist"
-                  type="text"
-                  value={artist}
-                  onChange={(e) => setArtist(e.target.value)}
-                  disabled={saving}
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="album">Album</label>
-                <input
-                  id="album"
-                  type="text"
-                  value={album}
-                  onChange={(e) => setAlbum(e.target.value)}
-                  disabled={saving}
-                />
-              </div>
-
-              <button onClick={handleSave} disabled={saving} className="btn-primary">
-                {saving ? 'Saving...' : 'Save Changes'}
+              <button onClick={handleSave} disabled={saving} className="btn-primary metadata-save">
+                {saving ? <Spinner inline /> : <Save aria-hidden="true" />}
+                Save
               </button>
             </div>
           </div>
 
-          <div className="audio-player">
-            <h3>Preview</h3>
+          <div className="audio-player glass glass--strong">
             <audio
               controls
               src={mp3Api.getFileUrl(filename)}

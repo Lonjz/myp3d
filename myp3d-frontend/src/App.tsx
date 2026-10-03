@@ -1,12 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import AlbumRoundedIcon from '@mui/icons-material/AlbumRounded';
-import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
-import LibraryMusicRoundedIcon from '@mui/icons-material/LibraryMusicRounded';
-import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
-import MusicNoteRoundedIcon from '@mui/icons-material/MusicNoteRounded';
-import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
-import SpaceDashboardRoundedIcon from '@mui/icons-material/SpaceDashboardRounded';
+import { AudioLines, ChevronLeft, DiscAlbum, LayoutDashboard, ListMusic, Menu, MonitorPlay } from 'lucide-react';
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { DashboardPage } from './pages/DashboardPage';
 import { QueryPage } from './pages/QueryPage';
@@ -15,6 +9,8 @@ import { EditPage } from './pages/EditPage';
 import { AlbumsPage } from './pages/AlbumsPage';
 import { AlbumEditPage } from './pages/AlbumEditPage';
 import { ToastProvider } from './components/messages/ToastProvider';
+import { IconButton } from './components/ui/IconButton';
+import { AppBackdrop } from './components/shell/AppBackdrop';
 
 function safeDecode(value: string): string {
   try {
@@ -75,25 +71,25 @@ function App() {
     {
       to: '/dashboard',
       label: 'Dashboard',
-      icon: <SpaceDashboardRoundedIcon fontSize="small" />,
+      icon: <LayoutDashboard aria-hidden="true" />,
       className: ({ isActive }: { isActive: boolean }) => getLinkClass(isActive),
     },
     {
       to: '/query',
       label: 'Query',
-      icon: <SearchRoundedIcon fontSize="small" />,
+      icon: <MonitorPlay aria-hidden="true" />,
       className: ({ isActive }: { isActive: boolean }) => getLinkClass(isActive),
     },
     {
       to: '/library',
       label: 'Library',
-      icon: <LibraryMusicRoundedIcon fontSize="small" />,
+      icon: <ListMusic aria-hidden="true" />,
       className: () => getLinkClass(isLibraryActive),
     },
     {
       to: '/albums',
       label: 'Albums',
-      icon: <AlbumRoundedIcon fontSize="small" />,
+      icon: <DiscAlbum aria-hidden="true" />,
       className: () => getLinkClass(isAlbumsActive),
     },
   ] as Array<{
@@ -105,30 +101,25 @@ function App() {
 
   return (
     <ToastProvider>
+      <AppBackdrop />
       <div className="app-shell">
         <aside
-          className={`sidebar ${isSidebarExpanded ? 'expanded' : 'collapsed'} ${
+          className={`sidebar glass ${isSidebarExpanded ? 'expanded' : 'collapsed'} ${
             isMobileSidebarOpen ? 'mobile-open' : ''
           }`}
         >
           <div className="sidebar-header">
-            <h2 className="sidebar-brand">
-              {/* <MusicNoteRoundedIcon fontSize="small" className="sidebar-brand-icon" /> */}
+            <span className="sidebar-brand">
+              <AudioLines aria-hidden="true" />
               <span>MYP3D</span>
-              <MusicNoteRoundedIcon fontSize="small" className="sidebar-brand-icon" />
-            </h2>
-            <button
-              type="button"
+            </span>
+            <IconButton
+              icon={ChevronLeft}
+              label={isSidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
+              variant="ghost"
               className="sidebar-collapse-btn"
               onClick={() => setIsSidebarExpanded((value) => !value)}
-              aria-label={isSidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
-              title={isSidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
-            >
-              <ArrowBackIosNewIcon
-                fontSize="small"
-                className={`sidebar-collapse-icon ${isSidebarExpanded ? '' : 'collapsed'}`.trim()}
-              />
-            </button>
+            />
           </div>
 
           <nav className="sidebar-nav" aria-label="Primary navigation">
@@ -137,8 +128,9 @@ function App() {
                 key={item.to}
                 to={item.to}
                 className={item.className}
+                title={item.label}
               >
-                <span className="sidebar-icon" aria-hidden="true">{item.icon}</span>
+                {item.icon}
                 <span className="sidebar-label">{item.label}</span>
               </NavLink>
             ))}
@@ -155,15 +147,13 @@ function App() {
         )}
 
         <section className="app-content">
-          <header className="content-header">
-            <button
-              type="button"
-              className="sidebar-mobile-btn"
+          <header className="content-header glass">
+            <IconButton
+              icon={Menu}
+              label="Open navigation"
+              variant="ghost"
               onClick={() => setIsMobileSidebarOpen(true)}
-              aria-label="Open navigation"
-            >
-              <MenuRoundedIcon fontSize="small" />
-            </button>
+            />
           </header>
 
           <main className="content-main">

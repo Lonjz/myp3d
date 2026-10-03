@@ -1,3 +1,4 @@
+import { DiscAlbum } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { mp3Api } from '../../api/mp3Api';
 import type { LibraryStats } from '../../api/mp3Api';
@@ -10,7 +11,7 @@ interface TopAlbumsProps {
 
 export function TopAlbums({ albums }: TopAlbumsProps) {
   return (
-    <ChartCard title="Top albums" subtitle="By track count" className="chart-card--full">
+    <ChartCard title="Top albums" icon={DiscAlbum} className="chart-card--full">
       {albums.length === 0 ? (
         <p className="chart-card__empty">No albums yet.</p>
       ) : (

@@ -1,13 +1,17 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Download, ListFilter, Pencil, RefreshCw, Search, Trash2 } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { MP3FilterBy, MP3SortBy } from '../api/mp3Api';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { usePagedList } from '../hooks/usePagedList';
 import { useSortState } from '../hooks/useSortState';
-import { formatBytes, formatDateTime } from '../utils/formatters';
+import { formatBytes, formatDate, formatDateTime } from '../utils/formatters';
 import { PaginatedTable } from '../components/table/PaginatedTable';
 import { SortableHeaderButton } from '../components/table/SortableHeaderButton';
+import { IconButton } from '../components/ui/IconButton';
+import { IconField } from '../components/ui/IconField';
+import { Spinner } from '../components/ui/Spinner';
 
 const PAGE_SIZE = 25;
 const SORT_COLUMN_LABELS: Record<MP3SortBy, string> = {
@@ -25,8 +29,8 @@ const LIBRARY_COLUMN_WIDTHS = {
   album: '14%',
   filename: '21%',
   size: '96px',
-  dateAdded: '176px',
-  actions: '210px',
+  dateAdded: '128px',
+  actions: '148px',
 } as const;
 
 export function LibraryPage() {
@@ -98,51 +102,40 @@ export function LibraryPage() {
     );
   };
 
-  if (loading && mp3s.length === 0) return <div className="page"><p>Loading...</p></div>;
+  if (loading && mp3s.length === 0) return <div className="page"><Spinner /></div>;
   if (error && mp3s.length === 0) return <div className="page"><p className="error">{error}</p></div>;
 
   return (
     <div className="page">
-      <h1>MP3 Library</h1>
       <div className="library-toolbar">
-        <button onClick={() => void loadMp3s({ force: true })} className="btn-secondary">
-          Refresh
-        </button>
-
-        <div className="library-filters">
-          <div className="form-group library-filter-group">
-            <label htmlFor="libraryFilterBy">Filter By</label>
-            <select
-              id="libraryFilterBy"
-              value={filterBy}
-              onChange={(e) => setFilterBy(e.target.value as MP3FilterBy)}
-            >
-              <option value="all">All</option>
-              <option value="title">Title</option>
-              <option value="artist">Artist</option>
-              <option value="album">Album</option>
-              <option value="filename">File Name</option>
-            </select>
-          </div>
-
-          <div className="form-group library-search-group">
-            <label htmlFor="librarySearch">Search</label>
-            <input
-              id="librarySearch"
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search title, artist, filename..."
-            />
-          </div>
-
-        </div>
+        <IconField
+          icon={Search}
+          label="Search"
+          className="library-search"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+        <label className="icon-field library-filter" title="Filter by">
+          <ListFilter className="icon-field__icon" aria-hidden="true" />
+          <select
+            aria-label="Filter by"
+            value={filterBy}
+            onChange={(e) => setFilterBy(e.target.value as MP3FilterBy)}
+          >
+            <option value="all">All</option>
+            <option value="title">Title</option>
+            <option value="artist">Artist</option>
+            <option value="album">Album</option>
+            <option value="filename">File name</option>
+          </select>
+        </label>
+        <IconButton icon={RefreshCw} label="Refresh" onClick={() => void loadMp3s({ force: true })} />
       </div>
 
       {error && <p className="error">{error}</p>}
 
       {totalItems === 0 ? (
-        <p>No MP3 files yet. Download some!</p>
+        <p className="page-empty">No tracks yet</p>
       ) : (
         <PaginatedTable
           colGroup={(
@@ -159,17 +152,17 @@ export function LibraryPage() {
           )}
           emptyColSpan={8}
           hasRows={mp3s.length > 0}
-          emptyMessage="No results for this search."
+          emptyMessage="No matches"
           headerRow={(
             <tr>
-              <th>Cover</th>
+              <th><span className="sr-only">Cover</span></th>
               <th>{renderSortHeader('title')}</th>
               <th>{renderSortHeader('artist')}</th>
               <th>{renderSortHeader('album')}</th>
               <th>{renderSortHeader('filename')}</th>
               <th>{renderSortHeader('size')}</th>
               <th>{renderSortHeader('date_added')}</th>
-              <th>Actions</th>
+              <th><span className="sr-only">Actions</span></th>
             </tr>
           )}
           rowContent={mp3s.map((mp3) => (
@@ -188,21 +181,31 @@ export function LibraryPage() {
               <td><span className="table-cell-ellipsis" title={mp3.album || '-'}>{mp3.album || '-'}</span></td>
               <td><span className="library-filename" title={mp3.filename}>{mp3.filename}</span></td>
               <td><span className="table-cell-ellipsis" title={formatBytes(mp3.file_size)}>{formatBytes(mp3.file_size)}</span></td>
-              <td><span className="library-date" title={formatDateTime(mp3.date_added)}>{formatDateTime(mp3.date_added)}</span></td>
+              <td><span className="library-date" title={formatDateTime(mp3.date_added)}>{formatDate(mp3.date_added)}</span></td>
               <td>
                 <div className="table-actions">
-                  <button
+                  <IconButton
+                    icon={Pencil}
+                    label="Edit"
+                    size="sm"
                     onClick={() => navigate(`/details/${encodeURIComponent(mp3.filename)}`)}
-                    className="btn-secondary btn-small"
+                  />
+                  <a
+                    href={mp3Api.getFileUrl(mp3.filename)}
+                    download
+                    className="icon-btn icon-btn--default icon-btn--sm"
+                    aria-label="Download"
+                    title="Download"
                   >
-                    Edit
-                  </button>
-                  <a href={mp3Api.getFileUrl(mp3.filename)} download className="btn-secondary btn-small">
-                    Download
+                    <Download aria-hidden="true" />
                   </a>
-                  <button onClick={() => handleDelete(mp3.filename)} className="btn-danger btn-small">
-                    Delete
-                  </button>
+                  <IconButton
+                    icon={Trash2}
+                    label="Delete"
+                    size="sm"
+                    variant="danger"
+                    onClick={() => handleDelete(mp3.filename)}
+                  />
                 </div>
               </td>
             </tr>

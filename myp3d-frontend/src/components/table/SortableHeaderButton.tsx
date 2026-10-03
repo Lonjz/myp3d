@@ -1,3 +1,5 @@
+import { ArrowDown, ArrowUp } from 'lucide-react';
+
 interface SortableHeaderButtonProps {
   label: string;
   isActive: boolean;
@@ -11,7 +13,7 @@ export function SortableHeaderButton({
   sortDirection,
   onClick,
 }: SortableHeaderButtonProps) {
-  const indicator = sortDirection === 'asc' ? '↑' : '↓';
+  const Indicator = sortDirection === 'asc' ? ArrowUp : ArrowDown;
 
   return (
     <button
@@ -20,7 +22,7 @@ export function SortableHeaderButton({
       onClick={onClick}
     >
       <span>{label}</span>
-      {isActive && <span className="library-sort-indicator" aria-hidden="true">{indicator}</span>}
+      {isActive && <Indicator className="library-sort-indicator" aria-hidden="true" />}
     </button>
   );
 }

@@ -17,6 +17,13 @@ export function formatDateTime(value: string | null | undefined): string {
   return parsed.toLocaleString();
 }
 
+export function formatDate(value: string | null | undefined): string {
+  if (!value) return '-';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '-';
+  return parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 export function formatDuration(value: number | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value)) return '-';
   const totalSeconds = Math.max(0, Math.round(value * 10) / 10);

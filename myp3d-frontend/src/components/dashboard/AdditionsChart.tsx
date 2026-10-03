@@ -1,3 +1,4 @@
+import { CalendarPlus } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { LibraryStats } from '../../api/mp3Api';
 import { ChartCard } from './ChartCard';
@@ -31,8 +32,8 @@ function formatMonthLong(month: string): string {
 export function AdditionsChart({ months }: AdditionsChartProps) {
   return (
     <ChartCard
-      title="Tracks added"
-      subtitle="Per month"
+      title="Added"
+      icon={CalendarPlus}
       className="chart-card--span-2"
       table={{
         columns: ['Month', 'Tracks'],

@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, Search } from 'lucide-react';
+import { IconButton } from '../ui/IconButton';
+import { IconField } from '../ui/IconField';
+import { Spinner } from '../ui/Spinner';
 
 interface SidebarPageResult<T> {
   items: T[];
@@ -14,10 +18,8 @@ interface QueryCacheEntry<T> {
 }
 
 interface InfiniteSidebarListProps<T> {
-  title: string;
   backLabel: string;
   onBack: () => void;
-  searchPlaceholder: string;
   activeKey: string;
   getItemKey: (item: T) => string;
   getItemTitle: (item: T) => string;
@@ -32,10 +34,8 @@ interface InfiniteSidebarListProps<T> {
 }
 
 export function InfiniteSidebarList<T>({
-  title,
   backLabel,
   onBack,
-  searchPlaceholder,
   activeKey,
   getItemKey,
   getItemTitle,
@@ -239,22 +239,18 @@ export function InfiniteSidebarList<T>({
   }, [getItemKey, loadedItems, pinnedItem]);
 
   return (
-    <aside className="details-sidebar">
-      <button onClick={onBack} className="btn-secondary details-back-btn">
-        {backLabel}
-      </button>
-
-      <h3>{title}</h3>
-      <div className="form-group" style={{ marginBottom: '0.75rem' }}>
-        <input
-          type="text"
-          value={searchInput}
-          onChange={(event) => setSearchInput(event.target.value)}
-          placeholder={searchPlaceholder}
-        />
+    <aside className="details-sidebar glass">
+      <div className="details-sidebar-header">
+        <IconButton icon={ArrowLeft} label={backLabel} onClick={onBack} />
+        <span className="details-sidebar-meta">{loadedCount} / {totalCount}</span>
       </div>
 
-      <p className="input-help details-sidebar-meta">Showing {loadedCount} of {totalCount}</p>
+      <IconField
+        icon={Search}
+        label="Search"
+        value={searchInput}
+        onChange={(event) => setSearchInput(event.target.value)}
+      />
 
       <div className="details-song-list" ref={listRef} onScroll={handleListScroll}>
         {visibleItems.map((item) => {
@@ -280,7 +276,7 @@ export function InfiniteSidebarList<T>({
         )}
 
         {(isLoadingInitial || isLoadingMore) && (
-          <p className="input-help details-sidebar-loading">Loading...</p>
+          <Spinner inline />
         )}
 
         <div ref={sentinelRef} className="details-sidebar-sentinel" aria-hidden="true" />

@@ -1,10 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import AlbumRoundedIcon from '@mui/icons-material/AlbumRounded';
-import ImageRoundedIcon from '@mui/icons-material/ImageRounded';
-import LibraryMusicRoundedIcon from '@mui/icons-material/LibraryMusicRounded';
-import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
-import ScheduleRoundedIcon from '@mui/icons-material/ScheduleRounded';
-import StorageRoundedIcon from '@mui/icons-material/StorageRounded';
+import { Clock, DiscAlbum, HardDrive, Image, MicVocal, Music, RefreshCw } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { LibraryStats } from '../api/mp3Api';
 import { AdditionsChart } from '../components/dashboard/AdditionsChart';
@@ -15,14 +10,10 @@ import { StatTile, StatTileSkeleton } from '../components/dashboard/StatTile';
 import { TopAlbums } from '../components/dashboard/TopAlbums';
 import { TopArtistsChart } from '../components/dashboard/TopArtistsChart';
 import { useToast } from '../components/messages/ToastProvider';
-import { formatBytes, formatDuration, formatHours } from '../utils/formatters';
+import { IconButton } from '../components/ui/IconButton';
+import { formatBytes, formatHours } from '../utils/formatters';
 
 const STAT_TILE_COUNT = 6;
-
-function currentMonthKey(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-}
 
 export function DashboardPage() {
   const { showError } = useToast();
@@ -47,9 +38,6 @@ export function DashboardPage() {
   if (!stats) {
     return (
       <div className="page dashboard">
-        <header className="dashboard-header">
-          <h1>Dashboard</h1>
-        </header>
         {loading ? (
           <div className="stat-grid">
             {Array.from({ length: STAT_TILE_COUNT }, (_, index) => (
@@ -57,75 +45,36 @@ export function DashboardPage() {
             ))}
           </div>
         ) : (
-          <div className="dashboard-error">
-            <p>Couldn't load library stats. Is the backend running?</p>
-            <button type="button" className="btn-secondary" onClick={() => void loadStats()}>
-              Retry
-            </button>
+          <div className="dashboard-error glass">
+            <p>Couldn't load stats</p>
+            <IconButton icon={RefreshCw} label="Retry" onClick={() => void loadStats()} />
           </div>
         )}
       </div>
     );
   }
 
-  const addedThisMonth =
-    stats.additions_by_month.find((bucket) => bucket.month === currentMonthKey())?.track_count ?? 0;
   const coverRatio = stats.total_tracks ? stats.tracks_with_cover / stats.total_tracks : 0;
 
   return (
     <div className="page dashboard">
-      <header className="dashboard-header">
-        <h1>Dashboard</h1>
-        <p className="dashboard-subtitle">An overview of your library</p>
-      </header>
-
       <div className="stat-grid">
-        <StatTile
-          label="Tracks"
-          value={stats.total_tracks.toLocaleString()}
-          icon={<LibraryMusicRoundedIcon fontSize="small" />}
-          detail={`${addedThisMonth.toLocaleString()} added this month`}
-        />
-        <StatTile
-          label="Albums"
-          value={stats.total_albums.toLocaleString()}
-          icon={<AlbumRoundedIcon fontSize="small" />}
-          detail={
-            stats.total_albums
-              ? `${(stats.total_tracks / stats.total_albums).toFixed(1)} tracks per album`
-              : undefined
-          }
-        />
-        <StatTile
-          label="Artists"
-          value={stats.total_artists.toLocaleString()}
-          icon={<PersonRoundedIcon fontSize="small" />}
-          detail={stats.top_artists[0] ? `Most tracks: ${stats.top_artists[0].name}` : undefined}
-        />
-        <StatTile
-          label="Storage"
-          value={formatBytes(stats.total_size)}
-          icon={<StorageRoundedIcon fontSize="small" />}
-          detail={`${formatBytes(stats.average_size)} per track on average`}
-        />
-        <StatTile
-          label="Listening time"
-          value={formatHours(stats.total_duration)}
-          icon={<ScheduleRoundedIcon fontSize="small" />}
-          detail={`${formatDuration(Math.round(stats.average_duration))} per track on average`}
-        />
+        <StatTile label="Tracks" value={stats.total_tracks.toLocaleString()} icon={Music} />
+        <StatTile label="Albums" value={stats.total_albums.toLocaleString()} icon={DiscAlbum} />
+        <StatTile label="Artists" value={stats.total_artists.toLocaleString()} icon={MicVocal} />
+        <StatTile label="Storage" value={formatBytes(stats.total_size)} icon={HardDrive} />
+        <StatTile label="Listening time" value={formatHours(stats.total_duration)} icon={Clock} />
         <StatTile
           label="Cover art"
           value={`${Math.round(coverRatio * 100)}%`}
-          icon={<ImageRoundedIcon fontSize="small" />}
+          icon={Image}
           progress={coverRatio}
-          detail={`${stats.tracks_with_cover.toLocaleString()} of ${stats.total_tracks.toLocaleString()} tracks`}
         />
       </div>
 
       <div className="dashboard-grid">
         <AdditionsChart months={stats.additions_by_month} />
-        <LibraryHealth health={stats.health} totalTracks={stats.total_tracks} />
+        <LibraryHealth health={stats.health} />
         <TopArtistsChart artists={stats.top_artists} />
         <DurationChart buckets={stats.duration_histogram} />
         <RecentTracks tracks={stats.recent_tracks} />

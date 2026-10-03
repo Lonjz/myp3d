@@ -1,4 +1,7 @@
+import type { ReactNode } from 'react';
+import { DiscAlbum, FileAudio, Link, MicVocal, Type } from 'lucide-react';
 import { CoverUploadSquare } from '../cover/CoverUploadSquare';
+import { IconField } from '../ui/IconField';
 
 interface DownloadConfigSectionProps {
   idPrefix?: string;
@@ -16,6 +19,7 @@ interface DownloadConfigSectionProps {
   coverPreview: string | null;
   onCoverSelect: (file: File) => void;
   onCoverClear: () => void;
+  action?: ReactNode;
 }
 
 export function DownloadConfigSection({
@@ -34,87 +38,59 @@ export function DownloadConfigSection({
   coverPreview,
   onCoverSelect,
   onCoverClear,
+  action,
 }: DownloadConfigSectionProps) {
-  const withPrefix = (name: string) => `${idPrefix}${name}`;
-
   return (
-    <div className="download-config-shell">
-      <div className="form-group download-url-row">
-        <label htmlFor={withPrefix('url')}>YouTube URL *</label>
-        <input
-          id={withPrefix('url')}
-          type="text"
-          value={url}
-          onChange={(event) => onUrlChange(event.target.value)}
-          placeholder="https://youtube.com/watch?v=..."
+    <div className="download-config-grid">
+      <div className="download-cover">
+        <CoverUploadSquare
+          inputId={`${idPrefix}coverImage`}
+          previewUrl={coverPreview}
           disabled={disabled}
+          onSelectFile={onCoverSelect}
+          onClear={onCoverClear}
         />
       </div>
 
-      <div className="download-config-grid">
-        <div className="download-meta-column">
-          <div className="form-group">
-            <label htmlFor={withPrefix('customFilename')}>Custom Filename (optional)</label>
-            <input
-              id={withPrefix('customFilename')}
-              type="text"
-              value={customFilename}
-              onChange={(event) => onCustomFilenameChange(event.target.value)}
-              placeholder="my-song"
-              disabled={disabled}
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor={withPrefix('title')}>Title</label>
-            <input
-              id={withPrefix('title')}
-              type="text"
-              value={title}
-              onChange={(event) => onTitleChange(event.target.value)}
-              placeholder="Song Title"
-              disabled={disabled}
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor={withPrefix('artist')}>Artist</label>
-            <input
-              id={withPrefix('artist')}
-              type="text"
-              value={artist}
-              onChange={(event) => onArtistChange(event.target.value)}
-              placeholder="Artist Name"
-              disabled={disabled}
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor={withPrefix('album')}>Album</label>
-            <input
-              id={withPrefix('album')}
-              type="text"
-              value={album}
-              onChange={(event) => onAlbumChange(event.target.value)}
-              placeholder="Album Name"
-              disabled={disabled}
-            />
-          </div>
-        </div>
-
-        <div className="download-cover-column">
-          <CoverUploadSquare
-            inputId={withPrefix('coverImage')}
-            label="Cover Image (optional)"
-            previewUrl={coverPreview}
-            disabled={disabled}
-            onSelectFile={onCoverSelect}
-            onClear={onCoverClear}
-            emptyText="Click to upload cover"
-            helpText="Image is cropped to 500x500."
-          />
-        </div>
+      <div className="download-url-row">
+        <IconField
+          icon={Link}
+          label="YouTube URL"
+          value={url}
+          onChange={(event) => onUrlChange(event.target.value)}
+          disabled={disabled}
+        />
+        {action}
       </div>
+
+      <IconField
+        icon={Type}
+        label="Title"
+        value={title}
+        onChange={(event) => onTitleChange(event.target.value)}
+        disabled={disabled}
+      />
+      <IconField
+        icon={MicVocal}
+        label="Artist"
+        value={artist}
+        onChange={(event) => onArtistChange(event.target.value)}
+        disabled={disabled}
+      />
+      <IconField
+        icon={DiscAlbum}
+        label="Album"
+        value={album}
+        onChange={(event) => onAlbumChange(event.target.value)}
+        disabled={disabled}
+      />
+      <IconField
+        icon={FileAudio}
+        label="File name"
+        value={customFilename}
+        onChange={(event) => onCustomFilenameChange(event.target.value)}
+        disabled={disabled}
+      />
     </div>
   );
 }

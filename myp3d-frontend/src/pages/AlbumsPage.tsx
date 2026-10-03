@@ -1,13 +1,17 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Pencil, RefreshCw, Search } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { AlbumSortBy } from '../api/mp3Api';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { usePagedList } from '../hooks/usePagedList';
 import { useSortState } from '../hooks/useSortState';
-import { formatBytes, formatDateTime } from '../utils/formatters';
+import { formatBytes, formatDate, formatDateTime } from '../utils/formatters';
 import { PaginatedTable } from '../components/table/PaginatedTable';
 import { SortableHeaderButton } from '../components/table/SortableHeaderButton';
+import { IconButton } from '../components/ui/IconButton';
+import { IconField } from '../components/ui/IconField';
+import { Spinner } from '../components/ui/Spinner';
 
 const PAGE_SIZE = 20;
 const ALBUM_COLUMN_WIDTHS = {
@@ -16,8 +20,8 @@ const ALBUM_COLUMN_WIDTHS = {
   artists: '22%',
   tracks: '90px',
   size: '110px',
-  dateAdded: '176px',
-  actions: '160px',
+  dateAdded: '128px',
+  actions: '72px',
 } as const;
 
 export function AlbumsPage() {
@@ -75,34 +79,26 @@ export function AlbumsPage() {
     );
   };
 
-  if (loading && albums.length === 0) return <div className="page"><p>Loading albums...</p></div>;
+  if (loading && albums.length === 0) return <div className="page"><Spinner /></div>;
   if (error && albums.length === 0) return <div className="page"><p className="error">{error}</p></div>;
 
   return (
     <div className="page">
-      <h1>Albums</h1>
       <div className="library-toolbar">
-        <button onClick={() => void loadAlbums({ force: true })} className="btn-secondary">
-          Refresh
-        </button>
-        <div className="library-filters albums-filters">
-          <div className="form-group library-search-group">
-            <label htmlFor="albumsSearch">Search Albums / Artists</label>
-            <input
-              id="albumsSearch"
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search album name or artist"
-            />
-          </div>
-        </div>
+        <IconField
+          icon={Search}
+          label="Search"
+          className="library-search"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+        <IconButton icon={RefreshCw} label="Refresh" onClick={() => void loadAlbums({ force: true })} />
       </div>
 
       {error && <p className="error">{error}</p>}
 
       {totalItems === 0 ? (
-        <p>No albums found yet. Add album metadata to your tracks.</p>
+        <p className="page-empty">No albums yet</p>
       ) : (
         <PaginatedTable
           tableClassName="albums-table"
@@ -119,16 +115,16 @@ export function AlbumsPage() {
           )}
           emptyColSpan={7}
           hasRows={albums.length > 0}
-          emptyMessage="No results for this search."
+          emptyMessage="No matches"
           headerRow={(
             <tr>
-              <th>Cover</th>
+              <th><span className="sr-only">Cover</span></th>
               <th>{renderSortHeader('album_name', 'Album')}</th>
               <th>Artists</th>
               <th>{renderSortHeader('track_count', 'Tracks')}</th>
               <th>{renderSortHeader('total_size', 'Size')}</th>
               <th>{renderSortHeader('date_added', 'Date Added')}</th>
-              <th>Actions</th>
+              <th><span className="sr-only">Actions</span></th>
             </tr>
           )}
           rowContent={albums.map((album) => (
@@ -146,15 +142,15 @@ export function AlbumsPage() {
               <td><span className="table-cell-ellipsis" title={album.artists.length > 0 ? album.artists.join(', ') : '-'}>{album.artists.length > 0 ? album.artists.join(', ') : '-'}</span></td>
               <td><span className="table-cell-ellipsis" title={String(album.track_count)}>{album.track_count}</span></td>
               <td><span className="table-cell-ellipsis" title={formatBytes(album.total_size)}>{formatBytes(album.total_size)}</span></td>
-              <td><span className="library-date" title={formatDateTime(album.date_added)}>{formatDateTime(album.date_added)}</span></td>
+              <td><span className="library-date" title={formatDateTime(album.date_added)}>{formatDate(album.date_added)}</span></td>
               <td>
                 <div className="table-actions">
-                  <button
-                    className="btn-secondary btn-small"
+                  <IconButton
+                    icon={Pencil}
+                    label="Edit album"
+                    size="sm"
                     onClick={() => navigate(`/albums/${encodeURIComponent(album.album_key)}`)}
-                  >
-                    Edit Album
-                  </button>
+                  />
                 </div>
               </td>
             </tr>

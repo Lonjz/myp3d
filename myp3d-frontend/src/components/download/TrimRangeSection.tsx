@@ -1,10 +1,6 @@
 import type { ChangeEvent, CSSProperties } from 'react';
-import AudiotrackIcon from '@mui/icons-material/Audiotrack';
-import CropIcon from '@mui/icons-material/Crop';
-import LoopIcon from '@mui/icons-material/Loop';
-import NotInterestedIcon from '@mui/icons-material/NotInterested';
-import PauseIcon from '@mui/icons-material/Pause';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import { ArrowLeftToLine, ArrowRightToLine, Clock, Crosshair, Pause, Play, Repeat, Scissors } from 'lucide-react';
+import { IconButton } from '../ui/IconButton';
 import { formatDuration } from '../../utils/formatters';
 
 interface TrimRangeSectionProps {
@@ -92,42 +88,36 @@ export function TrimRangeSection({
       <div className="trim-range-header">
         <div className="trim-range-controls">
           {onTogglePlay ? (
-            <button
-              type="button"
-              className="btn-secondary btn-icon"
+            <IconButton
+              icon={isPlaying ? Pause : Play}
+              label={isPlaying ? 'Pause sample' : 'Play sample'}
+              size="sm"
               onClick={onTogglePlay}
               disabled={!canPlay}
-              aria-label={isPlaying ? 'Pause sample' : 'Play sample'}
-              title={isPlaying ? 'Pause sample' : 'Play sample'}
-            >
-              {isPlaying ? <PauseIcon fontSize="small" /> : <PlayArrowIcon fontSize="small" />}
-            </button>
+            />
           ) : null}
           {onToggleLoop ? (
-            <button
-              type="button"
-              className="btn-secondary btn-icon"
+            <IconButton
+              icon={Repeat}
+              label={loopEnabled ? 'Disable looping' : 'Enable looping'}
+              size="sm"
+              active={loopEnabled}
+              aria-pressed={loopEnabled}
               onClick={onToggleLoop}
               disabled={disabled}
-              aria-label={loopEnabled ? 'Disable looping' : 'Enable looping'}
-              title={loopEnabled ? 'Disable looping' : 'Enable looping'}
-            >
-              {loopEnabled ? <LoopIcon fontSize="small" /> : <NotInterestedIcon fontSize="small" />}
-            </button>
+            />
           ) : null}
-          <button
-            type="button"
-            className="btn-secondary btn-icon"
+          <IconButton
+            icon={mode === 'range' ? Scissors : Crosshair}
+            label={mode === 'range' ? 'Trim mode' : 'Scrub mode'}
+            size="sm"
             onClick={() => onModeChange(mode === 'range' ? 'playhead' : 'range')}
             disabled={disabled}
-            aria-label={mode === 'range' ? 'Playhead' : 'Range'}
-            title={mode === 'range' ? 'Playhead' : 'Range'}
-          >
-            {mode === 'range' ? <CropIcon fontSize="small" /> : <AudiotrackIcon fontSize="small" />}
-          </button>
+          />
         </div>
-        <span className="trim-range-duration">
-          {safeDuration > 0 ? `Video: ${formatDuration(safeDuration)}` : 'Video duration unavailable'}
+        <span className="trim-range-duration" title="Video length">
+          <Clock aria-hidden="true" />
+          {safeDuration > 0 ? formatDuration(safeDuration) : '--:--'}
         </span>
       </div>
 
@@ -178,14 +168,17 @@ export function TrimRangeSection({
       </div>
 
       <div className="trim-range-values">
-        <span>
-          Start: <strong>{formatDuration(start)}</strong>
+        <span title="Start">
+          <ArrowRightToLine aria-hidden="true" />
+          {formatDuration(start)}
         </span>
-        <span>
-          End: <strong>{formatDuration(end)}</strong>
+        <span title="Clip length">
+          <Scissors aria-hidden="true" />
+          {formatDuration(clipLength)}
         </span>
-        <span>
-          Clip: <strong>{formatDuration(clipLength)}</strong>
+        <span title="End">
+          {formatDuration(end)}
+          <ArrowLeftToLine aria-hidden="true" />
         </span>
       </div>
 

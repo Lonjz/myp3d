@@ -1,10 +1,14 @@
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { ArrowRight, Download, MonitorPlay, Search } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { YouTubeSearchResult } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
 import { DownloadConfigSection } from '../components/download/DownloadConfigSection';
 import { TrimRangeSection } from '../components/download/TrimRangeSection';
 import { useToast } from '../components/messages/ToastProvider';
+import { IconButton } from '../components/ui/IconButton';
+import { IconField } from '../components/ui/IconField';
+import { Spinner } from '../components/ui/Spinner';
 import { useDownloadForm } from '../hooks/useDownloadForm';
 import { formatDuration } from '../utils/formatters';
 
@@ -123,8 +127,6 @@ export function QueryPage() {
       setSelectedVideoId('');
     },
   });
-
-  const hasResults = useMemo(() => searchResults.length > 0, [searchResults.length]);
 
   const hasDuration = Boolean(videoDuration && videoDuration > 0);
   const hasTrimRange = hasDuration && trimEnd > trimStart;
@@ -395,31 +397,23 @@ export function QueryPage() {
 
   return (
     <div className="page">
-      <h1>Youtube Search</h1>
-
       <div className="query-layout">
-        <aside className="query-sidebar">
+        <aside className="query-sidebar glass">
           <form onSubmit={handleSearch} className="query-search-form">
-            <div className="form-group">
-              <label htmlFor="queryInput">Search YouTube</label>
-              <input
-                id="queryInput"
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Song, artist, album, live version..."
-                disabled={searching}
-              />
-            </div>
-            <button type="submit" className="btn-primary" disabled={searching}>
-              {searching ? 'Searching...' : 'Search'}
-            </button>
+            <IconField
+              icon={Search}
+              label="Search YouTube"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              disabled={searching}
+            />
+            {searching ? (
+              <span className="query-search-spinner"><Spinner inline /></span>
+            ) : (
+              <IconButton icon={ArrowRight} label="Search" variant="primary" type="submit" />
+            )}
           </form>
 
-          <div className="query-results-header">
-            <h3>Results</h3>
-            <span>{hasResults ? `${searchResults.length} found` : 'No results yet'}</span>
-          </div>
 
           <div className="query-results-list">
             {searchResults.map((result) => {
@@ -456,8 +450,7 @@ export function QueryPage() {
         </aside>
 
         <section className="query-main">
-          <div className="query-preview-card">
-            <h3>Video Preview</h3>
+          <div className="query-preview-card glass">
             {selectedVideoId ? (
               previewError ? (
                 <div className="query-empty-player">{previewError}</div>
@@ -477,11 +470,13 @@ export function QueryPage() {
                 </div>
               )
             ) : (
-              <div className="query-empty-player">Select a result to preview it here.</div>
+              <div className="query-empty-player" aria-label="No preview">
+                <MonitorPlay aria-hidden="true" />
+              </div>
             )}
           </div>
 
-          <form onSubmit={handleSubmit} className="download-form">
+          <form onSubmit={handleSubmit} className="download-form glass">
             <DownloadConfigSection
               idPrefix="query"
               url={url}
@@ -507,6 +502,12 @@ export function QueryPage() {
               onCoverSelect={handleCoverFileSelect}
               onCoverClear={handleRemoveCover}
               disabled={downloading}
+              action={(
+                <button type="submit" disabled={downloading} className="btn-primary">
+                  {downloading ? <Spinner inline /> : <Download aria-hidden="true" />}
+                  Download
+                </button>
+              )}
             />
 
             <TrimRangeSection
@@ -529,10 +530,6 @@ export function QueryPage() {
               onStartChange={setTrimStart}
               onEndChange={setTrimEnd}
             />
-
-            <button type="submit" disabled={downloading} className="btn-primary">
-              {downloading ? 'Downloading...' : 'Download MP3'}
-            </button>
           </form>
         </section>
       </div>

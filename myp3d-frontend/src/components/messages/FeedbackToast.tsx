@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import CloseIcon from '@mui/icons-material/Close';
+import { CircleAlert, CircleCheck, Info, X } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 export type FeedbackMessage = {
   type: 'success' | 'error' | 'info';
@@ -12,10 +13,10 @@ interface FeedbackToastProps {
   autoHideMs?: number;
 }
 
-const MESSAGE_LABELS: Record<FeedbackMessage['type'], string> = {
-  success: 'Success',
-  error: 'Error',
-  info: 'Info',
+const MESSAGE_ICONS: Record<FeedbackMessage['type'], { icon: LucideIcon; label: string }> = {
+  success: { icon: CircleCheck, label: 'Success' },
+  error: { icon: CircleAlert, label: 'Error' },
+  info: { icon: Info, label: 'Info' },
 };
 
 export function FeedbackToast({
@@ -45,14 +46,16 @@ export function FeedbackToast({
     return null;
   }
 
+  const { icon: StatusIcon, label } = MESSAGE_ICONS[message.type];
+
   return (
     <div className="drop-message-layer" aria-live={message.type === 'error' ? 'assertive' : 'polite'}>
       <div
         key={`${message.type}:${message.text}`}
-        className={`drop-message drop-message--${message.type}`}
+        className={`drop-message drop-message--${message.type} glass`}
         role={message.type === 'error' ? 'alert' : 'status'}
       >
-        <span className="drop-message__label">{MESSAGE_LABELS[message.type]}</span>
+        <StatusIcon className="drop-message__icon" aria-label={label} />
         <span className="drop-message__text">{message.text}</span>
         <button
           type="button"
@@ -61,7 +64,7 @@ export function FeedbackToast({
           aria-label="Dismiss notification"
           title="Dismiss"
         >
-          <CloseIcon fontSize="inherit" />
+          <X aria-hidden="true" />
         </button>
       </div>
     </div>

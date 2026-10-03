@@ -1,3 +1,4 @@
+import { History } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { mp3Api } from '../../api/mp3Api';
 import type { MP3Info } from '../../api/mp3Api';
@@ -20,7 +21,7 @@ function formatRelativeDate(value: string | null | undefined): string {
 
 export function RecentTracks({ tracks }: RecentTracksProps) {
   return (
-    <ChartCard title="Recently added">
+    <ChartCard title="Recent" icon={History}>
       {tracks.length === 0 ? (
         <p className="chart-card__empty">Nothing downloaded yet.</p>
       ) : (

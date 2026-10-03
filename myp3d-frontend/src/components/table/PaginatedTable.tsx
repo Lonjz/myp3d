@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
+import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { IconButton } from '../ui/IconButton';
 
 interface PaginatedTableProps {
   tableClassName?: string;
@@ -63,8 +65,8 @@ export function PaginatedTable({
   const goDisabled = jumpDisabled || !isValidJumpInput || parsedPage === currentPage;
 
   return (
-    <div>
-      <div className="library-table-wrap">
+    <div className="paginated-table">
+      <div className="library-table-wrap glass glass--strong">
         <table className={`library-table ${tableClassName || ''}`.trim()}>
           {colGroup}
           <thead>{headerRow}</thead>
@@ -84,40 +86,33 @@ export function PaginatedTable({
 
       <div className="library-pagination">
         <p className="pagination-summary">
-          Showing {shownStart}-{shownEnd} of {totalItems}
+          {shownStart}–{shownEnd} of {totalItems}
         </p>
 
-        <div className="pagination-jump-center">
-          {onGoToPage && (
-            <form className="pagination-jump" onSubmit={handleGoToPage} noValidate>
-              <label htmlFor="paginationJumpInput">Go to</label>
-              <input
-                id="paginationJumpInput"
-                type="number"
-                min={1}
-                max={totalPages}
-                value={pageInput}
-                onChange={(event) => setPageInput(event.target.value)}
-                disabled={jumpDisabled}
-              />
-              <button type="submit" className="btn-secondary" disabled={goDisabled}>
-                Go
-              </button>
-            </form>
-          )}
+        <div className="pagination-buttons">
+          <IconButton icon={ChevronLeft} label="Previous page" size="sm" onClick={onPrevious} disabled={previousDisabled} />
+          <span className="pagination-page">
+            {currentPage} / {totalPages}
+          </span>
+          <IconButton icon={ChevronRight} label="Next page" size="sm" onClick={onNext} disabled={nextDisabled} />
         </div>
 
-        <div className="pagination-buttons">
-          <button className="btn-secondary" onClick={onPrevious} disabled={previousDisabled}>
-            Prev
-          </button>
-          <span>
-            Page {currentPage} / {totalPages}
-          </span>
-          <button className="btn-secondary" onClick={onNext} disabled={nextDisabled}>
-            Next
-          </button>
-        </div>
+        {onGoToPage && (
+          <form className="pagination-jump" onSubmit={handleGoToPage} noValidate>
+            <input
+              id="paginationJumpInput"
+              type="number"
+              min={1}
+              max={totalPages}
+              value={pageInput}
+              onChange={(event) => setPageInput(event.target.value)}
+              disabled={jumpDisabled}
+              aria-label="Page number"
+              placeholder="Page"
+            />
+            <IconButton icon={ArrowRight} label="Go to page" size="sm" type="submit" disabled={goDisabled} />
+          </form>
+        )}
       </div>
     </div>
   );

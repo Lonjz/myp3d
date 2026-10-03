@@ -1,3 +1,4 @@
+import { Clock } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { LibraryStats } from '../../api/mp3Api';
 import { ChartCard } from './ChartCard';
@@ -11,8 +12,8 @@ interface DurationChartProps {
 export function DurationChart({ buckets }: DurationChartProps) {
   return (
     <ChartCard
-      title="Track length"
-      subtitle="Number of tracks by duration"
+      title="Length"
+      icon={Clock}
       table={{
         columns: ['Length', 'Tracks'],
         rows: buckets.map((bucket) => [bucket.label, bucket.track_count]),

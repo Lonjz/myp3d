@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { DiscAlbum, HardDrive, ImagePlus, MicVocal, Music, Save } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { AlbumDetail, AlbumInfo } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
 import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
 import { useToast } from '../components/messages/ToastProvider';
 import { InfiniteSidebarList } from '../components/sidebar/InfiniteSidebarList';
+import { IconField } from '../components/ui/IconField';
+import { Spinner } from '../components/ui/Spinner';
 import { getCachedAlbumDetail, invalidateAlbumDetail, setCachedAlbumDetail } from '../utils/detailCache';
 import { formatBytes } from '../utils/formatters';
 
@@ -129,8 +132,8 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
     }
   };
 
-  if (loading && !albumDetail) return <div className="page"><p>Loading album...</p></div>;
-  if (!albumDetail) return <div className="page"><p>Album not found</p></div>;
+  if (loading && !albumDetail) return <div className="page"><Spinner /></div>;
+  if (!albumDetail) return <div className="page"><p className="page-empty">Album not found</p></div>;
 
   const effectiveCoverPreview = coverPreview || existingCoverPreview;
   const getAlbumSubtitle = (album: AlbumInfo) => {
@@ -146,10 +149,8 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
     <div className="page">
       <div className="details-layout">
         <InfiniteSidebarList<AlbumInfo>
-          title="Edit Another Album"
-          backLabel="← Back to Albums"
+          backLabel="Back to albums"
           onBack={onBack}
-          searchPlaceholder="Search album or artist"
           activeKey={albumKey}
           getItemKey={(album) => album.album_key}
           getItemTitle={(album) => album.album_name || NO_ALBUM_LABEL}
@@ -170,96 +171,95 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
               totalPages: response.meta.total_pages,
             };
           }}
-          emptyMessage="No matching albums."
+          emptyMessage="No matches"
           pinnedItem={albumDetail.album}
           pageSize={ALBUM_SIDEBAR_PAGE_SIZE}
           searchDebounceMs={300}
         />
 
         <section className="details-main">
-          <h1>Edit Album: {albumDetail.album.album_name}</h1>
-          {loading && <p className="input-help">Refreshing album data...</p>}
+          <h1 className="details-title">{albumDetail.album.album_name}</h1>
 
-          <div className="edit-container">
-            <div className="cover-section">
-              <div className="cover-preview">
-                {effectiveCoverPreview ? (
-                  <img src={effectiveCoverPreview} alt="Album cover" />
-                ) : (
-                  <div className="no-cover-large">🎵</div>
-                )}
-              </div>
-              <input
-                type="file"
-                accept="image/*"
-                ref={fileInputRef}
-                onChange={handleCoverChange}
-                style={{ display: 'none' }}
-              />
-              <button onClick={() => fileInputRef.current?.click()} className="btn-secondary" disabled={saving}>
-                Change Album Cover
-              </button>
-              <p className="input-help">Choose image, crop/zoom, then save to apply to all tracks in this album.</p>
-            </div>
+          <div className="edit-container glass">
+            <input
+              type="file"
+              accept="image/*"
+              ref={fileInputRef}
+              onChange={handleCoverChange}
+              className="hidden-file-input"
+            />
+            <button
+              type="button"
+              className="cover-preview"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={saving}
+              aria-label="Change album cover"
+              title="Change album cover"
+            >
+              {effectiveCoverPreview ? (
+                <img src={effectiveCoverPreview} alt="" />
+              ) : (
+                <div className="no-cover-large">🎵</div>
+              )}
+              <span className="cover-preview__overlay" aria-hidden="true">
+                <ImagePlus />
+              </span>
+            </button>
 
             <div className="metadata-section">
-              <div className="form-group">
-                <label htmlFor="albumName">Album Name</label>
-                <input
-                  id="albumName"
-                  type="text"
-                  value={albumName}
-                  onChange={(e) => setAlbumName(e.target.value)}
-                  disabled={saving}
-                  placeholder="Leave blank to clear album metadata"
-                />
+              <IconField
+                icon={DiscAlbum}
+                label="Album name"
+                value={albumName}
+                onChange={(e) => setAlbumName(e.target.value)}
+                disabled={saving}
+              />
+
+              <div className="album-chips">
+                <span className="album-chip" title="Tracks">
+                  <Music aria-hidden="true" />
+                  {albumDetail.album.track_count}
+                </span>
+                <span className="album-chip" title="Size">
+                  <HardDrive aria-hidden="true" />
+                  {formatBytes(albumDetail.album.total_size)}
+                </span>
+                {albumDetail.album.artists.length > 0 && (
+                  <span className="album-chip album-chip--wide" title={albumDetail.album.artists.join(', ')}>
+                    <MicVocal aria-hidden="true" />
+                    <span className="album-chip__text">{albumDetail.album.artists.join(', ')}</span>
+                  </span>
+                )}
               </div>
 
-              <div className="album-stats-grid">
-                <div className="album-stat-card">
-                  <span className="album-stat-label">Tracks</span>
-                  <strong>{albumDetail.album.track_count}</strong>
-                </div>
-                <div className="album-stat-card">
-                  <span className="album-stat-label">Total Size</span>
-                  <strong>{formatBytes(albumDetail.album.total_size)}</strong>
-                </div>
-                <div className="album-stat-card album-stat-card-wide">
-                  <span className="album-stat-label">Artists</span>
-                  <strong>{albumDetail.album.artists.length > 0 ? albumDetail.album.artists.join(', ') : '-'}</strong>
-                </div>
-              </div>
-
-              <button onClick={handleSave} disabled={saving} className="btn-primary">
-                Save Album Changes
+              <button onClick={handleSave} disabled={saving} className="btn-primary metadata-save">
+                {saving ? <Spinner inline /> : <Save aria-hidden="true" />}
+                Save
               </button>
             </div>
           </div>
 
-          <div className="audio-player">
-            <h3>Tracks in this Album</h3>
-            <div className="library-table-wrap">
-              <table className="library-table">
-                <thead>
-                  <tr>
-                    <th>Title</th>
-                    <th>Artist</th>
-                    <th>Filename</th>
-                    <th>Size</th>
+          <div className="library-table-wrap glass glass--strong">
+            <table className="library-table album-tracks-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Artist</th>
+                  <th>File name</th>
+                  <th>Size</th>
+                </tr>
+              </thead>
+              <tbody>
+                {albumDetail.tracks.map((track) => (
+                  <tr key={track.filename}>
+                    <td><span className="table-cell-ellipsis">{track.title || '-'}</span></td>
+                    <td><span className="table-cell-ellipsis">{track.artist || '-'}</span></td>
+                    <td><span className="library-filename">{track.filename}</span></td>
+                    <td>{formatBytes(track.file_size)}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {albumDetail.tracks.map((track) => (
-                    <tr key={track.filename}>
-                      <td>{track.title || '-'}</td>
-                      <td>{track.artist || '-'}</td>
-                      <td className="library-filename">{track.filename}</td>
-                      <td>{formatBytes(track.file_size)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
         </section>
       </div>
