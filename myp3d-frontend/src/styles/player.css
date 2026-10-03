@@ -612,10 +612,6 @@ tr:hover .track-index__icon,
   outline: 2px solid color-mix(in srgb, var(--color-accent) 70%, transparent);
 }
 
-.album-tracks-table .track-index-col {
-  width: 4rem;
-}
-
 .album-tracks-table tr.is-current td {
   background: color-mix(in srgb, var(--color-lavender) 10%, transparent);
 }

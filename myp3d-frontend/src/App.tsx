@@ -66,6 +66,8 @@ const KEEP_ALIVE_PAGES: KeepAlivePage[] = [
   { path: '/albums', element: <AlbumsPage /> },
 ];
 
+const FILL_PATHS = new Set(['/library', '/albums']);
+
 function SidebarSearchButton() {
   const { open } = useSpotlight();
 
@@ -103,6 +105,7 @@ function App() {
   const location = useLocation();
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const isFillPage = FILL_PATHS.has(location.pathname.replace(/(.)\/+$/, '$1'));
 
   useEffect(() => {
     setIsMobileSidebarOpen(false);
@@ -159,7 +162,7 @@ function App() {
               />
             )}
 
-            <section className="app-content">
+            <section className={isFillPage ? 'app-content app-content--fill' : 'app-content'}>
               <header className="content-header glass">
                 <IconButton
                   icon={Menu}

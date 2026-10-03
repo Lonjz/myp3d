@@ -9,6 +9,7 @@ import { useToast } from '../components/messages/ToastProvider';
 import { InfiniteSidebarList } from '../components/sidebar/InfiniteSidebarList';
 import { usePlayer } from '../components/player/playerContext';
 import { TrackIndexButton } from '../components/player/TrackIndexButton';
+import { DataTable } from '../components/table/DataTable';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
@@ -264,39 +265,59 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
             </div>
           </div>
 
-          <div className="library-table-wrap glass glass--strong">
-            <table className="library-table album-tracks-table">
-              <thead>
-                <tr>
-                  <th className="track-index-col"><span className="sr-only">Play</span></th>
-                  <th>Title</th>
-                  <th>Artist</th>
-                  <th>File name</th>
-                  <th>Size</th>
-                </tr>
-              </thead>
-              <tbody>
-                {albumDetail.tracks.map((track, index) => (
-                  <tr key={track.filename} className={player.isCurrent(track.filename) ? 'is-current' : undefined}>
-                    <td>
-                      <TrackIndexButton
-                        index={index + 1}
-                        label={`Play ${track.title || track.filename}`}
-                        isCurrent={player.isCurrent(track.filename)}
-                        isPlaying={player.state.isPlaying}
-                        onPlay={() => player.playTracks(albumDetail.tracks, index)}
-                        onToggle={player.togglePlay}
-                      />
-                    </td>
-                    <td><span className="table-cell-ellipsis">{track.title || '-'}</span></td>
-                    <td><span className="table-cell-ellipsis">{track.artist || '-'}</span></td>
-                    <td><span className="library-filename">{track.filename}</span></td>
-                    <td>{formatBytes(track.file_size)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            className="album-tracks-table"
+            items={albumDetail.tracks}
+            getRowKey={(track) => track.filename}
+            getRowClassName={(track) => (player.isCurrent(track.filename) ? 'is-current' : undefined)}
+            emptyMessage="No tracks"
+            columns={[
+              {
+                key: 'index',
+                header: <span className="sr-only">Play</span>,
+                width: '4rem',
+                render: (track, index) => (
+                  <TrackIndexButton
+                    index={index + 1}
+                    label={`Play ${track.title || track.filename}`}
+                    isCurrent={player.isCurrent(track.filename)}
+                    isPlaying={player.state.isPlaying}
+                    onPlay={() => player.playTracks(albumDetail.tracks, index)}
+                    onToggle={player.togglePlay}
+                  />
+                ),
+              },
+              {
+                key: 'title',
+                header: 'Title',
+                render: (track) => (
+                  <>
+                    <span className="table-cell-ellipsis" title={track.title || '-'}>{track.title || '-'}</span>
+                    {track.artist && <span className="table-cell-subtitle" title={track.artist}>{track.artist}</span>}
+                  </>
+                ),
+              },
+              {
+                key: 'artist',
+                header: 'Artist',
+                hideBelow: 'sm',
+                render: (track) => <span className="table-cell-ellipsis" title={track.artist || '-'}>{track.artist || '-'}</span>,
+              },
+              {
+                key: 'filename',
+                header: 'File name',
+                hideBelow: 'md',
+                render: (track) => <span className="library-filename" title={track.filename}>{track.filename}</span>,
+              },
+              {
+                key: 'size',
+                header: 'Size',
+                width: '96px',
+                hideBelow: 'sm',
+                render: (track) => formatBytes(track.file_size),
+              },
+            ]}
+          />
         </section>
       </div>
 

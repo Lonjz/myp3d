@@ -264,6 +264,23 @@
   flex: 1;
 }
 
+.app-content--fill {
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+}
+
+.app-content--fill .content-main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.app-content--fill .player-dock {
+  position: static;
+  padding-bottom: var(--sidebar-gap);
+}
+
 .sidebar-overlay {
   position: fixed;
   inset: 0;

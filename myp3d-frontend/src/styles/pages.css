@@ -5,6 +5,14 @@
   padding: var(--space-6) var(--space-7);
 }
 
+.page--fill {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+}
+
 @media (max-width: 980px) {
   .page {
     padding: var(--space-5);
