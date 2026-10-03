@@ -88,6 +88,15 @@
   height: 16px;
 }
 
+.icon-btn--lg {
+  --icon-btn-size: 3rem;
+}
+
+.icon-btn--lg svg {
+  width: 22px;
+  height: 22px;
+}
+
 .icon-btn--primary {
   color: var(--color-on-light);
   border-color: transparent;

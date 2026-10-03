@@ -11,6 +11,8 @@ import { ToastProvider } from './components/messages/ToastProvider';
 import { IconButton } from './components/ui/IconButton';
 import { AppBackdrop } from './components/shell/AppBackdrop';
 import { KeepAliveRoutes } from './components/shell/KeepAliveRoutes';
+import { PlayerBar } from './components/player/PlayerBar';
+import { PlayerProvider } from './components/player/PlayerProvider';
 import type { KeepAlivePage } from './components/shell/KeepAliveRoutes';
 import { NAV_ITEMS } from './components/shell/navItems';
 import { SpotlightProvider } from './components/spotlight/SpotlightProvider';
@@ -109,77 +111,81 @@ function App() {
   return (
     <ToastProvider>
       <SpotlightProvider>
-        <AppBackdrop />
-        <div className="app-shell">
-          <aside
-            className={`sidebar glass ${isSidebarExpanded ? 'expanded' : 'collapsed'} ${
-              isMobileSidebarOpen ? 'mobile-open' : ''
-            }`}
-          >
-            <div className="sidebar-header">
-              <span className="sidebar-brand">
-                <AudioLines aria-hidden="true" />
-                <span>MYP3D</span>
-              </span>
-              <IconButton
-                icon={ChevronLeft}
-                label={isSidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
-                variant="ghost"
-                className="sidebar-collapse-btn"
-                onClick={() => setIsSidebarExpanded((value) => !value)}
+        <PlayerProvider>
+          <AppBackdrop />
+          <div className="app-shell">
+            <aside
+              className={`sidebar glass ${isSidebarExpanded ? 'expanded' : 'collapsed'} ${
+                isMobileSidebarOpen ? 'mobile-open' : ''
+              }`}
+            >
+              <div className="sidebar-header">
+                <span className="sidebar-brand">
+                  <AudioLines aria-hidden="true" />
+                  <span>MYP3D</span>
+                </span>
+                <IconButton
+                  icon={ChevronLeft}
+                  label={isSidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
+                  variant="ghost"
+                  className="sidebar-collapse-btn"
+                  onClick={() => setIsSidebarExpanded((value) => !value)}
+                />
+              </div>
+
+              <SidebarSearchButton />
+
+              <nav className="sidebar-nav" aria-label="Primary navigation">
+                {NAV_ITEMS.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    className={() => (item.isActive(location.pathname) ? 'sidebar-link active' : 'sidebar-link')}
+                    title={item.label}
+                  >
+                    <item.icon aria-hidden="true" />
+                    <span className="sidebar-label">{item.label}</span>
+                  </NavLink>
+                ))}
+              </nav>
+            </aside>
+
+            {isMobileSidebarOpen && (
+              <button
+                type="button"
+                aria-label="Close navigation"
+                className="sidebar-overlay"
+                onClick={() => setIsMobileSidebarOpen(false)}
               />
-            </div>
+            )}
 
-            <SidebarSearchButton />
+            <section className="app-content">
+              <header className="content-header glass">
+                <IconButton
+                  icon={Menu}
+                  label="Open navigation"
+                  variant="ghost"
+                  onClick={() => setIsMobileSidebarOpen(true)}
+                />
+                <HeaderSearchButton />
+              </header>
 
-            <nav className="sidebar-nav" aria-label="Primary navigation">
-              {NAV_ITEMS.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  className={() => (item.isActive(location.pathname) ? 'sidebar-link active' : 'sidebar-link')}
-                  title={item.label}
-                >
-                  <item.icon aria-hidden="true" />
-                  <span className="sidebar-label">{item.label}</span>
-                </NavLink>
-              ))}
-            </nav>
-          </aside>
+              <main className="content-main">
+                <KeepAliveRoutes pages={KEEP_ALIVE_PAGES}>
+                  <Routes>
+                    <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                    <Route path="/download" element={<Navigate to="/query" replace />} />
+                    <Route path="/details/:songName" element={<EditRoute />} />
+                    <Route path="/albums/:albumKey" element={<AlbumEditRoute />} />
+                    <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                  </Routes>
+                </KeepAliveRoutes>
+              </main>
 
-          {isMobileSidebarOpen && (
-            <button
-              type="button"
-              aria-label="Close navigation"
-              className="sidebar-overlay"
-              onClick={() => setIsMobileSidebarOpen(false)}
-            />
-          )}
-
-          <section className="app-content">
-            <header className="content-header glass">
-              <IconButton
-                icon={Menu}
-                label="Open navigation"
-                variant="ghost"
-                onClick={() => setIsMobileSidebarOpen(true)}
-              />
-              <HeaderSearchButton />
-            </header>
-
-            <main className="content-main">
-              <KeepAliveRoutes pages={KEEP_ALIVE_PAGES}>
-                <Routes>
-                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                  <Route path="/download" element={<Navigate to="/query" replace />} />
-                  <Route path="/details/:songName" element={<EditRoute />} />
-                  <Route path="/albums/:albumKey" element={<AlbumEditRoute />} />
-                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                </Routes>
-              </KeepAliveRoutes>
-            </main>
-          </section>
-        </div>
+              <PlayerBar />
+            </section>
+          </div>
+        </PlayerProvider>
       </SpotlightProvider>
     </ToastProvider>
   );

@@ -223,6 +223,16 @@ export const mp3Api = {
     return apiFetch(`/mp3s/paged?${query.toString()}`, undefined, 'Failed to fetch paged MP3 list');
   },
 
+  listAll(params: Omit<MP3ListPagedParams, 'page' | 'limit'> = {}): Promise<MP3Info[]> {
+    const query = new URLSearchParams({
+      search: params.search || '',
+      filter_by: params.filterBy || 'all',
+      sort_by: params.sortBy || 'date_added',
+      sort_direction: params.sortDirection || 'desc',
+    });
+    return apiFetch(`/mp3s/all?${query.toString()}`, undefined, 'Failed to fetch MP3 list');
+  },
+
   // Search YouTube through backend yt-dlp integration
   async searchYouTube(query: string, limit = 12): Promise<YouTubeSearchResult[]> {
     const params = new URLSearchParams({ query, limit: String(limit) });
