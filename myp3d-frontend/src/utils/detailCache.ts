@@ -1,7 +1,13 @@
 import type { AlbumDetail, MP3Info } from '../api/mp3Api';
+import { subscribeAppEvent } from './appEvents';
 
 const mp3InfoCache = new Map<string, MP3Info>();
 const albumDetailCache = new Map<string, AlbumDetail>();
+
+subscribeAppEvent('library-changed', () => {
+  mp3InfoCache.clear();
+  albumDetailCache.clear();
+});
 
 export function getCachedMp3Info(filename: string): MP3Info | null {
   return mp3InfoCache.get(filename) || null;

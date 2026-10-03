@@ -9,7 +9,8 @@ import { useToast } from '../components/messages/ToastProvider';
 import { InfiniteSidebarList } from '../components/sidebar/InfiniteSidebarList';
 import { IconField } from '../components/ui/IconField';
 import { Spinner } from '../components/ui/Spinner';
-import { getCachedMp3Info, invalidateMp3Info, setCachedMp3Info } from '../utils/detailCache';
+import { emitAppEvent } from '../utils/appEvents';
+import { getCachedMp3Info, setCachedMp3Info } from '../utils/detailCache';
 
 interface EditPageProps {
   filename: string;
@@ -120,7 +121,7 @@ export function EditPage({ filename, onBack }: EditPageProps) {
 
       showSuccess('Saved successfully!');
 
-      invalidateMp3Info(filename);
+      emitAppEvent('library-changed');
       if (result.filename === filename) {
         await loadMp3({ force: true });
       }

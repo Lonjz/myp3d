@@ -9,7 +9,8 @@ import { useToast } from '../components/messages/ToastProvider';
 import { InfiniteSidebarList } from '../components/sidebar/InfiniteSidebarList';
 import { IconField } from '../components/ui/IconField';
 import { Spinner } from '../components/ui/Spinner';
-import { getCachedAlbumDetail, invalidateAlbumDetail, setCachedAlbumDetail } from '../utils/detailCache';
+import { emitAppEvent } from '../utils/appEvents';
+import { getCachedAlbumDetail, setCachedAlbumDetail } from '../utils/detailCache';
 import { formatBytes } from '../utils/formatters';
 
 interface AlbumEditPageProps {
@@ -116,13 +117,13 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
         await mp3Api.updateAlbumCover(targetAlbumKey, coverFile);
       }
 
+      emitAppEvent('library-changed');
+
       if (targetAlbumKey !== albumKey) {
-        invalidateAlbumDetail(albumKey);
         navigate(`/albums/${encodeURIComponent(targetAlbumKey)}`, { replace: true });
         return;
       }
 
-      invalidateAlbumDetail(targetAlbumKey);
       await loadAlbum(targetAlbumKey, { clearToast: false, force: true });
       showSuccess('Album updated successfully!');
     } catch (err) {

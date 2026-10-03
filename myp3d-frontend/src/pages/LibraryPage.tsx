@@ -7,6 +7,7 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { usePagedList } from '../hooks/usePagedList';
 import { useSortState } from '../hooks/useSortState';
 import { formatBytes, formatDate, formatDateTime } from '../utils/formatters';
+import { emitAppEvent } from '../utils/appEvents';
 import { PaginatedTable } from '../components/table/PaginatedTable';
 import { SortableHeaderButton } from '../components/table/SortableHeaderButton';
 import { IconButton } from '../components/ui/IconButton';
@@ -61,7 +62,6 @@ export function LibraryPage() {
     loading,
     error,
     loadPage: loadMp3s,
-    invalidateCache: invalidateMp3Cache,
     currentPage,
     totalPages,
     shownStart,
@@ -84,7 +84,7 @@ export function LibraryPage() {
     if (!confirm(`Delete "${filename}"?`)) return;
     try {
       await mp3Api.delete(filename);
-      invalidateMp3Cache();
+      emitAppEvent('library-changed');
       await loadMp3s({ force: true });
     } catch {
       alert('Failed to delete file');

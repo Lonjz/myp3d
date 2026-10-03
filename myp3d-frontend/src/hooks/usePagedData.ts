@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import { subscribeAppEvent } from '../utils/appEvents';
 
 type PagedMeta = {
   total: number;
@@ -15,6 +16,8 @@ type CacheEntry<TItem> = {
 };
 
 const sharedCache = new Map<string, CacheEntry<unknown>>();
+
+subscribeAppEvent('library-changed', () => sharedCache.clear());
 
 const buildCacheKey = (prefix: string, key: string) => `${prefix}::${key}`;
 

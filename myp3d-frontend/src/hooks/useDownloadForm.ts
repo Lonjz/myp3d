@@ -3,6 +3,7 @@ import { mp3Api } from '../api/mp3Api';
 import type { DownloadRequest } from '../api/mp3Api';
 import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
 import { useToast } from '../components/messages/ToastProvider';
+import { emitAppEvent } from '../utils/appEvents';
 
 interface UseDownloadFormOptions {
   zoomInputId: string;
@@ -62,6 +63,7 @@ export function useDownloadForm({ zoomInputId, onDownloaded }: UseDownloadFormOp
 
       const result = await mp3Api.download(request);
       showSuccess(`Downloaded: ${result.filename}`);
+      emitAppEvent('library-changed');
       resetFields();
       onDownloaded?.();
       return true;
