@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DiscAlbum, HardDrive, ImagePlus, MicVocal, Music, Save } from 'lucide-react';
+import { DiscAlbum, HardDrive, ImagePlus, MicVocal, Music, Save, Trash2, TriangleAlert, Undo2 } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { AlbumDetail, AlbumInfo } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
 import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
 import { useToast } from '../components/messages/ToastProvider';
 import { InfiniteSidebarList } from '../components/sidebar/InfiniteSidebarList';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { IconField } from '../components/ui/IconField';
 import { Spinner } from '../components/ui/Spinner';
+import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { emitAppEvent } from '../utils/appEvents';
 import { getCachedAlbumDetail, setCachedAlbumDetail } from '../utils/detailCache';
 import { formatBytes } from '../utils/formatters';
@@ -101,6 +103,12 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
     loadAlbum(albumKey);
   }, [albumKey]);
 
+  const loadedAlbumName =
+    albumDetail && albumDetail.album.album_name !== NO_ALBUM_LABEL ? albumDetail.album.album_name : '';
+  const isDirty = albumDetail !== null && (albumName !== loadedAlbumName || coverFile !== null);
+
+  const { blocker, allowNavigation } = useUnsavedChangesGuard(isDirty);
+
   const handleSave = async () => {
     if (!albumDetail) {
       return;
@@ -120,11 +128,13 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
       emitAppEvent('library-changed');
 
       if (targetAlbumKey !== albumKey) {
+        allowNavigation();
         navigate(`/albums/${encodeURIComponent(targetAlbumKey)}`, { replace: true });
         return;
       }
 
       await loadAlbum(targetAlbumKey, { clearToast: false, force: true });
+      resetCoverState();
       showSuccess('Album updated successfully!');
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Failed to save album');
@@ -264,6 +274,19 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
           </div>
         </section>
       </div>
+
+      <ConfirmDialog
+        open={blocker.state === 'blocked'}
+        icon={TriangleAlert}
+        title="Discard changes?"
+        cancelLabel="Stay"
+        cancelIcon={Undo2}
+        confirmLabel="Discard"
+        confirmIcon={Trash2}
+        tone="danger"
+        onCancel={() => blocker.reset?.()}
+        onConfirm={() => blocker.proceed?.()}
+      />
 
       <CoverCropModal
         isOpen={isCropModalOpen}

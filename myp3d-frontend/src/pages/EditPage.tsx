@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DiscAlbum, FileAudio, ImagePlus, MicVocal, Save, Type } from 'lucide-react';
+import { DiscAlbum, FileAudio, ImagePlus, MicVocal, Save, Trash2, TriangleAlert, Type, Undo2 } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { MP3Info } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
 import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
 import { useToast } from '../components/messages/ToastProvider';
 import { InfiniteSidebarList } from '../components/sidebar/InfiniteSidebarList';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { IconField } from '../components/ui/IconField';
 import { Spinner } from '../components/ui/Spinner';
+import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { emitAppEvent } from '../utils/appEvents';
 import { getCachedMp3Info, setCachedMp3Info } from '../utils/detailCache';
 
@@ -101,6 +103,16 @@ export function EditPage({ filename, onBack }: EditPageProps) {
     void loadMp3();
   }, [filename]);
 
+  const isDirty =
+    mp3 !== null &&
+    (title !== (mp3.title || '') ||
+      artist !== (mp3.artist || '') ||
+      album !== (mp3.album || '') ||
+      newFilename !== mp3.filename ||
+      coverFile !== null);
+
+  const { blocker, allowNavigation } = useUnsavedChangesGuard(isDirty);
+
   const handleSave = async () => {
     setSaving(true);
     clearToast();
@@ -128,6 +140,7 @@ export function EditPage({ filename, onBack }: EditPageProps) {
       
       // If filename changed, go back to library
       if (result.filename !== filename) {
+        allowNavigation();
         window.setTimeout(() => onBack(), 1000);
       }
     } catch (err) {
@@ -280,6 +293,19 @@ export function EditPage({ filename, onBack }: EditPageProps) {
           </div>
         </section>
       </div>
+
+      <ConfirmDialog
+        open={blocker.state === 'blocked'}
+        icon={TriangleAlert}
+        title="Discard changes?"
+        cancelLabel="Stay"
+        cancelIcon={Undo2}
+        confirmLabel="Discard"
+        confirmIcon={Trash2}
+        tone="danger"
+        onCancel={() => blocker.reset?.()}
+        onConfirm={() => blocker.proceed?.()}
+      />
 
       <CoverCropModal
         isOpen={isCropModalOpen}
