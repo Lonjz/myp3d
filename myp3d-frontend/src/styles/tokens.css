@@ -1,44 +1,69 @@
 :root {
   color-scheme: dark;
 
-  --color-bg: #1a1a2e;
-  --color-surface: #16213e;
-  --color-surface-sunken: #111a35;
-  --color-surface-hover: #1a284b;
-  --color-surface-selected: #2b1f3d;
-  --color-sidebar-from: #17264a;
-  --color-sidebar-to: #111a35;
+  --color-bg: #17122b;
+  --color-surface: #2a2147;
+  --color-surface-sunken: #1f1838;
+  --color-surface-hover: rgba(255, 255, 255, 0.1);
+  --color-surface-selected: rgba(255, 255, 255, 0.18);
 
-  --color-border: #0f3460;
-  --color-border-emphasis: #2b4b84;
-  --color-border-hover: #5c77b5;
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-border-emphasis: rgba(255, 255, 255, 0.2);
+  --color-border-hover: rgba(255, 255, 255, 0.34);
 
-  --color-text: #f4f6ff;
-  --color-text-secondary: #b6c2e7;
-  --color-text-muted: #8f9bc4;
+  --color-text: #fbf8ff;
+  --color-text-secondary: #d8d0ee;
+  --color-text-muted: #a99fc8;
+  --color-on-light: #221a3b;
 
-  --color-accent: #e94560;
-  --color-accent-hover: #ff6b81;
-  --color-accent-alt: #d23b74;
+  --color-accent: #ff9ec4;
+  --color-accent-hover: #ffb8d4;
+  --color-accent-alt: #b9a2ff;
 
-  --color-success: #27ae60;
-  --color-danger: #c0392b;
-  --color-danger-hover: #e74c3c;
-  --color-danger-text: #ff9a9a;
-  --color-warning: #fab219;
-  --color-info: #8fa3d8;
+  --color-lavender: #b9a2ff;
+  --color-rose: #ff9ec4;
+  --color-peach: #ffc4a3;
+  --color-sky: #9ec5ff;
 
-  --color-scrim: rgba(0, 0, 0, 0.7);
-  --color-scrim-nav: rgba(2, 7, 20, 0.58);
+  --color-success: #8ee3b8;
+  --color-danger: #ff8b9a;
+  --color-danger-hover: #ffa3af;
+  --color-danger-text: #ffc0c8;
+  --color-warning: #ffd48f;
+  --color-info: #a9c6ff;
 
-  --chart-series: #5b8def;
+  --color-scrim: rgba(12, 8, 26, 0.55);
+  --color-scrim-nav: rgba(12, 8, 26, 0.45);
+
+  --chart-series: #8a80f0;
   --chart-series-active: color-mix(in srgb, var(--chart-series) 75%, white);
   --chart-grid: var(--color-border);
   --chart-axis: var(--color-text-muted);
 
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25);
-  --shadow-md: 0 12px 34px rgba(0, 0, 0, 0.28);
-  --shadow-lg: 0 12px 34px rgba(0, 0, 0, 0.45);
+  --glass-tint: rgba(255, 255, 255, 0.06);
+  --glass-tint-strong: rgba(24, 18, 46, 0.42);
+  --glass-tint-hover: rgba(255, 255, 255, 0.12);
+  --glass-tint-dark: rgba(16, 11, 33, 0.78);
+  --glass-sheen: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.14) 0%,
+    rgba(255, 255, 255, 0.03) 42%,
+    rgba(255, 255, 255, 0.07) 100%
+  );
+  --glass-rim: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.62) 0%,
+    rgba(255, 255, 255, 0.14) 28%,
+    rgba(255, 255, 255, 0.04) 58%,
+    rgba(255, 255, 255, 0.32) 100%
+  );
+  --glass-inner: inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 0 24px rgba(255, 255, 255, 0.04);
+  --glass-shadow: 0 12px 40px rgba(8, 4, 24, 0.32);
+  --glass-blur: blur(28px) saturate(170%);
+
+  --shadow-sm: 0 2px 8px rgba(8, 4, 24, 0.25);
+  --shadow-md: 0 12px 34px rgba(8, 4, 24, 0.3);
+  --shadow-lg: 0 20px 50px rgba(8, 4, 24, 0.45);
 
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -49,9 +74,10 @@
   --space-7: 2rem;
   --space-8: 3rem;
 
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --radius-xl: 28px;
   --radius-full: 999px;
 
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -70,4 +96,11 @@
   --duration-fast: 150ms;
   --duration-base: 200ms;
   --ease-standard: ease;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root {
+    --glass-tint: rgba(42, 33, 71, 0.94);
+    --glass-tint-strong: rgba(42, 33, 71, 0.94);
+  }
 }

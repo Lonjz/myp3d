@@ -1,0 +1,25 @@
+.glass {
+  position: relative;
+  background: var(--glass-sheen), var(--glass-tint);
+  border: 0;
+  box-shadow: var(--glass-inner), var(--glass-shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+
+.glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: var(--glass-rim);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.glass--strong {
+  background: var(--glass-sheen), var(--glass-tint-strong);
+}

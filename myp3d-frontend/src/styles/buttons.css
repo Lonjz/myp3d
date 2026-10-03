@@ -1,65 +1,126 @@
-/* Buttons */
-.btn-primary,
-.btn-secondary,
-.btn-danger {
-  color: var(--color-text);
-  border: none;
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-5);
+  min-height: 2.5rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  font: inherit;
   font-size: var(--text-sm);
-  transition: background var(--duration-base) var(--ease-standard);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+.btn-primary svg {
+  width: 18px;
+  height: 18px;
+}
+
+.btn-primary:active:not(:disabled),
+.icon-btn:active:not(:disabled) {
+  transform: scale(0.96);
 }
 
 .btn-primary:disabled,
-.btn-secondary:disabled,
-.btn-danger:disabled {
-  opacity: 0.6;
+.icon-btn:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
 .btn-primary {
-  background: var(--color-accent);
-  padding: var(--space-3) var(--space-6);
-  font-size: var(--text-md);
+  color: var(--color-on-light);
+  background: linear-gradient(135deg, var(--color-rose) 0%, var(--color-lavender) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 6px 20px color-mix(in srgb, var(--color-rose) 30%, transparent);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--color-accent-hover);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 8px 26px color-mix(in srgb, var(--color-rose) 45%, transparent);
 }
 
-.btn-secondary {
-  background: var(--color-border);
-  text-decoration: none;
-  display: inline-block;
-}
-
-.btn-secondary:hover {
-  background: var(--color-border-emphasis);
-}
-
-.btn-danger {
-  background: var(--color-danger);
-}
-
-.btn-danger:hover {
-  background: var(--color-danger-hover);
-}
-
-.btn-small {
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--text-xs);
-}
-
-.btn-icon {
-  padding: var(--space-1);
-  width: 2.2rem;
-  height: 2.2rem;
+.icon-btn {
+  --icon-btn-size: 2.5rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+  width: var(--icon-btn-size);
+  height: var(--icon-btn-size);
+  padding: 0;
+  border: 1px solid var(--color-border-emphasis);
+  border-radius: var(--radius-full);
+  color: var(--color-text);
+  background: var(--glass-tint-hover);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
 }
 
-.btn-icon svg {
-  font-size: var(--text-lg);
+.icon-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.icon-btn:hover:not(:disabled),
+.icon-btn.is-active {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: var(--color-border-hover);
+}
+
+.icon-btn--sm {
+  --icon-btn-size: 2rem;
+}
+
+.icon-btn--sm svg {
+  width: 16px;
+  height: 16px;
+}
+
+.icon-btn--primary {
+  color: var(--color-on-light);
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--color-rose) 0%, var(--color-lavender) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.icon-btn--primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--color-accent-hover) 0%, var(--color-lavender) 100%);
+  border-color: transparent;
+}
+
+.icon-btn--danger {
+  color: var(--color-danger-text);
+  background: color-mix(in srgb, var(--color-danger) 14%, transparent);
+  border-color: color-mix(in srgb, var(--color-danger) 35%, transparent);
+}
+
+.icon-btn--danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-danger) 28%, transparent);
+  border-color: color-mix(in srgb, var(--color-danger) 55%, transparent);
+}
+
+.icon-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--color-text-secondary);
+}
+
+.icon-btn--ghost:hover:not(:disabled),
+.icon-btn--ghost.is-active {
+  background: var(--color-surface-hover);
+  border-color: transparent;
+  color: var(--color-text);
 }
