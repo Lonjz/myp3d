@@ -1,13 +1,15 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DiscAlbum, FileAudio, ImagePlus, MicVocal, Save, Trash2, TriangleAlert, Type, Undo2 } from 'lucide-react';
+import { DiscAlbum, FileAudio, ImagePlus, MicVocal, Pause, Play, Save, Trash2, TriangleAlert, Type, Undo2 } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { MP3Info } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
 import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
 import { useToast } from '../components/messages/ToastProvider';
 import { InfiniteSidebarList } from '../components/sidebar/InfiniteSidebarList';
+import { usePlayer } from '../components/player/playerContext';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { Spinner } from '../components/ui/Spinner';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
@@ -20,8 +22,6 @@ interface EditPageProps {
 }
 
 const SIDEBAR_SCROLL_KEY = 'edit-sidebar-scroll-top';
-const EDIT_AUDIO_VOLUME_KEY = 'edit-audio-volume';
-const EDIT_AUDIO_MUTED_KEY = 'edit-audio-muted';
 const SIDEBAR_PAGE_SIZE = 25;
 
 export function EditPage({ filename, onBack }: EditPageProps) {
@@ -109,6 +109,7 @@ export function EditPage({ filename, onBack }: EditPageProps) {
       coverFile !== null);
 
   const { blocker, allowNavigation } = useUnsavedChangesGuard(isDirty);
+  const player = usePlayer();
 
   const handleSave = async () => {
     setSaving(true);
@@ -130,6 +131,15 @@ export function EditPage({ filename, onBack }: EditPageProps) {
 
       showSuccess('Saved successfully!');
 
+      if (mp3) {
+        player.trackUpdated(filename, {
+          ...mp3,
+          filename: result.filename,
+          title: title || mp3.title,
+          artist: artist || mp3.artist,
+          album: album || mp3.album,
+        });
+      }
       emitAppEvent('library-changed');
       if (result.filename === filename) {
         await loadMp3({ force: true });
@@ -152,35 +162,7 @@ export function EditPage({ filename, onBack }: EditPageProps) {
 
   const existingCoverPreview = mp3.has_cover ? mp3Api.getCoverUrl(mp3.filename, 'full') : null;
   const effectiveCoverPreview = coverPreview || existingCoverPreview;
-
-  const restoreAudioState = (audio: HTMLAudioElement) => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    const storedVolume = window.localStorage.getItem(EDIT_AUDIO_VOLUME_KEY);
-    if (storedVolume !== null) {
-      const parsedVolume = Number(storedVolume);
-      if (Number.isFinite(parsedVolume)) {
-        const clampedVolume = Math.min(1, Math.max(0, parsedVolume));
-        audio.volume = clampedVolume;
-      }
-    }
-
-    const storedMuted = window.localStorage.getItem(EDIT_AUDIO_MUTED_KEY);
-    if (storedMuted !== null) {
-      audio.muted = storedMuted === 'true';
-    }
-  };
-
-  const persistAudioState = (audio: HTMLAudioElement) => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    window.localStorage.setItem(EDIT_AUDIO_VOLUME_KEY, String(audio.volume));
-    window.localStorage.setItem(EDIT_AUDIO_MUTED_KEY, String(audio.muted));
-  };
+  const isPlayingThis = player.isCurrent(mp3.filename) && player.state.isPlaying;
 
   return (
     <div className="page">
@@ -274,21 +256,20 @@ export function EditPage({ filename, onBack }: EditPageProps) {
                 disabled={saving}
               />
 
-              <button onClick={handleSave} disabled={saving} className="btn-primary metadata-save">
-                {saving ? <Spinner inline /> : <Save aria-hidden="true" />}
-                Save
-              </button>
+              <div className="metadata-actions">
+                <IconButton
+                  icon={isPlayingThis ? Pause : Play}
+                  label={isPlayingThis ? 'Pause' : 'Play'}
+                  onClick={() => (player.isCurrent(mp3.filename) ? player.togglePlay() : player.playTracks([mp3], 0))}
+                />
+                <button onClick={handleSave} disabled={saving} className="btn-primary metadata-save">
+                  {saving ? <Spinner inline /> : <Save aria-hidden="true" />}
+                  Save
+                </button>
+              </div>
             </div>
           </div>
 
-          <div className="audio-player glass glass--strong">
-            <audio
-              controls
-              src={mp3Api.getFileUrl(filename)}
-              onLoadedMetadata={(e) => restoreAudioState(e.currentTarget)}
-              onVolumeChange={(e) => persistAudioState(e.currentTarget)}
-            />
-          </div>
         </section>
       </div>
 

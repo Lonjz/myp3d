@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Download, ListFilter, Pencil, RefreshCw, Search, Trash2 } from 'lucide-react';
+import { Download, ListFilter, Pencil, Play, RefreshCw, Search, Shuffle, Trash2 } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { MP3FilterBy, MP3SortBy } from '../api/mp3Api';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
@@ -11,6 +11,8 @@ import { formatBytes, formatDate, formatDateTime } from '../utils/formatters';
 import { emitAppEvent } from '../utils/appEvents';
 import { PaginatedTable } from '../components/table/PaginatedTable';
 import { SortableHeaderButton } from '../components/table/SortableHeaderButton';
+import { CoverPlayButton } from '../components/player/CoverPlayButton';
+import { usePlayer } from '../components/player/playerContext';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { Spinner } from '../components/ui/Spinner';
@@ -83,6 +85,27 @@ export function LibraryPage() {
     storageKey: 'library:page',
   });
 
+  const player = usePlayer();
+
+  const loadPlayableTracks = async () => {
+    try {
+      return await mp3Api.listAll({ search: debouncedSearchQuery, filterBy, sortBy, sortDirection });
+    } catch {
+      return mp3s;
+    }
+  };
+
+  const playFrom = async (filename: string) => {
+    const tracks = await loadPlayableTracks();
+    const index = tracks.findIndex((track) => track.filename === filename);
+    player.playTracks(tracks, Math.max(0, index));
+  };
+
+  const playAll = async (shuffle: boolean) => {
+    const tracks = await loadPlayableTracks();
+    player.playTracks(tracks, shuffle ? undefined : 0, { shuffle });
+  };
+
   const handleDelete = async (filename: string) => {
     if (!confirm(`Delete "${filename}"?`)) return;
     try {
@@ -131,6 +154,8 @@ export function LibraryPage() {
             <option value="filename">File name</option>
           </select>
         </label>
+        <IconButton icon={Play} label="Play all" onClick={() => void playAll(false)} disabled={totalItems === 0} />
+        <IconButton icon={Shuffle} label="Shuffle all" onClick={() => void playAll(true)} disabled={totalItems === 0} />
         <IconButton icon={RefreshCw} label="Refresh" onClick={() => void loadMp3s({ force: true })} />
       </div>
 
@@ -171,11 +196,14 @@ export function LibraryPage() {
             <tr key={mp3.filename}>
               <td>
                 <div className="library-cover-sm">
-                  {mp3.has_cover ? (
-                    <img src={mp3Api.getCoverUrl(mp3.filename, 'thumb')} alt="Cover" />
-                  ) : (
-                    <div className="no-cover">🎵</div>
-                  )}
+                  <CoverPlayButton
+                    src={mp3.has_cover ? mp3Api.getCoverUrl(mp3.filename, 'thumb') : undefined}
+                    label={`Play ${mp3.title || mp3.filename}`}
+                    isCurrent={player.isCurrent(mp3.filename)}
+                    isPlaying={player.state.isPlaying}
+                    onPlay={() => void playFrom(mp3.filename)}
+                    onToggle={player.togglePlay}
+                  />
                 </div>
               </td>
               <td><span className="table-cell-ellipsis" title={mp3.title || '-'}>{mp3.title || '-'}</span></td>

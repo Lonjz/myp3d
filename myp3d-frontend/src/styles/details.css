@@ -177,11 +177,6 @@
   min-width: 0;
 }
 
-.metadata-save {
-  align-self: flex-end;
-  margin-top: auto;
-}
-
 .album-chips {
   display: flex;
   flex-wrap: wrap;
@@ -220,27 +215,6 @@
 
 .album-tracks-table {
   min-width: 560px;
-}
-
-/* Audio Player */
-.audio-player {
-  padding: var(--space-3);
-  border-radius: var(--radius-full);
-}
-
-.audio-player audio {
-  display: block;
-  width: 100%;
-  color-scheme: dark;
-}
-
-.audio-player audio::-webkit-media-controls-enclosure {
-  border-radius: var(--radius-full);
-  background: transparent;
-}
-
-.audio-player audio::-webkit-media-controls-panel {
-  background: transparent;
 }
 
 @media (max-width: 980px) {

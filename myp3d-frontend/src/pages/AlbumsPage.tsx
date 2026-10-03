@@ -10,6 +10,8 @@ import { useSortState } from '../hooks/useSortState';
 import { formatBytes, formatDate, formatDateTime } from '../utils/formatters';
 import { PaginatedTable } from '../components/table/PaginatedTable';
 import { SortableHeaderButton } from '../components/table/SortableHeaderButton';
+import { CoverPlayButton } from '../components/player/CoverPlayButton';
+import { usePlayer } from '../components/player/playerContext';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { Spinner } from '../components/ui/Spinner';
@@ -70,6 +72,9 @@ export function AlbumsPage() {
     resetKey: `${searchQuery}|${sortBy}|${sortDirection}`,
     storageKey: 'albums:page',
   });
+
+  const player = usePlayer();
+  const currentAlbumName = (player.currentTrack?.album || '').trim().toLowerCase();
 
   const renderSortHeader = (column: AlbumSortBy, label: string) => {
     return (
@@ -134,11 +139,14 @@ export function AlbumsPage() {
             <tr key={album.album_key}>
               <td>
                 <div className="library-cover-sm">
-                  {album.has_cover ? (
-                    <img src={mp3Api.getAlbumCoverUrl(album.album_key, 'thumb')} alt="Album cover" />
-                  ) : (
-                    <div className="no-cover">🎵</div>
-                  )}
+                  <CoverPlayButton
+                    src={album.has_cover ? mp3Api.getAlbumCoverUrl(album.album_key, 'thumb') : undefined}
+                    label={`Play ${album.album_name}`}
+                    isCurrent={player.currentTrack !== null && currentAlbumName === album.album_name.toLowerCase()}
+                    isPlaying={player.state.isPlaying}
+                    onPlay={() => void player.playAlbum(album.album_key)}
+                    onToggle={player.togglePlay}
+                  />
                 </div>
               </td>
               <td><span className="table-cell-ellipsis" title={album.album_name || '(No Album)'}>{album.album_name || '(No Album)'}</span></td>

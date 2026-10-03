@@ -1,13 +1,16 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DiscAlbum, HardDrive, ImagePlus, MicVocal, Music, Save, Trash2, TriangleAlert, Undo2 } from 'lucide-react';
+import { DiscAlbum, HardDrive, ImagePlus, MicVocal, Music, Play, Save, Shuffle, Trash2, TriangleAlert, Undo2 } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { AlbumDetail, AlbumInfo } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
 import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
 import { useToast } from '../components/messages/ToastProvider';
 import { InfiniteSidebarList } from '../components/sidebar/InfiniteSidebarList';
+import { usePlayer } from '../components/player/playerContext';
+import { TrackIndexButton } from '../components/player/TrackIndexButton';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { Spinner } from '../components/ui/Spinner';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
@@ -103,6 +106,7 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
   const isDirty = albumDetail !== null && (albumName !== loadedAlbumName || coverFile !== null);
 
   const { blocker, allowNavigation } = useUnsavedChangesGuard(isDirty);
+  const player = usePlayer();
 
   const handleSave = async () => {
     if (!albumDetail) {
@@ -239,10 +243,24 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
                 )}
               </div>
 
-              <button onClick={handleSave} disabled={saving} className="btn-primary metadata-save">
-                {saving ? <Spinner inline /> : <Save aria-hidden="true" />}
-                Save
-              </button>
+              <div className="metadata-actions">
+                <IconButton
+                  icon={Play}
+                  label="Play album"
+                  onClick={() => player.playTracks(albumDetail.tracks, 0)}
+                  disabled={albumDetail.tracks.length === 0}
+                />
+                <IconButton
+                  icon={Shuffle}
+                  label="Shuffle album"
+                  onClick={() => player.playTracks(albumDetail.tracks, undefined, { shuffle: true })}
+                  disabled={albumDetail.tracks.length === 0}
+                />
+                <button onClick={handleSave} disabled={saving} className="btn-primary metadata-save">
+                  {saving ? <Spinner inline /> : <Save aria-hidden="true" />}
+                  Save
+                </button>
+              </div>
             </div>
           </div>
 
@@ -250,6 +268,7 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
             <table className="library-table album-tracks-table">
               <thead>
                 <tr>
+                  <th className="track-index-col"><span className="sr-only">Play</span></th>
                   <th>Title</th>
                   <th>Artist</th>
                   <th>File name</th>
@@ -257,8 +276,18 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
                 </tr>
               </thead>
               <tbody>
-                {albumDetail.tracks.map((track) => (
-                  <tr key={track.filename}>
+                {albumDetail.tracks.map((track, index) => (
+                  <tr key={track.filename} className={player.isCurrent(track.filename) ? 'is-current' : undefined}>
+                    <td>
+                      <TrackIndexButton
+                        index={index + 1}
+                        label={`Play ${track.title || track.filename}`}
+                        isCurrent={player.isCurrent(track.filename)}
+                        isPlaying={player.state.isPlaying}
+                        onPlay={() => player.playTracks(albumDetail.tracks, index)}
+                        onToggle={player.togglePlay}
+                      />
+                    </td>
                     <td><span className="table-cell-ellipsis">{track.title || '-'}</span></td>
                     <td><span className="table-cell-ellipsis">{track.artist || '-'}</span></td>
                     <td><span className="library-filename">{track.filename}</span></td>

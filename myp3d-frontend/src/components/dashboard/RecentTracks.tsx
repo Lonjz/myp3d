@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { mp3Api } from '../../api/mp3Api';
 import type { MP3Info } from '../../api/mp3Api';
 import { formatDuration } from '../../utils/formatters';
+import { CoverPlayButton } from '../player/CoverPlayButton';
+import { usePlayer } from '../player/playerContext';
 import { ChartCard } from './ChartCard';
 
 interface RecentTracksProps {
@@ -20,22 +22,27 @@ function formatRelativeDate(value: string | null | undefined): string {
 }
 
 export function RecentTracks({ tracks }: RecentTracksProps) {
+  const player = usePlayer();
+
   return (
     <ChartCard title="Recent" icon={History}>
       {tracks.length === 0 ? (
         <p className="chart-card__empty">Nothing downloaded yet.</p>
       ) : (
         <ul className="recent-list">
-          {tracks.map((track) => (
-            <li key={track.filename}>
+          {tracks.map((track, index) => (
+            <li key={track.filename} className="recent-row">
+              <div className="recent-item__cover">
+                <CoverPlayButton
+                  src={track.has_cover ? mp3Api.getCoverUrl(track.filename, 'thumb') : undefined}
+                  label={`Play ${track.title || track.filename}`}
+                  isCurrent={player.isCurrent(track.filename)}
+                  isPlaying={player.state.isPlaying}
+                  onPlay={() => player.playTracks(tracks, index)}
+                  onToggle={player.togglePlay}
+                />
+              </div>
               <Link to={`/details/${encodeURIComponent(track.filename)}`} className="recent-item">
-                <div className="recent-item__cover">
-                  {track.has_cover ? (
-                    <img src={mp3Api.getCoverUrl(track.filename, 'thumb')} alt="" loading="lazy" />
-                  ) : (
-                    <div className="no-cover">🎵</div>
-                  )}
-                </div>
                 <div className="recent-item__text">
                   <span className="recent-item__title">{track.title || track.filename}</span>
                   <span className="recent-item__artist">{track.artist || 'Unknown artist'}</span>

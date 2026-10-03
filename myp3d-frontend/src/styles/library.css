@@ -91,23 +91,8 @@
   height: 44px;
 }
 
-.library-cover-sm img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: var(--radius-sm);
+.library-cover-sm .cover-play {
   box-shadow: var(--shadow-sm);
-}
-
-.no-cover {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.08);
-  font-size: var(--text-xl);
 }
 
 .table-cell-ellipsis,
