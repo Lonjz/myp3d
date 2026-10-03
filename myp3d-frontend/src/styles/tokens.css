@@ -44,6 +44,7 @@
   --glass-tint-strong: rgba(24, 18, 46, 0.42);
   --glass-tint-hover: rgba(255, 255, 255, 0.12);
   --glass-tint-dark: rgba(16, 11, 33, 0.78);
+  --glass-tint-overlay: rgba(22, 16, 42, 0.6);
   --glass-sheen: linear-gradient(
     135deg,
     rgba(255, 255, 255, 0.14) 0%,
@@ -60,6 +61,7 @@
   --glass-inner: inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 0 24px rgba(255, 255, 255, 0.04);
   --glass-shadow: 0 12px 40px rgba(8, 4, 24, 0.32);
   --glass-blur: blur(28px) saturate(170%);
+  --glass-blur-heavy: blur(40px) saturate(180%);
 
   --shadow-sm: 0 2px 8px rgba(8, 4, 24, 0.25);
   --shadow-md: 0 12px 34px rgba(8, 4, 24, 0.3);
@@ -96,11 +98,13 @@
   --duration-fast: 150ms;
   --duration-base: 200ms;
   --ease-standard: ease;
+  --ease-spring: cubic-bezier(0.2, 0.9, 0.3, 1.12);
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   :root {
     --glass-tint: rgba(42, 33, 71, 0.94);
     --glass-tint-strong: rgba(42, 33, 71, 0.94);
+    --glass-tint-overlay: rgba(34, 26, 59, 0.97);
   }
 }

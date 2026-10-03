@@ -83,6 +83,11 @@ export interface LibraryStats {
   recent_tracks: MP3Info[];
 }
 
+export interface SearchResults {
+  tracks: MP3Info[];
+  albums: AlbumInfo[];
+}
+
 interface AlbumUpdateRequest {
   album_name: string;
 }
@@ -260,5 +265,10 @@ export const mp3Api = {
 
   getStats(): Promise<LibraryStats> {
     return apiFetch('/stats', undefined, 'Failed to fetch library stats');
+  },
+
+  searchLibrary(query: string, limit: number, signal?: AbortSignal): Promise<SearchResults> {
+    const params = new URLSearchParams({ q: query, limit: String(limit) });
+    return apiFetch(`/search?${params.toString()}`, { signal }, 'Failed to search library');
   },
 };

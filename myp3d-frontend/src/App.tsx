@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { ReactNode } from 'react';
-import { AudioLines, ChevronLeft, DiscAlbum, LayoutDashboard, ListMusic, Menu, MonitorPlay } from 'lucide-react';
+import { AudioLines, ChevronLeft, Menu, Search } from 'lucide-react';
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { DashboardPage } from './pages/DashboardPage';
 import { QueryPage } from './pages/QueryPage';
@@ -11,6 +10,10 @@ import { AlbumEditPage } from './pages/AlbumEditPage';
 import { ToastProvider } from './components/messages/ToastProvider';
 import { IconButton } from './components/ui/IconButton';
 import { AppBackdrop } from './components/shell/AppBackdrop';
+import { NAV_ITEMS } from './components/shell/navItems';
+import { SpotlightProvider } from './components/spotlight/SpotlightProvider';
+import { useSpotlight } from './components/spotlight/spotlightContext';
+import { SPOTLIGHT_SHORTCUT_LABEL } from './components/spotlight/spotlightTypes';
 
 function safeDecode(value: string): string {
   try {
@@ -52,6 +55,39 @@ function AlbumEditRoute() {
   );
 }
 
+function SidebarSearchButton() {
+  const { open } = useSpotlight();
+
+  return (
+    <button
+      type="button"
+      className="sidebar-search"
+      aria-label="Search"
+      aria-keyshortcuts="Control+K Meta+K"
+      title={`Search (${SPOTLIGHT_SHORTCUT_LABEL})`}
+      onClick={() => open()}
+    >
+      <Search aria-hidden="true" />
+      <span className="sidebar-label">Search</span>
+      <kbd className="sidebar-search__kbd">{SPOTLIGHT_SHORTCUT_LABEL}</kbd>
+    </button>
+  );
+}
+
+function HeaderSearchButton() {
+  const { open } = useSpotlight();
+
+  return (
+    <IconButton
+      icon={Search}
+      label="Search"
+      variant="ghost"
+      className="content-header__search"
+      onClick={() => open()}
+    />
+  );
+}
+
 function App() {
   const location = useLocation();
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
@@ -61,116 +97,83 @@ function App() {
     setIsMobileSidebarOpen(false);
   }, [location.pathname]);
 
-  const isLibraryActive =
-    location.pathname === '/library' || location.pathname.startsWith('/details/');
-  const isAlbumsActive = location.pathname === '/albums' || location.pathname.startsWith('/albums/');
-
-  const getLinkClass = (active: boolean) => (active ? 'sidebar-link active' : 'sidebar-link');
-
-  const navItems = [
-    {
-      to: '/dashboard',
-      label: 'Dashboard',
-      icon: <LayoutDashboard aria-hidden="true" />,
-      className: ({ isActive }: { isActive: boolean }) => getLinkClass(isActive),
-    },
-    {
-      to: '/query',
-      label: 'Query',
-      icon: <MonitorPlay aria-hidden="true" />,
-      className: ({ isActive }: { isActive: boolean }) => getLinkClass(isActive),
-    },
-    {
-      to: '/library',
-      label: 'Library',
-      icon: <ListMusic aria-hidden="true" />,
-      className: () => getLinkClass(isLibraryActive),
-    },
-    {
-      to: '/albums',
-      label: 'Albums',
-      icon: <DiscAlbum aria-hidden="true" />,
-      className: () => getLinkClass(isAlbumsActive),
-    },
-  ] as Array<{
-    to: string;
-    label: string;
-    icon: ReactNode;
-    className: ((state: { isActive: boolean }) => string) | (() => string);
-  }>;
-
   return (
     <ToastProvider>
-      <AppBackdrop />
-      <div className="app-shell">
-        <aside
-          className={`sidebar glass ${isSidebarExpanded ? 'expanded' : 'collapsed'} ${
-            isMobileSidebarOpen ? 'mobile-open' : ''
-          }`}
-        >
-          <div className="sidebar-header">
-            <span className="sidebar-brand">
-              <AudioLines aria-hidden="true" />
-              <span>MYP3D</span>
-            </span>
-            <IconButton
-              icon={ChevronLeft}
-              label={isSidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
-              variant="ghost"
-              className="sidebar-collapse-btn"
-              onClick={() => setIsSidebarExpanded((value) => !value)}
+      <SpotlightProvider>
+        <AppBackdrop />
+        <div className="app-shell">
+          <aside
+            className={`sidebar glass ${isSidebarExpanded ? 'expanded' : 'collapsed'} ${
+              isMobileSidebarOpen ? 'mobile-open' : ''
+            }`}
+          >
+            <div className="sidebar-header">
+              <span className="sidebar-brand">
+                <AudioLines aria-hidden="true" />
+                <span>MYP3D</span>
+              </span>
+              <IconButton
+                icon={ChevronLeft}
+                label={isSidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
+                variant="ghost"
+                className="sidebar-collapse-btn"
+                onClick={() => setIsSidebarExpanded((value) => !value)}
+              />
+            </div>
+
+            <SidebarSearchButton />
+
+            <nav className="sidebar-nav" aria-label="Primary navigation">
+              {NAV_ITEMS.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={() => (item.isActive(location.pathname) ? 'sidebar-link active' : 'sidebar-link')}
+                  title={item.label}
+                >
+                  <item.icon aria-hidden="true" />
+                  <span className="sidebar-label">{item.label}</span>
+                </NavLink>
+              ))}
+            </nav>
+          </aside>
+
+          {isMobileSidebarOpen && (
+            <button
+              type="button"
+              aria-label="Close navigation"
+              className="sidebar-overlay"
+              onClick={() => setIsMobileSidebarOpen(false)}
             />
-          </div>
+          )}
 
-          <nav className="sidebar-nav" aria-label="Primary navigation">
-            {navItems.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={item.className}
-                title={item.label}
-              >
-                {item.icon}
-                <span className="sidebar-label">{item.label}</span>
-              </NavLink>
-            ))}
-          </nav>
-        </aside>
+          <section className="app-content">
+            <header className="content-header glass">
+              <IconButton
+                icon={Menu}
+                label="Open navigation"
+                variant="ghost"
+                onClick={() => setIsMobileSidebarOpen(true)}
+              />
+              <HeaderSearchButton />
+            </header>
 
-        {isMobileSidebarOpen && (
-          <button
-            type="button"
-            aria-label="Close navigation"
-            className="sidebar-overlay"
-            onClick={() => setIsMobileSidebarOpen(false)}
-          />
-        )}
-
-        <section className="app-content">
-          <header className="content-header glass">
-            <IconButton
-              icon={Menu}
-              label="Open navigation"
-              variant="ghost"
-              onClick={() => setIsMobileSidebarOpen(true)}
-            />
-          </header>
-
-          <main className="content-main">
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/download" element={<Navigate to="/query" replace />} />
-            <Route path="/query" element={<QueryPage />} />
-            <Route path="/library" element={<LibraryPage />} />
-            <Route path="/details/:songName" element={<EditRoute />} />
-            <Route path="/albums" element={<AlbumsPage />} />
-            <Route path="/albums/:albumKey" element={<AlbumEditRoute />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-          </main>
-        </section>
-      </div>
+            <main className="content-main">
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/download" element={<Navigate to="/query" replace />} />
+              <Route path="/query" element={<QueryPage />} />
+              <Route path="/library" element={<LibraryPage />} />
+              <Route path="/details/:songName" element={<EditRoute />} />
+              <Route path="/albums" element={<AlbumsPage />} />
+              <Route path="/albums/:albumKey" element={<AlbumEditRoute />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+            </main>
+          </section>
+        </div>
+      </SpotlightProvider>
     </ToastProvider>
   );
 }
