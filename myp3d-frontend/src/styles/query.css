@@ -62,14 +62,13 @@
 }
 
 .query-result-item.active {
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 6px 18px rgba(8, 4, 24, 0.25);
+  background: var(--selected-bg);
+  box-shadow: var(--selected-shadow);
 }
 
-.query-result-item.active .query-result-title,
 .query-result-item.active .query-result-subtitle,
 .query-result-item.active .query-result-duration {
-  color: var(--color-on-light);
+  color: var(--color-text-secondary);
 }
 
 .query-result-thumb-wrap {

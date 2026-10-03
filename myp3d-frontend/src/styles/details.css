@@ -65,14 +65,13 @@
 }
 
 .details-song-item.active {
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 6px 18px rgba(8, 4, 24, 0.25);
+  background: var(--selected-bg);
+  box-shadow: var(--selected-shadow);
   cursor: default;
 }
 
-.details-song-item.active .details-song-title,
 .details-song-item.active .details-song-subtitle {
-  color: var(--color-on-light);
+  color: var(--color-text-secondary);
 }
 
 .details-song-title {

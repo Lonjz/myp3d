@@ -143,9 +143,8 @@
 }
 
 .spotlight-row.is-active {
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 6px 18px rgba(8, 4, 24, 0.25), inset 0 1px 0 #fff;
-  color: var(--color-on-light);
+  background: var(--selected-bg);
+  box-shadow: var(--selected-shadow);
 }
 
 .spotlight-row__art {
@@ -161,8 +160,8 @@
 }
 
 .spotlight-row.is-active .spotlight-row__art {
-  background: rgba(34, 26, 59, 0.08);
-  color: var(--color-on-light);
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--color-text);
 }
 
 .spotlight-row__art img {
@@ -200,7 +199,7 @@
 }
 
 .spotlight-row.is-active .spotlight-row__subtitle {
-  color: color-mix(in srgb, var(--color-on-light) 70%, transparent);
+  color: var(--color-text-secondary);
 }
 
 .spotlight-row__enter {
