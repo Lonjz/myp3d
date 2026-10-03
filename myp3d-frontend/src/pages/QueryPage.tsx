@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useEffectEvent, useRef } from 'react';
 import { ArrowRight, Download, MonitorPlay, Search } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { mp3Api } from '../api/mp3Api';
 import type { YouTubeSearchResult } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
@@ -11,20 +12,9 @@ import { IconField } from '../components/ui/IconField';
 import { Spinner } from '../components/ui/Spinner';
 import { useDownloadForm } from '../hooks/useDownloadForm';
 import { formatDuration } from '../utils/formatters';
+import { getVideoIdFromUrl } from '../utils/youtube';
 
 type YouTubePlayer = any;
-
-const getVideoIdFromUrl = (url: string): string => {
-  try {
-    const parsed = new URL(url);
-    if (parsed.hostname.includes('youtu.be')) {
-      return parsed.pathname.replace('/', '');
-    }
-    return parsed.searchParams.get('v') || '';
-  } catch {
-    return '';
-  }
-};
 
 const loadYouTubeApi = (() => {
   let promise: Promise<any> | null = null;
@@ -313,9 +303,8 @@ export function QueryPage() {
     clearToast();
   };
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const normalized = searchQuery.trim();
+  const runSearch = async (query: string) => {
+    const normalized = query.trim();
     if (!normalized) {
       showError('Please enter a search query');
       return;
@@ -340,6 +329,43 @@ export function QueryPage() {
       setSearching(false);
     }
   };
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    void runSearch(searchQuery);
+  };
+
+  const applyUrl = (nextUrl: string) => {
+    setUrl(nextUrl);
+    const nextVideoId = getVideoIdFromUrl(nextUrl);
+    setSelectedVideoId(nextVideoId);
+    if (!nextVideoId || nextVideoId !== selectedResult?.video_id) {
+      setSelectedResult(null);
+      setVideoDuration(null);
+      setPlayheadTime(0);
+    }
+  };
+
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const applySearchParams = useEffectEvent((params: URLSearchParams) => {
+    const incomingUrl = params.get('url');
+    const incomingQuery = params.get('q');
+    if (!incomingUrl && !incomingQuery) return;
+
+    if (incomingUrl) {
+      applyUrl(incomingUrl);
+    }
+    if (incomingQuery) {
+      setSearchQuery(incomingQuery);
+      void runSearch(incomingQuery);
+    }
+    setSearchParams({}, { replace: true });
+  });
+
+  useEffect(() => {
+    applySearchParams(searchParams);
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -480,16 +506,7 @@ export function QueryPage() {
             <DownloadConfigSection
               idPrefix="query"
               url={url}
-              onUrlChange={(nextUrl) => {
-                setUrl(nextUrl);
-                const nextVideoId = getVideoIdFromUrl(nextUrl);
-                setSelectedVideoId(nextVideoId);
-                if (!nextVideoId || nextVideoId !== selectedResult?.video_id) {
-                  setSelectedResult(null);
-                  setVideoDuration(null);
-                  setPlayheadTime(0);
-                }
-              }}
+              onUrlChange={applyUrl}
               customFilename={customFilename}
               onCustomFilenameChange={setCustomFilename}
               title={title}
