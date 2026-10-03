@@ -5,17 +5,27 @@ import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
 import { useToast } from '../components/messages/ToastProvider';
 import { emitAppEvent } from '../utils/appEvents';
 
+export interface DownloadFormValues {
+  url: string;
+  customFilename: string;
+  title: string;
+  artist: string;
+  album: string;
+  cover?: string;
+}
+
 interface UseDownloadFormOptions {
   zoomInputId: string;
   onDownloaded?: () => void;
+  initialValues?: Partial<DownloadFormValues>;
 }
 
-export function useDownloadForm({ zoomInputId, onDownloaded }: UseDownloadFormOptions) {
-  const [url, setUrl] = useState('');
-  const [customFilename, setCustomFilename] = useState('');
-  const [title, setTitle] = useState('');
-  const [artist, setArtist] = useState('');
-  const [album, setAlbum] = useState('');
+export function useDownloadForm({ zoomInputId, onDownloaded, initialValues }: UseDownloadFormOptions) {
+  const [url, setUrl] = useState(initialValues?.url ?? '');
+  const [customFilename, setCustomFilename] = useState(initialValues?.customFilename ?? '');
+  const [title, setTitle] = useState(initialValues?.title ?? '');
+  const [artist, setArtist] = useState(initialValues?.artist ?? '');
+  const [album, setAlbum] = useState(initialValues?.album ?? '');
   const [loading, setLoading] = useState(false);
   const { showSuccess, showError, clearToast } = useToast();
 
@@ -35,7 +45,7 @@ export function useDownloadForm({ zoomInputId, onDownloaded }: UseDownloadFormOp
     handleCancelCrop,
     handleRemoveCover,
     resetCoverState,
-  } = useCoverImageCrop({ onError: showError, onClearError: clearToast });
+  } = useCoverImageCrop({ onError: showError, onClearError: clearToast, initialCover: initialValues?.cover });
 
   const resetFields = () => {
     setUrl('');
@@ -102,6 +112,7 @@ export function useDownloadForm({ zoomInputId, onDownloaded }: UseDownloadFormOp
     album,
     setAlbum,
     loading,
+    coverImageBase64,
     coverPreview,
     handleCoverFileSelect,
     handleRemoveCover,

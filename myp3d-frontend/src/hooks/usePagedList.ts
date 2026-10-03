@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { usePagedData, type PagedResponse } from './usePagedData';
+import { usePersistentState } from './usePersistentState';
 
 type UsePagedListOptions<TParams extends Record<string, unknown>, TItem> = {
   pageSize: number;
@@ -8,6 +9,7 @@ type UsePagedListOptions<TParams extends Record<string, unknown>, TItem> = {
   errorMessage: string;
   cacheKeyPrefix: string;
   resetKey: string;
+  storageKey?: string;
 };
 
 export function usePagedList<TParams extends Record<string, unknown>, TItem>({
@@ -17,8 +19,9 @@ export function usePagedList<TParams extends Record<string, unknown>, TItem>({
   errorMessage,
   cacheKeyPrefix,
   resetKey,
+  storageKey,
 }: UsePagedListOptions<TParams, TItem>) {
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = usePersistentState(storageKey ?? null, 1);
   const prevResetKeyRef = useRef(resetKey);
 
   const { items, total, loading, error, loadPage, invalidateCache } = usePagedData({
@@ -39,15 +42,15 @@ export function usePagedList<TParams extends Record<string, unknown>, TItem>({
       }
     }
     void loadPage();
-  }, [loadPage, currentPage, resetKey]);
+  }, [loadPage, currentPage, resetKey, setCurrentPage]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   useEffect(() => {
-    if (currentPage > totalPages) {
+    if (!loading && currentPage > totalPages) {
       setCurrentPage(totalPages);
     }
-  }, [currentPage, totalPages]);
+  }, [currentPage, loading, totalPages, setCurrentPage]);
 
   const shownStart = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const shownEnd = total === 0 ? 0 : shownStart + items.length - 1;

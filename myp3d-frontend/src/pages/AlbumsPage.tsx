@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Pencil, RefreshCw, Search } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { AlbumSortBy } from '../api/mp3Api';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { usePersistentState } from '../hooks/usePersistentState';
 import { usePagedList } from '../hooks/usePagedList';
 import { useSortState } from '../hooks/useSortState';
 import { formatBytes, formatDate, formatDateTime } from '../utils/formatters';
@@ -26,13 +27,14 @@ const ALBUM_COLUMN_WIDTHS = {
 
 export function AlbumsPage() {
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = usePersistentState('albums:search', '');
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
 
   const { sortBy, sortDirection, handleSortClick } = useSortState<AlbumSortBy>({
     initialSortBy: 'album_name',
     initialDirection: 'asc',
     getDefaultDirection: (column) => (column === 'album_name' ? 'asc' : 'desc'),
+    storageKey: 'albums:sort',
   });
 
   const queryParams = useMemo(
@@ -66,6 +68,7 @@ export function AlbumsPage() {
     errorMessage: 'Failed to load albums',
     cacheKeyPrefix: 'albums',
     resetKey: `${searchQuery}|${sortBy}|${sortDirection}`,
+    storageKey: 'albums:page',
   });
 
   const renderSortHeader = (column: AlbumSortBy, label: string) => {

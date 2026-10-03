@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Download, ListFilter, Pencil, RefreshCw, Search, Trash2 } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { MP3FilterBy, MP3SortBy } from '../api/mp3Api';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { usePersistentState } from '../hooks/usePersistentState';
 import { usePagedList } from '../hooks/usePagedList';
 import { useSortState } from '../hooks/useSortState';
 import { formatBytes, formatDate, formatDateTime } from '../utils/formatters';
@@ -36,14 +37,15 @@ const LIBRARY_COLUMN_WIDTHS = {
 
 export function LibraryPage() {
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterBy, setFilterBy] = useState<MP3FilterBy>('all');
+  const [searchQuery, setSearchQuery] = usePersistentState('library:search', '');
+  const [filterBy, setFilterBy] = usePersistentState<MP3FilterBy>('library:filter', 'all');
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
 
   const { sortBy, sortDirection, handleSortClick } = useSortState<MP3SortBy>({
     initialSortBy: 'date_added',
     initialDirection: 'desc',
     getDefaultDirection: (column) => (column === 'date_added' ? 'desc' : 'asc'),
+    storageKey: 'library:sort',
   });
 
   const queryParams = useMemo(
@@ -78,6 +80,7 @@ export function LibraryPage() {
     errorMessage: 'Failed to load MP3 library',
     cacheKeyPrefix: 'library',
     resetKey: `${searchQuery}|${filterBy}|${sortBy}|${sortDirection}`,
+    storageKey: 'library:page',
   });
 
   const handleDelete = async (filename: string) => {

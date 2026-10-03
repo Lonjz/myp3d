@@ -50,16 +50,18 @@ interface UseCoverImageCropOptions {
   onError: (message: string) => void;
   onClearError?: () => void;
   outputFilename?: string;
+  initialCover?: string;
 }
 
 export function useCoverImageCrop({
   onError,
   onClearError,
   outputFilename = 'cover.jpg',
+  initialCover,
 }: UseCoverImageCropOptions) {
-  const [coverImageBase64, setCoverImageBase64] = useState<string | undefined>(undefined);
+  const [coverImageBase64, setCoverImageBase64] = useState<string | undefined>(initialCover);
   const [coverFile, setCoverFile] = useState<File | null>(null);
-  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(initialCover ?? null);
   const [cropSource, setCropSource] = useState<string | null>(null);
   const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);

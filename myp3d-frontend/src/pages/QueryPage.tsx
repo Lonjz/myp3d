@@ -1,4 +1,4 @@
-import { useState, useEffect, useEffectEvent, useRef } from 'react';
+import { useState, useEffect, useEffectEvent, useMemo, useRef } from 'react';
 import { ArrowRight, Download, MonitorPlay, Search } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { mp3Api } from '../api/mp3Api';
@@ -11,6 +11,8 @@ import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { Spinner } from '../components/ui/Spinner';
 import { useDownloadForm } from '../hooks/useDownloadForm';
+import type { DownloadFormValues } from '../hooks/useDownloadForm';
+import { readStoredValue, useStoredValueWriter } from '../hooks/usePersistentState';
 import { formatDuration } from '../utils/formatters';
 import { getVideoIdFromUrl } from '../utils/youtube';
 
@@ -62,23 +64,39 @@ const loadYouTubeApi = (() => {
   };
 })();
 
+const QUERY_DRAFT_KEY = 'query:draft';
+
+interface QueryDraft {
+  searchQuery: string;
+  searchResults: YouTubeSearchResult[];
+  selectedResult: YouTubeSearchResult | null;
+  selectedVideoId: string;
+  videoDuration: number | null;
+  trimStart: number;
+  trimEnd: number;
+  sliderMode: 'range' | 'playhead';
+  loopEnabled: boolean;
+  form: DownloadFormValues;
+}
+
 export function QueryPage() {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [initialDraft] = useState(() => readStoredValue<Partial<QueryDraft>>(QUERY_DRAFT_KEY, {}));
+  const [searchQuery, setSearchQuery] = useState(initialDraft.searchQuery ?? '');
   const [searching, setSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<YouTubeSearchResult[]>([]);
+  const [searchResults, setSearchResults] = useState<YouTubeSearchResult[]>(initialDraft.searchResults ?? []);
 
-  const [selectedResult, setSelectedResult] = useState<YouTubeSearchResult | null>(null);
-  const [selectedVideoId, setSelectedVideoId] = useState('');
+  const [selectedResult, setSelectedResult] = useState<YouTubeSearchResult | null>(initialDraft.selectedResult ?? null);
+  const [selectedVideoId, setSelectedVideoId] = useState(initialDraft.selectedVideoId ?? '');
 
-  const [videoDuration, setVideoDuration] = useState<number | null>(null);
-  const [trimStart, setTrimStart] = useState(0);
-  const [trimEnd, setTrimEnd] = useState(0);
+  const [videoDuration, setVideoDuration] = useState<number | null>(initialDraft.videoDuration ?? null);
+  const [trimStart, setTrimStart] = useState(initialDraft.trimStart ?? 0);
+  const [trimEnd, setTrimEnd] = useState(initialDraft.trimEnd ?? 0);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
   const [isSamplePlaying, setIsSamplePlaying] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [playheadTime, setPlayheadTime] = useState(0);
-  const [sliderMode, setSliderMode] = useState<'range' | 'playhead'>('range');
-  const [loopEnabled, setLoopEnabled] = useState(true);
+  const [sliderMode, setSliderMode] = useState<'range' | 'playhead'>(initialDraft.sliderMode ?? 'range');
+  const [loopEnabled, setLoopEnabled] = useState(initialDraft.loopEnabled ?? true);
 
   const playerContainerRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<YouTubePlayer | null>(null);
@@ -103,6 +121,7 @@ export function QueryPage() {
     album,
     setAlbum,
     loading: downloading,
+    coverImageBase64,
     coverPreview,
     handleCoverFileSelect,
     handleRemoveCover,
@@ -110,12 +129,47 @@ export function QueryPage() {
     submitDownload,
   } = useDownloadForm({
     zoomInputId: 'queryCropZoom',
+    initialValues: initialDraft.form,
     onDownloaded: () => {
       resetTiming(null);
       setSelectedResult(null);
       setSelectedVideoId('');
     },
   });
+
+  const draft = useMemo<QueryDraft>(
+    () => ({
+      searchQuery,
+      searchResults,
+      selectedResult,
+      selectedVideoId,
+      videoDuration,
+      trimStart,
+      trimEnd,
+      sliderMode,
+      loopEnabled,
+      form: { url, customFilename, title, artist, album, cover: coverImageBase64 },
+    }),
+    [
+      searchQuery,
+      searchResults,
+      selectedResult,
+      selectedVideoId,
+      videoDuration,
+      trimStart,
+      trimEnd,
+      sliderMode,
+      loopEnabled,
+      url,
+      customFilename,
+      title,
+      artist,
+      album,
+      coverImageBase64,
+    ],
+  );
+
+  useStoredValueWriter(QUERY_DRAFT_KEY, draft);
 
   const hasDuration = Boolean(videoDuration && videoDuration > 0);
   const hasTrimRange = hasDuration && trimEnd > trimStart;
