@@ -1,6 +1,7 @@
-import { CalendarPlus, Clock, DiscAlbum, HardDrive, MicVocal, Music } from 'lucide-react';
+import { CalendarPlus, Clock, DiscAlbum, HardDrive, MicVocal, Music, Play } from 'lucide-react';
 import { mp3Api } from '../../../api/mp3Api';
 import type { AlbumInfo, MP3Info } from '../../../api/mp3Api';
+import { emitAppEvent } from '../../../utils/appEvents';
 import { formatBytes, formatDate, formatDuration } from '../../../utils/formatters';
 import { SPOTLIGHT_SECTION_LIMIT } from '../spotlightTypes';
 import type { RemoteSpotlightSource, SpotlightItem, SpotlightMeta } from '../spotlightTypes';
@@ -29,6 +30,11 @@ function trackItem(track: MP3Info): SpotlightItem {
       ]),
     },
     run: ({ navigate }) => navigate(`/details/${encodeURIComponent(track.filename)}`),
+    secondary: {
+      label: 'Play',
+      icon: Play,
+      run: () => emitAppEvent('play-request', { tracks: [track], startIndex: 0 }),
+    },
   };
 }
 
@@ -51,6 +57,11 @@ function albumItem(album: AlbumInfo): SpotlightItem {
       ]),
     },
     run: ({ navigate }) => navigate(`/albums/${encodeURIComponent(album.album_key)}`),
+    secondary: {
+      label: 'Play album',
+      icon: Play,
+      run: () => emitAppEvent('play-request', { albumKey: album.album_key }),
+    },
   };
 }
 

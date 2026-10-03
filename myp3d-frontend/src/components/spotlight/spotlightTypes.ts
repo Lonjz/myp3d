@@ -8,11 +8,12 @@ export interface SpotlightSection {
   id: SpotlightSectionId;
   label: string;
   icon: LucideIcon;
+  limit?: number;
 }
 
 export const SPOTLIGHT_SECTIONS: SpotlightSection[] = [
   { id: 'action', label: 'Actions', icon: Zap },
-  { id: 'commands', label: 'Commands', icon: SquareTerminal },
+  { id: 'commands', label: 'Commands', icon: SquareTerminal, limit: 10 },
   { id: 'pages', label: 'Pages', icon: Compass },
   { id: 'tracks', label: 'Songs', icon: Music },
   { id: 'albums', label: 'Albums', icon: DiscAlbum },
@@ -39,6 +40,12 @@ export interface SpotlightRunContext {
   query: string;
 }
 
+export interface SpotlightSecondaryAction {
+  label: string;
+  icon: LucideIcon;
+  run: (context: SpotlightRunContext) => void;
+}
+
 export interface SpotlightItem {
   id: string;
   section: SpotlightSectionId;
@@ -48,6 +55,7 @@ export interface SpotlightItem {
   thumbnail?: string;
   preview?: SpotlightPreview;
   run: (context: SpotlightRunContext) => void;
+  secondary?: SpotlightSecondaryAction;
 }
 
 export interface SpotlightCommand {

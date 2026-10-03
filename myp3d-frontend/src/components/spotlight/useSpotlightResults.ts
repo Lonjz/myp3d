@@ -65,7 +65,7 @@ export function useSpotlightResults(query: string, sources: SpotlightSource[]): 
     const allItems = [...instantItems, ...(remoteItems ?? [])];
     const sections = SPOTLIGHT_SECTIONS.map((section) => ({
       section,
-      items: allItems.filter((item) => item.section === section.id).slice(0, SPOTLIGHT_SECTION_LIMIT),
+      items: allItems.filter((item) => item.section === section.id).slice(0, section.limit ?? SPOTLIGHT_SECTION_LIMIT),
     })).filter((entry) => entry.items.length > 0);
 
     return {

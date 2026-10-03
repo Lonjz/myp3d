@@ -95,10 +95,11 @@ function SpotlightPanel({ closing, initialQuery, sources, onClose }: SpotlightPa
     setActiveId(null);
   };
 
-  const runItem = (item: SpotlightItem) => {
+  const runItem = (item: SpotlightItem, useSecondary = false) => {
     ranItemRef.current = true;
     onClose();
-    item.run({ navigate, close: onClose, query });
+    const action = useSecondary && item.secondary ? item.secondary.run : item.run;
+    action({ navigate, close: onClose, query });
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -115,7 +116,7 @@ function SpotlightPanel({ closing, initialQuery, sources, onClose }: SpotlightPa
 
     if (event.key === 'Enter') {
       event.preventDefault();
-      if (activeItem) runItem(activeItem);
+      if (activeItem) runItem(activeItem, event.shiftKey);
       return;
     }
 
@@ -208,6 +209,22 @@ function SpotlightPanel({ closing, initialQuery, sources, onClose }: SpotlightPa
                               <span className="spotlight-row__title">{item.title}</span>
                               {item.subtitle && <span className="spotlight-row__subtitle">{item.subtitle}</span>}
                             </span>
+                            {item.secondary && (
+                              <button
+                                type="button"
+                                className="spotlight-row__secondary"
+                                aria-label={`${item.secondary.label} (Shift+Enter)`}
+                                title={`${item.secondary.label} (Shift+Enter)`}
+                                tabIndex={-1}
+                                onMouseDown={(event) => event.preventDefault()}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  runItem(item, true);
+                                }}
+                              >
+                                <item.secondary.icon aria-hidden="true" />
+                              </button>
+                            )}
                             <CornerDownLeft className="spotlight-row__enter" aria-hidden="true" />
                           </div>
                         );

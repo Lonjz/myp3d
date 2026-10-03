@@ -9,6 +9,7 @@ import { useToast } from '../messages/ToastProvider';
 import { PlayerContext, PlayerTimeContext } from './playerContext';
 import type { PlayerContextValue, PlayerTimeValue, PlayOptions } from './playerContext';
 import { playerReducer, restorePlayerState } from './playerReducer';
+import { usePlayerCommands } from './usePlayerCommands';
 import type { PersistedPlayerState } from './playerReducer';
 
 const STATE_KEY = 'player';
@@ -204,6 +205,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }),
     [state, currentTrack, currentFilename, playTracks, playAlbum, previous, seek],
   );
+
+  usePlayerCommands(value);
 
   const onPlayRequest = useEffectEvent((request: PlayRequest) => {
     if ('albumKey' in request) {
