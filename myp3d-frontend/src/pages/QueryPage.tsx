@@ -14,6 +14,7 @@ import { useDownloadForm } from '../hooks/useDownloadForm';
 import type { DownloadFormValues } from '../hooks/useDownloadForm';
 import { readStoredValue, useStoredValueWriter } from '../hooks/usePersistentState';
 import { formatDuration } from '../utils/formatters';
+import { emitAppEvent, subscribeAppEvent } from '../utils/appEvents';
 import { getVideoIdFromUrl } from '../utils/youtube';
 
 type YouTubePlayer = any;
@@ -305,6 +306,7 @@ export function QueryPage() {
             onStateChange: (event: { data: number }) => {
               if (cancelled) return;
               if (event.data === 1) {
+                emitAppEvent('preview-play');
                 setIsSamplePlaying(true);
                 startMonitor();
               } else if (event.data === 2 || event.data === 0) {
@@ -337,6 +339,8 @@ export function QueryPage() {
   }, [selectedVideoId]);
 
   useEffect(() => () => stopMonitor(), []);
+
+  useEffect(() => subscribeAppEvent('player-play', () => playerRef.current?.pauseVideo?.()), []);
 
   const applySelectedResult = (result: YouTubeSearchResult) => {
     const fallbackVideoId = getVideoIdFromUrl(result.url);
