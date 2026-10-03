@@ -10,16 +10,16 @@ function compactMeta(entries: Array<SpotlightMeta | null>): SpotlightMeta[] {
 }
 
 function trackItem(track: MP3Info): SpotlightItem {
-  const cover = track.has_cover ? mp3Api.getCoverUrl(track.filename) : undefined;
+  const hasCover = track.has_cover;
   return {
     id: `track:${track.filename}`,
     section: 'tracks',
     title: track.title || track.filename,
     subtitle: [track.artist, track.album].filter(Boolean).join(' · ') || undefined,
     icon: Music,
-    thumbnail: cover,
+    thumbnail: hasCover ? mp3Api.getCoverUrl(track.filename, 'thumb') : undefined,
     preview: {
-      art: cover,
+      art: hasCover ? mp3Api.getCoverUrl(track.filename, 'medium') : undefined,
       meta: compactMeta([
         { icon: MicVocal, label: 'Artist', value: track.artist || '' },
         { icon: DiscAlbum, label: 'Album', value: track.album || '' },
@@ -33,16 +33,16 @@ function trackItem(track: MP3Info): SpotlightItem {
 }
 
 function albumItem(album: AlbumInfo): SpotlightItem {
-  const cover = album.has_cover ? mp3Api.getAlbumCoverUrl(album.album_key) : undefined;
+  const hasCover = album.has_cover;
   return {
     id: `album:${album.album_key}`,
     section: 'albums',
     title: album.album_name,
     subtitle: album.artists.join(', ') || undefined,
     icon: DiscAlbum,
-    thumbnail: cover,
+    thumbnail: hasCover ? mp3Api.getAlbumCoverUrl(album.album_key, 'thumb') : undefined,
     preview: {
-      art: cover,
+      art: hasCover ? mp3Api.getAlbumCoverUrl(album.album_key, 'medium') : undefined,
       meta: compactMeta([
         { icon: MicVocal, label: 'Artists', value: album.artists.join(', ') },
         { icon: Music, label: 'Tracks', value: String(album.track_count) },

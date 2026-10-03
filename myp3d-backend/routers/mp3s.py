@@ -1,12 +1,13 @@
 import eyed3
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Optional
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Query, Response
 from fastapi.responses import FileResponse
 
 from models.schemas import MP3Info, MetadataUpdate, PaginatedMP3Response, PaginationMeta
 from services.config import OUTPUT_DIR
+from services.cover_service import CoverSize, get_cover_variant
 from services.mp3_service import (
     get_mp3_info,
     invalidate_library_cache,
@@ -19,6 +20,7 @@ router = APIRouter(prefix="/mp3s", tags=["MP3s"])
 
 
 CACHE_CONTROL_HEADER = {"Cache-Control": "public, max-age=300"}
+IMMUTABLE_CACHE_HEADER = {"Cache-Control": "public, max-age=31536000, immutable"}
 
 
 def _sanitize_filename(filename: str) -> str:
@@ -154,11 +156,23 @@ async def update_cover(filename: str, cover: UploadFile = File(...)):
 
 
 @router.get("/{filename}/cover")
-async def get_cover(filename: str):
+def get_cover(
+    filename: str,
+    size: Optional[CoverSize] = Query(None),
+    v: Optional[str] = Query(None, max_length=64),
+):
     """Get the cover image from an MP3 file."""
     filepath = _resolve_mp3_path(filename)
     if not filepath.exists() or filepath.suffix.lower() != ".mp3":
         raise HTTPException(status_code=404, detail="MP3 file not found")
+
+    headers = IMMUTABLE_CACHE_HEADER if v else CACHE_CONTROL_HEADER
+
+    if size:
+        variant = get_cover_variant([filepath], size)
+        if variant is None:
+            raise HTTPException(status_code=404, detail="No cover image found")
+        return Response(content=variant[0], media_type=variant[1], headers=headers)
 
     audio = eyed3.load(str(filepath))
     if not audio or not audio.tag or not audio.tag.images:
@@ -168,7 +182,7 @@ async def get_cover(filename: str):
     return Response(
         content=image.image_data,
         media_type=image.mime_type or "image/jpeg",
-        headers=CACHE_CONTROL_HEADER,
+        headers=headers,
     )
 
 

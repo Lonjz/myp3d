@@ -31,7 +31,7 @@ export function RecentTracks({ tracks }: RecentTracksProps) {
               <Link to={`/details/${encodeURIComponent(track.filename)}`} className="recent-item">
                 <div className="recent-item__cover">
                   {track.has_cover ? (
-                    <img src={mp3Api.getCoverUrl(track.filename)} alt="" loading="lazy" />
+                    <img src={mp3Api.getCoverUrl(track.filename, 'thumb')} alt="" loading="lazy" />
                   ) : (
                     <div className="no-cover">🎵</div>
                   )}

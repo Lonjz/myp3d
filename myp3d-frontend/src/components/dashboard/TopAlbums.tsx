@@ -24,7 +24,7 @@ export function TopAlbums({ albums }: TopAlbumsProps) {
             >
               <div className="album-tile__cover">
                 {album.has_cover ? (
-                  <img src={mp3Api.getAlbumCoverUrl(album.album_key)} alt="" loading="lazy" />
+                  <img src={mp3Api.getAlbumCoverUrl(album.album_key, 'medium')} alt="" loading="lazy" />
                 ) : (
                   <div className="no-cover">🎵</div>
                 )}

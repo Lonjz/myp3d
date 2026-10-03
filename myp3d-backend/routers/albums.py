@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Optional
 
 from fastapi import APIRouter, File, HTTPException, Query, Response, UploadFile
 
@@ -9,6 +9,7 @@ from models.schemas import (
     PaginatedAlbumResponse,
     PaginationMeta,
 )
+from services.cover_service import CoverSize, get_cover_variant
 from services.mp3_service import (
     get_album_cover,
     get_album_group,
@@ -24,6 +25,7 @@ router = APIRouter(prefix="/albums", tags=["Albums"])
 
 
 CACHE_CONTROL_HEADER = {"Cache-Control": "public, max-age=300"}
+IMMUTABLE_CACHE_HEADER = {"Cache-Control": "public, max-age=31536000, immutable"}
 
 
 def _get_album_group_or_404(album_key: str):
@@ -114,12 +116,17 @@ async def update_album_cover(album_key: str, cover: UploadFile = File(...)):
 
 
 @router.get("/{album_key}/cover")
-async def get_album_cover_image(album_key: str):
+def get_album_cover_image(
+    album_key: str,
+    size: Optional[CoverSize] = Query(None),
+    v: Optional[str] = Query(None, max_length=64),
+):
     """Get the first embedded cover image found in this album."""
     album_group = _get_album_group_or_404(album_key)
-    cover = get_album_cover(album_group.filepaths)
+    cover = get_cover_variant(album_group.filepaths, size) if size else get_album_cover(album_group.filepaths)
     if cover is None:
         raise HTTPException(status_code=404, detail="No cover image found")
 
     image_data, mime_type = cover
-    return Response(content=image_data, media_type=mime_type, headers=CACHE_CONTROL_HEADER)
+    headers = IMMUTABLE_CACHE_HEADER if v else CACHE_CONTROL_HEADER
+    return Response(content=image_data, media_type=mime_type, headers=headers)

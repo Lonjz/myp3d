@@ -172,7 +172,7 @@ export function LibraryPage() {
               <td>
                 <div className="library-cover-sm">
                   {mp3.has_cover ? (
-                    <img src={mp3Api.getCoverUrl(mp3.filename)} alt="Cover" />
+                    <img src={mp3Api.getCoverUrl(mp3.filename, 'thumb')} alt="Cover" />
                   ) : (
                     <div className="no-cover">🎵</div>
                   )}

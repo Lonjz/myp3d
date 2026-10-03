@@ -135,7 +135,7 @@ export function AlbumsPage() {
               <td>
                 <div className="library-cover-sm">
                   {album.has_cover ? (
-                    <img src={mp3Api.getAlbumCoverUrl(album.album_key)} alt="Album cover" />
+                    <img src={mp3Api.getAlbumCoverUrl(album.album_key, 'thumb')} alt="Album cover" />
                   ) : (
                     <div className="no-cover">🎵</div>
                   )}

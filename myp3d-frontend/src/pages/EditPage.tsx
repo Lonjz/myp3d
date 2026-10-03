@@ -150,7 +150,7 @@ export function EditPage({ filename, onBack }: EditPageProps) {
   if (loading && !mp3) return <div className="page"><Spinner /></div>;
   if (!mp3) return <div className="page"><p className="page-empty">Track not found</p></div>;
 
-  const existingCoverPreview = mp3.has_cover ? mp3Api.getCoverUrl(mp3.filename) : null;
+  const existingCoverPreview = mp3.has_cover ? mp3Api.getCoverUrl(mp3.filename, 'full') : null;
   const effectiveCoverPreview = coverPreview || existingCoverPreview;
 
   const restoreAudioState = (audio: HTMLAudioElement) => {

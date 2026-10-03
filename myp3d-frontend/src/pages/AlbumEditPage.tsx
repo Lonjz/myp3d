@@ -141,7 +141,7 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
   if (loading && !albumDetail) return <div className="page"><Spinner /></div>;
   if (!albumDetail) return <div className="page"><p className="page-empty">Album not found</p></div>;
 
-  const existingCoverPreview = albumDetail.album.has_cover ? mp3Api.getAlbumCoverUrl(albumDetail.album.album_key) : null;
+  const existingCoverPreview = albumDetail.album.has_cover ? mp3Api.getAlbumCoverUrl(albumDetail.album.album_key, 'full') : null;
   const effectiveCoverPreview = coverPreview || existingCoverPreview;
   const getAlbumSubtitle = (album: AlbumInfo) => {
     const subtitleParts = [
