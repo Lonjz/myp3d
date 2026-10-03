@@ -9,6 +9,7 @@ from models.schemas import MP3Info, MetadataUpdate, PaginatedMP3Response, Pagina
 from services.config import OUTPUT_DIR
 from services.cover_service import CoverSize, get_cover_variant
 from services.mp3_service import (
+    filter_sort_mp3_infos,
     get_mp3_info,
     invalidate_library_cache,
     make_square_cover,
@@ -64,6 +65,16 @@ async def list_mp3s_paged(
             returned=len(items),
         ),
     )
+
+
+@router.get("/all", response_model=list[MP3Info])
+async def list_all_mp3s(
+    search: str = Query(""),
+    filter_by: Literal["all", "title", "artist", "filename", "album"] = Query("all"),
+    sort_by: Literal["date_added", "filename", "size", "artist", "title", "album"] = Query("date_added"),
+    sort_direction: Literal["asc", "desc"] = Query("desc"),
+):
+    return filter_sort_mp3_infos(search, filter_by, sort_by, sort_direction)
 
 
 @router.get("/{filename}")

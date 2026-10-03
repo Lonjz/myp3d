@@ -170,14 +170,17 @@ def list_albums() -> list[AlbumInfo]:
     return sorted(albums, key=lambda album: (album.album_name or "").lower())
 
 
-def query_mp3_infos(
-    page: int,
-    limit: int,
+MP3FilterBy = Literal["all", "title", "artist", "filename", "album"]
+MP3SortBy = Literal["date_added", "filename", "size", "artist", "title", "album"]
+SortDirection = Literal["asc", "desc"]
+
+
+def filter_sort_mp3_infos(
     search: str,
-    filter_by: Literal["all", "title", "artist", "filename", "album"],
-    sort_by: Literal["date_added", "filename", "size", "artist", "title", "album"],
-    sort_direction: Literal["asc", "desc"],
-) -> tuple[list[MP3Info], int]:
+    filter_by: MP3FilterBy,
+    sort_by: MP3SortBy,
+    sort_direction: SortDirection,
+) -> list[MP3Info]:
     mp3s = list_mp3_infos()
     search_query = search.strip().casefold()
 
@@ -226,6 +229,18 @@ def query_mp3_infos(
     if sort_direction == "desc":
         mp3s.reverse()
 
+    return mp3s
+
+
+def query_mp3_infos(
+    page: int,
+    limit: int,
+    search: str,
+    filter_by: MP3FilterBy,
+    sort_by: MP3SortBy,
+    sort_direction: SortDirection,
+) -> tuple[list[MP3Info], int]:
+    mp3s = filter_sort_mp3_infos(search, filter_by, sort_by, sort_direction)
     total = len(mp3s)
     start = (page - 1) * limit
     end = start + limit
