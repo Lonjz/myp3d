@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import albums, download, mp3s, search, stats, youtube
+from routers import albums, cache, download, mp3s, search, stats, youtube
 
 app = FastAPI(title="MP3 Download API", description="YouTube to MP3 converter and metadata editor")
 
@@ -21,6 +21,7 @@ app.include_router(mp3s.router)
 app.include_router(youtube.router)
 app.include_router(stats.router)
 app.include_router(search.router)
+app.include_router(cache.router)
 
 
 @app.get("/")

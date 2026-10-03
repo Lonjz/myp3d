@@ -11,6 +11,7 @@ import { TopAlbums } from '../components/dashboard/TopAlbums';
 import { TopArtistsChart } from '../components/dashboard/TopArtistsChart';
 import { useToast } from '../components/messages/ToastProvider';
 import { IconButton } from '../components/ui/IconButton';
+import { subscribeAppEvent } from '../utils/appEvents';
 import { formatBytes, formatHours } from '../utils/formatters';
 
 const STAT_TILE_COUNT = 6;
@@ -34,6 +35,8 @@ export function DashboardPage() {
   useEffect(() => {
     void loadStats();
   }, [loadStats]);
+
+  useEffect(() => subscribeAppEvent('library-changed', () => void loadStats()), [loadStats]);
 
   if (!stats) {
     return (

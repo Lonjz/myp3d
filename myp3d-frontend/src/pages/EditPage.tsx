@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DiscAlbum, FileAudio, ImagePlus, MicVocal, Save, Trash2, TriangleAlert, Type, Undo2 } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
@@ -11,7 +11,7 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { IconField } from '../components/ui/IconField';
 import { Spinner } from '../components/ui/Spinner';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
-import { emitAppEvent } from '../utils/appEvents';
+import { emitAppEvent, subscribeAppEvent } from '../utils/appEvents';
 import { getCachedMp3Info, setCachedMp3Info } from '../utils/detailCache';
 
 interface EditPageProps {
@@ -37,7 +37,7 @@ export function EditPage({ filename, onBack }: EditPageProps) {
   const [newFilename, setNewFilename] = useState('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [existingCoverPreview, setExistingCoverPreview] = useState<string | null>(null);
+  const [, refreshCoverPreview] = useReducer((count: number) => count + 1, 0);
 
   const {
     coverFile,
@@ -66,11 +66,6 @@ export function EditPage({ filename, onBack }: EditPageProps) {
     setArtist(info.artist || '');
     setAlbum(info.album || '');
     setNewFilename(info.filename);
-    if (info.has_cover) {
-      setExistingCoverPreview(mp3Api.getCoverUrl(info.filename));
-    } else {
-      setExistingCoverPreview(null);
-    }
   };
 
   const loadMp3 = async (options?: { force?: boolean }) => {
@@ -102,6 +97,8 @@ export function EditPage({ filename, onBack }: EditPageProps) {
   useEffect(() => {
     void loadMp3();
   }, [filename]);
+
+  useEffect(() => subscribeAppEvent('library-changed', refreshCoverPreview), []);
 
   const isDirty =
     mp3 !== null &&
@@ -153,6 +150,7 @@ export function EditPage({ filename, onBack }: EditPageProps) {
   if (loading && !mp3) return <div className="page"><Spinner /></div>;
   if (!mp3) return <div className="page"><p className="page-empty">Track not found</p></div>;
 
+  const existingCoverPreview = mp3.has_cover ? mp3Api.getCoverUrl(mp3.filename) : null;
   const effectiveCoverPreview = coverPreview || existingCoverPreview;
 
   const restoreAudioState = (audio: HTMLAudioElement) => {

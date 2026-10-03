@@ -88,7 +88,6 @@ export function LibraryPage() {
     try {
       await mp3Api.delete(filename);
       emitAppEvent('library-changed');
-      await loadMp3s({ force: true });
     } catch {
       alert('Failed to delete file');
     }

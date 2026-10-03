@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { usePagedData, type PagedResponse } from './usePagedData';
 import { usePersistentState } from './usePersistentState';
+import { subscribeAppEvent } from '../utils/appEvents';
 
 type UsePagedListOptions<TParams extends Record<string, unknown>, TItem> = {
   pageSize: number;
@@ -43,6 +44,8 @@ export function usePagedList<TParams extends Record<string, unknown>, TItem>({
     }
     void loadPage();
   }, [loadPage, currentPage, resetKey, setCurrentPage]);
+
+  useEffect(() => subscribeAppEvent('library-changed', () => void loadPage({ force: true })), [loadPage]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 

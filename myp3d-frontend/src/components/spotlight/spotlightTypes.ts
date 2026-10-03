@@ -1,8 +1,8 @@
-import { Compass, DiscAlbum, MonitorPlay, Music, Zap } from 'lucide-react';
+import { Compass, DiscAlbum, MonitorPlay, Music, SquareTerminal, Zap } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { NavigateFunction } from 'react-router-dom';
 
-export type SpotlightSectionId = 'action' | 'pages' | 'tracks' | 'albums' | 'web';
+export type SpotlightSectionId = 'action' | 'commands' | 'pages' | 'tracks' | 'albums' | 'web';
 
 export interface SpotlightSection {
   id: SpotlightSectionId;
@@ -12,6 +12,7 @@ export interface SpotlightSection {
 
 export const SPOTLIGHT_SECTIONS: SpotlightSection[] = [
   { id: 'action', label: 'Actions', icon: Zap },
+  { id: 'commands', label: 'Commands', icon: SquareTerminal },
   { id: 'pages', label: 'Pages', icon: Compass },
   { id: 'tracks', label: 'Songs', icon: Music },
   { id: 'albums', label: 'Albums', icon: DiscAlbum },
@@ -49,9 +50,20 @@ export interface SpotlightItem {
   run: (context: SpotlightRunContext) => void;
 }
 
+export interface SpotlightCommand {
+  id: string;
+  title: string;
+  icon: LucideIcon;
+  keywords?: string[];
+  run: (context: SpotlightRunContext) => void | Promise<void>;
+}
+
+export const SPOTLIGHT_COMMAND_PREFIX = '>';
+
 export interface InstantSpotlightSource {
   id: string;
   remote?: false;
+  commands?: boolean;
   search: (query: string) => SpotlightItem[];
 }
 

@@ -1,4 +1,30 @@
+import { subscribeAppEvent } from '../utils/appEvents';
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const ASSET_VERSION_KEY = 'myp3d:asset-version';
+
+function readAssetVersion(): string | null {
+  try {
+    return window.localStorage.getItem(ASSET_VERSION_KEY);
+  } catch {
+    return null;
+  }
+}
+
+let assetVersion = readAssetVersion();
+
+export function bumpAssetVersion(): void {
+  assetVersion = String(Date.now());
+  try {
+    window.localStorage.setItem(ASSET_VERSION_KEY, assetVersion);
+  } catch {
+    return;
+  }
+}
+
+subscribeAppEvent('library-changed', bumpAssetVersion);
+
+const withAssetVersion = (url: string) => (assetVersion ? `${url}?v=${assetVersion}` : url);
 
 export interface MP3Info {
   filename: string;
@@ -218,7 +244,7 @@ export const mp3Api = {
 
   // Get cover image URL
   getCoverUrl(filename: string): string {
-    return `${API_BASE}/mp3s/${encodeURIComponent(filename)}/cover`;
+    return withAssetVersion(`${API_BASE}/mp3s/${encodeURIComponent(filename)}/cover`);
   },
 
   // Get MP3 file URL (for download/play)
@@ -260,11 +286,15 @@ export const mp3Api = {
 
   // Get album cover URL
   getAlbumCoverUrl(albumKey: string): string {
-    return `${API_BASE}/albums/${encodeURIComponent(albumKey)}/cover`;
+    return withAssetVersion(`${API_BASE}/albums/${encodeURIComponent(albumKey)}/cover`);
   },
 
   getStats(): Promise<LibraryStats> {
     return apiFetch('/stats', undefined, 'Failed to fetch library stats');
+  },
+
+  clearServerCache(): Promise<{ success: boolean }> {
+    return apiFetch('/cache/clear', { method: 'POST' }, 'Failed to clear cache');
   },
 
   searchLibrary(query: string, limit: number, signal?: AbortSignal): Promise<SearchResults> {

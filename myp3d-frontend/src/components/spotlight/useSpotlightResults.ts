@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
-import { SPOTLIGHT_SECTIONS, SPOTLIGHT_SECTION_LIMIT } from './spotlightTypes';
+import { SPOTLIGHT_COMMAND_PREFIX, SPOTLIGHT_SECTIONS, SPOTLIGHT_SECTION_LIMIT } from './spotlightTypes';
 import type {
   InstantSpotlightSource,
   RemoteSpotlightSource,
@@ -24,7 +24,9 @@ export interface SpotlightResults {
 
 export function useSpotlightResults(query: string, sources: SpotlightSource[]): SpotlightResults {
   const trimmed = query.trim();
-  const debounced = useDebouncedValue(trimmed, REMOTE_DELAY_MS);
+  const commandMode = trimmed.startsWith(SPOTLIGHT_COMMAND_PREFIX);
+  const searchText = commandMode ? trimmed.slice(SPOTLIGHT_COMMAND_PREFIX.length).trim() : trimmed;
+  const debounced = useDebouncedValue(commandMode ? '' : trimmed, REMOTE_DELAY_MS);
   const [remote, setRemote] = useState<{ query: string; items: SpotlightItem[] }>({ query: '', items: [] });
 
   const instantSources = useMemo(
@@ -51,12 +53,13 @@ export function useSpotlightResults(query: string, sources: SpotlightSource[]): 
     return () => controller.abort();
   }, [debounced, remoteSources]);
 
-  const instantItems = useMemo(
-    () => (trimmed ? instantSources.flatMap((source) => source.search(trimmed)) : []),
-    [instantSources, trimmed],
-  );
+  const instantItems = useMemo(() => {
+    if (!trimmed) return [];
+    const activeSources = commandMode ? instantSources.filter((source) => source.commands) : instantSources;
+    return activeSources.flatMap((source) => source.search(searchText));
+  }, [commandMode, instantSources, searchText, trimmed]);
 
-  const remoteItems = trimmed && remote.query ? remote.items : null;
+  const remoteItems = trimmed && !commandMode && remote.query ? remote.items : null;
 
   return useMemo(() => {
     const allItems = [...instantItems, ...(remoteItems ?? [])];
@@ -68,7 +71,7 @@ export function useSpotlightResults(query: string, sources: SpotlightSource[]): 
     return {
       sections,
       items: sections.flatMap((entry) => entry.items),
-      loading: Boolean(trimmed) && remoteSources.length > 0 && remote.query !== trimmed,
+      loading: Boolean(trimmed) && !commandMode && remoteSources.length > 0 && remote.query !== trimmed,
     };
-  }, [instantItems, remoteItems, remoteSources.length, remote.query, trimmed]);
+  }, [commandMode, instantItems, remoteItems, remoteSources.length, remote.query, trimmed]);
 }

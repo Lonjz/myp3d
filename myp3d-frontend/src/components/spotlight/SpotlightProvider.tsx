@@ -5,6 +5,7 @@ import { SpotlightContext } from './spotlightContext';
 import type { SpotlightContextValue } from './spotlightContext';
 import { librarySource } from './sources/librarySource';
 import { pagesSource } from './sources/pagesSource';
+import { useAppCommandsSource } from './sources/useAppCommandsSource';
 import { youtubeSource } from './sources/youtubeSource';
 import type { SpotlightSource } from './spotlightTypes';
 
@@ -66,7 +67,11 @@ export function SpotlightProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, open, toggle]);
 
-  const sources = useMemo(() => [...BUILT_IN_SOURCES, ...registeredSources], [registeredSources]);
+  const appCommandsSource = useAppCommandsSource();
+  const sources = useMemo(
+    () => [appCommandsSource, ...BUILT_IN_SOURCES, ...registeredSources],
+    [appCommandsSource, registeredSources],
+  );
 
   const value = useMemo<SpotlightContextValue>(
     () => ({ isOpen, open, close, toggle, registerSource }),

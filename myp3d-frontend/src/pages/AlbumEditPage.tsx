@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DiscAlbum, HardDrive, ImagePlus, MicVocal, Music, Save, Trash2, TriangleAlert, Undo2 } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
@@ -11,7 +11,7 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { IconField } from '../components/ui/IconField';
 import { Spinner } from '../components/ui/Spinner';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
-import { emitAppEvent } from '../utils/appEvents';
+import { emitAppEvent, subscribeAppEvent } from '../utils/appEvents';
 import { getCachedAlbumDetail, setCachedAlbumDetail } from '../utils/detailCache';
 import { formatBytes } from '../utils/formatters';
 
@@ -31,7 +31,7 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
   const { showSuccess, showError, showInfo, clearToast } = useToast();
 
   const [albumName, setAlbumName] = useState('');
-  const [existingCoverPreview, setExistingCoverPreview] = useState<string | null>(null);
+  const [, refreshCoverPreview] = useReducer((count: number) => count + 1, 0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -56,18 +56,11 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
     outputFilename: 'album-cover.jpg',
   });
 
-  const applyAlbumDetail = (detail: AlbumDetail, targetKey: string) => {
+  const applyAlbumDetail = (detail: AlbumDetail) => {
     setAlbumDetail(detail);
 
     const editableName = detail.album.album_name === NO_ALBUM_LABEL ? '' : detail.album.album_name;
     setAlbumName(editableName);
-
-    if (detail.album.has_cover) {
-      const cacheBuster = Date.now();
-      setExistingCoverPreview(`${mp3Api.getAlbumCoverUrl(targetKey)}?t=${cacheBuster}`);
-    } else {
-      setExistingCoverPreview(null);
-    }
   };
 
   const loadAlbum = async (targetKey: string, options?: { clearToast?: boolean; force?: boolean }) => {
@@ -79,7 +72,7 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
     if (!force) {
       const cached = getCachedAlbumDetail(targetKey);
       if (cached) {
-        applyAlbumDetail(cached, targetKey);
+        applyAlbumDetail(cached);
         setLoading(false);
         return;
       }
@@ -89,7 +82,7 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
       setLoading(true);
       const detail = await mp3Api.getAlbum(targetKey);
       setCachedAlbumDetail(targetKey, detail);
-      applyAlbumDetail(detail, targetKey);
+      applyAlbumDetail(detail);
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Failed to load album');
       setAlbumDetail(null);
@@ -102,6 +95,8 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
     resetCoverState();
     loadAlbum(albumKey);
   }, [albumKey]);
+
+  useEffect(() => subscribeAppEvent('library-changed', refreshCoverPreview), []);
 
   const loadedAlbumName =
     albumDetail && albumDetail.album.album_name !== NO_ALBUM_LABEL ? albumDetail.album.album_name : '';
@@ -146,6 +141,7 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
   if (loading && !albumDetail) return <div className="page"><Spinner /></div>;
   if (!albumDetail) return <div className="page"><p className="page-empty">Album not found</p></div>;
 
+  const existingCoverPreview = albumDetail.album.has_cover ? mp3Api.getAlbumCoverUrl(albumDetail.album.album_key) : null;
   const effectiveCoverPreview = coverPreview || existingCoverPreview;
   const getAlbumSubtitle = (album: AlbumInfo) => {
     const subtitleParts = [
