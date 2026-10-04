@@ -1,0 +1,112 @@
+.sidebar-link,
+.details-song-item,
+.query-result-item {
+  position: relative;
+  isolation: isolate;
+}
+
+.sidebar-link::before,
+.details-song-item::before,
+.query-result-item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--selected-bg);
+  box-shadow: var(--selected-shadow);
+  opacity: 0;
+  transform: scale(0.94);
+  pointer-events: none;
+  transition:
+    opacity 220ms var(--ease-standard),
+    transform 300ms var(--ease-spring);
+}
+
+.details-song-item::before,
+.query-result-item::before {
+  inset: -1px;
+}
+
+.sidebar-link.active,
+.details-song-item.active,
+.query-result-item.active {
+  background: transparent;
+  box-shadow: none;
+}
+
+.sidebar-link.active::before,
+.details-song-item.active::before,
+.query-result-item.active::before {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.data-table > .library-toolbar,
+.data-table > .library-table-wrap,
+.query-sidebar,
+.query-preview-card,
+.download-form,
+.details-sidebar,
+.details-title,
+.edit-container {
+  animation: panel-rise 460ms var(--ease-spring) backwards;
+}
+
+.data-table > .library-table-wrap,
+.query-preview-card,
+.details-title {
+  animation-delay: 60ms;
+}
+
+.download-form,
+.edit-container {
+  animation-delay: 120ms;
+}
+
+.details-main .data-table > .library-table-wrap {
+  animation-delay: 180ms;
+}
+
+.library-table tbody tr,
+.query-result-item,
+.details-song-item {
+  animation: row-rise 380ms var(--ease-standard) backwards;
+  animation-delay: calc(min(var(--row, 0), 14) * 22ms + 100ms);
+}
+
+@keyframes panel-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+}
+
+@keyframes row-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .data-table > .library-toolbar,
+  .data-table > .library-table-wrap,
+  .query-sidebar,
+  .query-preview-card,
+  .download-form,
+  .details-sidebar,
+  .details-title,
+  .edit-container,
+  .library-table tbody tr,
+  .query-result-item,
+  .details-song-item {
+    animation: none;
+  }
+
+  .sidebar-link::before,
+  .details-song-item::before,
+  .query-result-item::before {
+    transform: none;
+  }
+}

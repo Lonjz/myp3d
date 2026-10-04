@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { ArrowLeft, Search } from 'lucide-react';
 import { IconButton } from '../ui/IconButton';
 import { IconField } from '../ui/IconField';
@@ -253,7 +254,7 @@ export function InfiniteSidebarList<T>({
       />
 
       <div className="details-song-list" ref={listRef} onScroll={handleListScroll}>
-        {visibleItems.map((item) => {
+        {visibleItems.map((item, index) => {
           const itemKey = getItemKey(item);
           const isActive = itemKey === activeKey;
 
@@ -262,6 +263,7 @@ export function InfiniteSidebarList<T>({
               key={itemKey}
               type="button"
               className={`details-song-item ${isActive ? 'active' : ''}`}
+              style={{ '--row': index } as CSSProperties}
               onClick={() => onSelect(item)}
               disabled={isActive}
             >

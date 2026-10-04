@@ -1,4 +1,5 @@
 import { useState, useEffect, useEffectEvent, useMemo, useRef } from 'react';
+import type { CSSProperties } from 'react';
 import { ArrowRight, Download, MonitorPlay, Search } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { mp3Api } from '../api/mp3Api';
@@ -492,13 +493,14 @@ export function QueryPage() {
 
 
           <div className="query-results-list">
-            {searchResults.map((result) => {
+            {searchResults.map((result, index) => {
               const isActive = selectedResult?.video_id === result.video_id;
               return (
                 <button
                   key={`${result.video_id}-${result.url}`}
                   type="button"
                   className={`query-result-item ${isActive ? 'active' : ''}`}
+                  style={{ '--row': index } as CSSProperties}
                   onClick={() => applySelectedResult(result)}
                 >
                   <div className="query-result-thumb-wrap">

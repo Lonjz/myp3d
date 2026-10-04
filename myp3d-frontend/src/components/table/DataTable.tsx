@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { Spinner } from '../ui/Spinner';
 
 export interface DataTableColumn<T> {
@@ -129,7 +129,11 @@ export function DataTable<T>({
             <tbody>
               {items.length > 0 ? (
                 items.map((item, index) => (
-                  <tr key={getRowKey(item)} className={getRowClassName?.(item)}>
+                  <tr
+                    key={getRowKey(item)}
+                    className={getRowClassName?.(item)}
+                    style={{ '--row': index } as CSSProperties}
+                  >
                     {columns.map((column) => (
                       <td key={column.key} data-hide={column.hideBelow}>
                         {column.render(item, index)}
