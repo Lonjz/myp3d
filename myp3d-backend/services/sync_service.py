@@ -59,6 +59,7 @@ class _Session:
         )
 
 
+_opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 _lock = threading.Lock()
 _session: Optional[_Session] = None
 
@@ -76,7 +77,7 @@ def _request_json(session: _Session, method: str, path: str, payload: Optional[d
         headers={"Content-Type": "application/json"} if data is not None else {},
     )
     try:
-        with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_S) as response:
+        with _opener.open(request, timeout=HTTP_TIMEOUT_S) as response:
             body = response.read()
     except urllib.error.HTTPError as exc:
         try:
@@ -303,7 +304,7 @@ def _download(session: _Session, filename: str) -> bool:
     partial = OUTPUT_DIR / f".{filename}.part"
     url = _peer_url(session, f"/mp3s/{urllib.parse.quote(filename)}")
     try:
-        with urllib.request.urlopen(url, timeout=TRANSFER_TIMEOUT_S) as response, open(partial, "wb") as handle:
+        with _opener.open(url, timeout=TRANSFER_TIMEOUT_S) as response, open(partial, "wb") as handle:
             shutil.copyfileobj(response, handle, COPY_CHUNK_BYTES)
         if destination.exists():
             partial.unlink(missing_ok=True)
