@@ -18,6 +18,8 @@ from models.schemas import (
 from services.config import OUTPUT_DIR
 from services.cover_service import CoverSize, get_cover_variant
 from services.mp3_service import (
+    MP3DurationRange,
+    MP3SortBy,
     filter_sort_mp3_infos,
     get_mp3_info,
     invalidate_library_cache,
@@ -53,8 +55,9 @@ async def list_mp3s_paged(
     limit: int = Query(25, ge=1, le=200),
     search: str = Query(""),
     filter_by: Literal["all", "title", "artist", "filename", "album"] = Query("all"),
-    sort_by: Literal["date_added", "filename", "size", "artist", "title", "album"] = Query("date_added"),
+    sort_by: MP3SortBy = Query("date_added"),
     sort_direction: Literal["asc", "desc"] = Query("desc"),
+    duration: MP3DurationRange = Query("any"),
 ):
     """List MP3 files using server-side pagination, filtering, and sorting."""
     items, total = query_mp3_infos(
@@ -64,6 +67,7 @@ async def list_mp3s_paged(
         filter_by=filter_by,
         sort_by=sort_by,
         sort_direction=sort_direction,
+        duration_range=duration,
     )
     total_pages = max(1, (total + limit - 1) // limit)
     return PaginatedMP3Response(
@@ -82,10 +86,11 @@ async def list_mp3s_paged(
 async def list_all_mp3s(
     search: str = Query(""),
     filter_by: Literal["all", "title", "artist", "filename", "album"] = Query("all"),
-    sort_by: Literal["date_added", "filename", "size", "artist", "title", "album"] = Query("date_added"),
+    sort_by: MP3SortBy = Query("date_added"),
     sort_direction: Literal["asc", "desc"] = Query("desc"),
+    duration: MP3DurationRange = Query("any"),
 ):
-    return filter_sort_mp3_infos(search, filter_by, sort_by, sort_direction)
+    return filter_sort_mp3_infos(search, filter_by, sort_by, sort_direction, duration)
 
 
 def _resolve_bulk_paths(filenames: list[str]) -> tuple[list[Path], list[BulkFailure]]:

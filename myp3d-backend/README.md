@@ -40,7 +40,7 @@ USE_SYSTEM_FFMPEG=false
 - `GET /` health
 - `POST /download` download + tag
 - `GET /youtube/search` search
-- `GET /mp3s/paged` list with pagination
+- `GET /mp3s/paged` list with pagination (`sort_by=duration`, `duration=under-2|2-3|3-4|4-5|5-7|over-7`)
 - `GET /mp3s/{filename}` stream/download
 - `GET /mp3s/{filename}/info` metadata
 - `PUT /mp3s/{filename}/metadata` update + optional rename

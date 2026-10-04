@@ -171,8 +171,18 @@ def list_albums() -> list[AlbumInfo]:
 
 
 MP3FilterBy = Literal["all", "title", "artist", "filename", "album"]
-MP3SortBy = Literal["date_added", "filename", "size", "artist", "title", "album"]
+MP3SortBy = Literal["date_added", "filename", "size", "artist", "title", "album", "duration"]
+MP3DurationRange = Literal["any", "under-2", "2-3", "3-4", "4-5", "5-7", "over-7"]
 SortDirection = Literal["asc", "desc"]
+
+DURATION_RANGES: dict[str, tuple[float, float]] = {
+    "under-2": (0, 120),
+    "2-3": (120, 180),
+    "3-4": (180, 240),
+    "4-5": (240, 300),
+    "5-7": (300, 420),
+    "over-7": (420, float("inf")),
+}
 
 
 def filter_sort_mp3_infos(
@@ -180,9 +190,14 @@ def filter_sort_mp3_infos(
     filter_by: MP3FilterBy,
     sort_by: MP3SortBy,
     sort_direction: SortDirection,
+    duration_range: MP3DurationRange = "any",
 ) -> list[MP3Info]:
     mp3s = list_mp3_infos()
     search_query = search.strip().casefold()
+
+    if duration_range in DURATION_RANGES:
+        lower, upper = DURATION_RANGES[duration_range]
+        mp3s = [track for track in mp3s if track.duration is not None and lower <= track.duration < upper]
 
     if search_query:
         def matches_query(track: MP3Info) -> bool:
@@ -223,6 +238,8 @@ def filter_sort_mp3_infos(
         mp3s.sort(key=lambda track: ((track.title or "").casefold(), track.filename.casefold()))
     elif sort_by == "album":
         mp3s.sort(key=lambda track: ((track.album or "").casefold(), track.filename.casefold()))
+    elif sort_by == "duration":
+        mp3s.sort(key=lambda track: (track.duration or 0, track.filename.casefold()))
     else:
         mp3s.sort(key=lambda track: track.filename.casefold())
 
@@ -239,8 +256,9 @@ def query_mp3_infos(
     filter_by: MP3FilterBy,
     sort_by: MP3SortBy,
     sort_direction: SortDirection,
+    duration_range: MP3DurationRange = "any",
 ) -> tuple[list[MP3Info], int]:
-    mp3s = filter_sort_mp3_infos(search, filter_by, sort_by, sort_direction)
+    mp3s = filter_sort_mp3_infos(search, filter_by, sort_by, sort_direction, duration_range)
     total = len(mp3s)
     start = (page - 1) * limit
     end = start + limit
