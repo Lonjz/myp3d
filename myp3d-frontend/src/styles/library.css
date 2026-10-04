@@ -145,7 +145,7 @@
 }
 
 .library-table tbody tr {
-  transition: background var(--duration-fast) var(--ease-standard);
+  transition: background-color var(--duration-base) var(--ease-standard);
 }
 
 .library-table tbody tr:hover {
@@ -153,7 +153,28 @@
 }
 
 .library-table tbody tr.is-selected {
-  background: var(--selected-bg);
+  background: color-mix(in srgb, var(--color-lavender) 16%, transparent);
+}
+
+.library-table tbody tr.is-selected:hover {
+  background: color-mix(in srgb, var(--color-lavender) 22%, transparent);
+}
+
+.library-toolbar > * {
+  animation: toolbar-item-in 260ms var(--ease-spring) backwards;
+}
+
+@keyframes toolbar-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .library-toolbar > * {
+    animation-name: confirm-fade-in;
+  }
 }
 
 .library-table--selectable th:first-child,

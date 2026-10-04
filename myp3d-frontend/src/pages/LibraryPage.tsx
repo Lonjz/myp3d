@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -353,7 +353,7 @@ export function LibraryPage() {
         onEndReached={loadMore}
         resetKey={queryParams}
         toolbar={hasSelection ? (
-          <>
+          <Fragment key="selection">
             <IconButton icon={X} label="Clear selection" onClick={selection.clear} />
             <span className="library-selection-count" title="Selected">
               <ListChecks aria-hidden="true" />
@@ -363,9 +363,9 @@ export function LibraryPage() {
             <IconButton icon={Pencil} label="Edit selected" onClick={editSelected} disabled={deleting} />
             {downloadControl}
             <IconButton icon={Trash2} label="Delete selected" variant="danger" onClick={deleteSelected} disabled={deleting} />
-          </>
+          </Fragment>
         ) : (
-          <>
+          <Fragment key="browse">
             <IconField
               icon={Search}
               label="Search"
@@ -392,7 +392,7 @@ export function LibraryPage() {
             <IconButton icon={RefreshCw} label="Refresh" onClick={() => void refresh()} />
             {downloads.progress && downloadControl}
             <span className="library-count">{mp3s.length} / {totalItems}</span>
-          </>
+          </Fragment>
         )}
       />
 
