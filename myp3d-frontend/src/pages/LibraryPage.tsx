@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -104,6 +104,13 @@ export function LibraryPage() {
   const editPresence = usePresence(editOpen);
   const [deleteTargets, setDeleteTargets] = useState<string[] | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const { clear: clearSelection } = selection;
+
+  useEffect(() => () => {
+    clearSelection();
+    setEditOpen(false);
+    setDeleteTargets(null);
+  }, [clearSelection]);
 
   const loadMatchingTracks = () =>
     mp3Api.listAll({ search: debouncedSearchQuery, filterBy, sortBy, sortDirection });
