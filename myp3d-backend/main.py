@@ -1,9 +1,24 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import albums, cache, download, mp3s, search, stats, youtube
+from routers import albums, cache, download, mp3s, search, stats, sync, youtube
+from services.config import API_PORT
+from services.discovery_service import discovery
 
-app = FastAPI(title="MP3 Download API", description="YouTube to MP3 converter and metadata editor")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    yield
+    discovery.stop()
+
+
+app = FastAPI(
+    title="MP3 Download API",
+    description="YouTube to MP3 converter and metadata editor",
+    lifespan=lifespan,
+)
 
 # CORS for React frontend
 app.add_middleware(
@@ -22,6 +37,7 @@ app.include_router(youtube.router)
 app.include_router(stats.router)
 app.include_router(search.router)
 app.include_router(cache.router)
+app.include_router(sync.router)
 
 
 @app.get("/")
@@ -33,4 +49,4 @@ async def root():
 # Run with: uvicorn main:app --reload
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=API_PORT, reload=True)

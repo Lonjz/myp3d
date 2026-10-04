@@ -56,6 +56,9 @@ USE_SYSTEM_FFMPEG=false
 - `PUT /albums/{album_key}` rename album + optional artist for every track
 - `POST /albums/{album_key}/cover` update album cover
 - `GET /albums/{album_key}/cover` album cover bytes
+- `GET /sync/device` this device's LAN name and active discovery port
+- `POST /sync/start` / `POST /sync/stop` start or stop discovery on a chosen UDP port
+- `GET /sync/peers` devices found on the same port
 
 ## Notes
 

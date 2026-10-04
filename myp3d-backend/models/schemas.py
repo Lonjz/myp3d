@@ -171,3 +171,21 @@ class LibraryStats(BaseModel):
     additions_by_month: list[MonthBucket]
     duration_histogram: list[DurationBucket]
     recent_tracks: list[MP3Info]
+
+class SyncDevice(BaseModel):
+    id: str
+    name: str
+
+
+class SyncPeer(SyncDevice):
+    host: str
+
+
+class SyncStartRequest(BaseModel):
+    port: int = Field(ge=1024, le=65535)
+
+
+class SyncStatus(BaseModel):
+    device: SyncDevice
+    port: Optional[int] = None
+

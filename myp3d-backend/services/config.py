@@ -7,8 +7,9 @@ load_dotenv()
 # Configuration
 USE_SYSTEM_FFMPEG = os.getenv("USE_SYSTEM_FFMPEG", "false").lower() == "true"
 BASE_DIR = Path(__file__).parent.parent
-OUTPUT_DIR = BASE_DIR / "downloads"
-OUTPUT_DIR.mkdir(exist_ok=True)
+OUTPUT_DIR = Path(os.getenv("MYP3D_LIBRARY_DIR") or BASE_DIR / "downloads")
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+API_PORT = int(os.getenv("API_PORT", "8000"))
 
 YTDLP_COOKIES_BROWSER = os.getenv("YTDLP_COOKIES_BROWSER", "firefox").strip()
 YTDLP_COOKIES_PROFILE = os.getenv("YTDLP_COOKIES_PROFILE", "").strip() or None
