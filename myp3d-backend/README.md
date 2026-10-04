@@ -59,6 +59,10 @@ USE_SYSTEM_FFMPEG=false
 - `GET /sync/device` this device's LAN name and active discovery port
 - `POST /sync/start` / `POST /sync/stop` start or stop discovery on a chosen UDP port
 - `GET /sync/peers` devices found on the same port
+- `GET /sync/session` current sync session
+- `POST /sync/requests` ask a device to sync
+- `POST /sync/session/accept|decline|cancel|dismiss` answer or end a session
+- `GET /sync/manifest`, `POST /sync/incoming`, `POST /sync/sessions/{id}/accepted|declined|cancelled|progress` device-to-device calls
 
 ## Notes
 

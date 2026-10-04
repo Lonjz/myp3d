@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 
@@ -172,6 +172,7 @@ class LibraryStats(BaseModel):
     duration_histogram: list[DurationBucket]
     recent_tracks: list[MP3Info]
 
+
 class SyncDevice(BaseModel):
     id: str
     name: str
@@ -189,3 +190,34 @@ class SyncStatus(BaseModel):
     device: SyncDevice
     port: Optional[int] = None
 
+
+class SyncRequestCreate(BaseModel):
+    peer_id: str
+
+
+class SyncIncomingRequest(BaseModel):
+    session_id: str
+    device: SyncDevice
+    port: int = Field(ge=1, le=65535)
+
+
+class SyncProgress(BaseModel):
+    total: int = 0
+    done: int = 0
+    failed: int = 0
+    finished: bool = False
+
+
+class SyncSessionInfo(BaseModel):
+    id: str
+    peer: SyncPeer
+    direction: Literal["outgoing", "incoming"]
+    status: Literal["requested", "incoming", "syncing", "done", "declined", "failed", "cancelled"]
+    local: SyncProgress
+    remote: SyncProgress
+    error: Optional[str] = None
+
+
+class SyncManifestEntry(BaseModel):
+    filename: str
+    size: int
