@@ -114,6 +114,7 @@ class PaginatedAlbumResponse(BaseModel):
 
 class AlbumUpdate(BaseModel):
     album_name: str
+    artist: Optional[str] = None
 
 
 class AlbumUpdateResponse(BaseModel):

@@ -79,7 +79,7 @@ async def get_album(album_key: str):
 async def update_album(album_key: str, payload: AlbumUpdate):
     """Update album name for every track in the selected album."""
     album_group = _get_album_group_or_404(album_key)
-    set_track_tags(album_group.filepaths, album=payload.album_name)
+    set_track_tags(album_group.filepaths, artist=payload.artist, album=payload.album_name)
 
     new_album_key = make_album_key(payload.album_name)
     normalized_name = payload.album_name.strip() or "(No Album)"

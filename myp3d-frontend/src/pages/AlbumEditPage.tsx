@@ -25,6 +25,8 @@ interface AlbumEditPageProps {
 }
 
 const NO_ALBUM_LABEL = '(No Album)';
+
+const getSharedArtist = (detail: AlbumDetail) => (detail.album.artists.length === 1 ? detail.album.artists[0] : '');
 const ALBUM_SIDEBAR_PAGE_SIZE = 25;
 
 export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
@@ -35,6 +37,7 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
   const { showSuccess, showError, showInfo, clearToast } = useToast();
 
   const [albumName, setAlbumName] = useState('');
+  const [artist, setArtist] = useState('');
   const [, refreshCoverPreview] = useReducer((count: number) => count + 1, 0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -65,6 +68,7 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
 
     const editableName = detail.album.album_name === NO_ALBUM_LABEL ? '' : detail.album.album_name;
     setAlbumName(editableName);
+    setArtist(getSharedArtist(detail));
   };
 
   const loadAlbum = async (targetKey: string, options?: { clearToast?: boolean; force?: boolean }) => {
@@ -104,7 +108,9 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
 
   const loadedAlbumName =
     albumDetail && albumDetail.album.album_name !== NO_ALBUM_LABEL ? albumDetail.album.album_name : '';
-  const isDirty = albumDetail !== null && (albumName !== loadedAlbumName || coverFile !== null);
+  const loadedArtist = albumDetail ? getSharedArtist(albumDetail) : '';
+  const isArtistDirty = artist !== loadedArtist;
+  const isDirty = albumDetail !== null && (albumName !== loadedAlbumName || isArtistDirty || coverFile !== null);
 
   const { blocker, allowNavigation } = useUnsavedChangesGuard(isDirty);
   const player = usePlayer();
@@ -118,7 +124,10 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
     showInfo('Saving album changes...');
 
     try {
-      const renameResult = await mp3Api.updateAlbum(albumKey, { album_name: albumName });
+      const renameResult = await mp3Api.updateAlbum(albumKey, {
+        album_name: albumName,
+        artist: isArtistDirty ? artist : undefined,
+      });
       const targetAlbumKey = renameResult.album_key;
 
       if (coverFile) {
@@ -226,6 +235,13 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
                 onChange={(e) => setAlbumName(e.target.value)}
                 disabled={saving}
               />
+              <IconField
+                icon={MicVocal}
+                label="Artist"
+                value={artist}
+                onChange={(e) => setArtist(e.target.value)}
+                disabled={saving}
+              />
 
               <div className="album-chips">
                 <span className="album-chip" title="Tracks">
@@ -236,7 +252,7 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
                   <HardDrive aria-hidden="true" />
                   {formatBytes(albumDetail.album.total_size)}
                 </span>
-                {albumDetail.album.artists.length > 0 && (
+                {albumDetail.album.artists.length > 1 && (
                   <span className="album-chip album-chip--wide" title={albumDetail.album.artists.join(', ')}>
                     <MicVocal aria-hidden="true" />
                     <span className="album-chip__text">{albumDetail.album.artists.join(', ')}</span>

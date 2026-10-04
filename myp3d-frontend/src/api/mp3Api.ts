@@ -129,6 +129,7 @@ export interface SearchResults {
 
 interface AlbumUpdateRequest {
   album_name: string;
+  artist?: string;
 }
 
 interface AlbumUpdateResponse {
