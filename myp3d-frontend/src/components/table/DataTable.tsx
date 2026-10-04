@@ -84,28 +84,27 @@ export function DataTable<T>({
     }
   }, [resetKey]);
 
+  const tableClassName = `library-table ${className ?? ''}`.trim();
+  const colgroup = (
+    <colgroup>
+      {columns.map((column) => (
+        <col
+          key={column.key}
+          data-hide={column.hideBelow}
+          style={column.width ? { width: column.width } : undefined}
+        />
+      ))}
+    </colgroup>
+  );
+
   return (
     <div className={fill ? 'data-table data-table--fill' : 'data-table'}>
       {toolbar && <div className="library-toolbar glass">{toolbar}</div>}
 
       <div className="library-table-wrap glass glass--strong">
-        <div
-          ref={scrollRef}
-          className="library-table-scroll"
-          onScroll={(event) => {
-            scrollTopRef.current = event.currentTarget.scrollTop;
-          }}
-        >
-          <table className={`library-table ${className ?? ''}`.trim()}>
-            <colgroup>
-              {columns.map((column) => (
-                <col
-                  key={column.key}
-                  data-hide={column.hideBelow}
-                  style={column.width ? { width: column.width } : undefined}
-                />
-              ))}
-            </colgroup>
+        <div className="library-table-head">
+          <table className={tableClassName}>
+            {colgroup}
             <thead>
               <tr>
                 {columns.map((column) => (
@@ -115,6 +114,18 @@ export function DataTable<T>({
                 ))}
               </tr>
             </thead>
+          </table>
+        </div>
+
+        <div
+          ref={scrollRef}
+          className="library-table-scroll"
+          onScroll={(event) => {
+            scrollTopRef.current = event.currentTarget.scrollTop;
+          }}
+        >
+          <table className={tableClassName}>
+            {colgroup}
             <tbody>
               {items.length > 0 ? (
                 items.map((item, index) => (
