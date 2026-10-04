@@ -195,7 +195,7 @@ interface AlbumListPagedParams {
 
 // Shared fetch wrapper: resolves JSON on success, throws error.detail (or a
 // fallback) on failure. Tolerates non-JSON error bodies.
-async function apiFetch<T>(path: string, init: RequestInit | undefined, fallbackError: string): Promise<T> {
+export async function apiFetch<T>(path: string, init: RequestInit | undefined, fallbackError: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, init);
   if (!res.ok) {
     const error = await res.json().catch(() => ({}));
@@ -204,7 +204,7 @@ async function apiFetch<T>(path: string, init: RequestInit | undefined, fallback
   return res.json() as Promise<T>;
 }
 
-const jsonInit = (method: string, body: unknown): RequestInit => ({
+export const jsonInit = (method: string, body: unknown): RequestInit => ({
   method,
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(body),

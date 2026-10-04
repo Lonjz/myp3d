@@ -7,6 +7,7 @@ import { LibraryPage } from './pages/LibraryPage';
 import { EditPage } from './pages/EditPage';
 import { AlbumsPage } from './pages/AlbumsPage';
 import { AlbumEditPage } from './pages/AlbumEditPage';
+import { SyncPage } from './pages/SyncPage';
 import { ToastProvider } from './components/messages/ToastProvider';
 import { IconButton } from './components/ui/IconButton';
 import { AppBackdrop } from './components/shell/AppBackdrop';
@@ -64,6 +65,7 @@ const KEEP_ALIVE_PAGES: KeepAlivePage[] = [
   { path: '/query', element: <QueryPage /> },
   { path: '/library', element: <LibraryPage /> },
   { path: '/albums', element: <AlbumsPage /> },
+  { path: '/sync', element: <SyncPage /> },
 ];
 
 const FILL_PATHS = new Set(['/library', '/albums']);
