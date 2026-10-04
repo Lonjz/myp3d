@@ -142,6 +142,34 @@
   background: var(--color-surface-hover);
 }
 
+.library-table tbody tr.is-selected {
+  background: var(--selected-bg);
+}
+
+.library-table--selectable th:first-child,
+.library-table--selectable td:first-child {
+  padding-right: 0;
+  user-select: none;
+}
+
+.library-selection-count {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-inline: var(--space-2) var(--space-3);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.library-selection-count svg {
+  width: 18px;
+  height: 18px;
+  color: var(--color-lavender);
+}
+
 .library-cover-sm {
   width: 44px;
   height: 44px;

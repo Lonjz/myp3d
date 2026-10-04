@@ -1,19 +1,34 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import type { ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Download, ListFilter, Pencil, Play, RefreshCw, Search, Shuffle, Trash2 } from 'lucide-react';
+import {
+  Download,
+  ListChecks,
+  ListFilter,
+  Pencil,
+  Play,
+  RefreshCw,
+  Search,
+  Shuffle,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { MP3FilterBy, MP3Info, MP3SortBy } from '../api/mp3Api';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useInfiniteList } from '../hooks/useInfiniteList';
 import { usePersistentState } from '../hooks/usePersistentState';
 import { useSortState } from '../hooks/useSortState';
+import { useTrackSelection } from '../hooks/useTrackSelection';
 import { formatBytes, formatDate, formatDateTime } from '../utils/formatters';
 import { emitAppEvent } from '../utils/appEvents';
 import { DataTable } from '../components/table/DataTable';
 import type { DataTableColumn } from '../components/table/DataTable';
 import { SortableHeaderButton } from '../components/table/SortableHeaderButton';
+import { useToast } from '../components/messages/ToastProvider';
 import { CoverPlayButton } from '../components/player/CoverPlayButton';
 import { usePlayer } from '../components/player/playerContext';
+import { Checkbox } from '../components/ui/Checkbox';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 
@@ -28,6 +43,8 @@ const SORT_COLUMN_LABELS: Record<MP3SortBy, string> = {
 };
 
 const getTrackKey = (mp3: MP3Info) => mp3.filename;
+const isShiftClick = (event: ChangeEvent<HTMLInputElement>) =>
+  event.nativeEvent instanceof MouseEvent && event.nativeEvent.shiftKey;
 
 export function LibraryPage() {
   const navigate = useNavigate();
@@ -70,10 +87,16 @@ export function LibraryPage() {
   });
 
   const player = usePlayer();
+  const { showError } = useToast();
+  const selection = useTrackSelection();
+  const [selectingAll, setSelectingAll] = useState(false);
+
+  const loadMatchingTracks = () =>
+    mp3Api.listAll({ search: debouncedSearchQuery, filterBy, sortBy, sortDirection });
 
   const loadPlayableTracks = async () => {
     try {
-      return await mp3Api.listAll({ search: debouncedSearchQuery, filterBy, sortBy, sortDirection });
+      return await loadMatchingTracks();
     } catch {
       return mp3s;
     }
@@ -100,6 +123,31 @@ export function LibraryPage() {
     }
   };
 
+  const selectAll = async () => {
+    setSelectingAll(true);
+    try {
+      selection.selectMany(await loadMatchingTracks());
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Failed to select tracks');
+    } finally {
+      setSelectingAll(false);
+    }
+  };
+
+  const allSelected = totalItems > 0 && selection.size >= totalItems;
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      selection.clear();
+    } else {
+      void selectAll();
+    }
+  };
+
+  const hasSelection = selection.size > 0;
+  const playSelected = () => {
+    if (hasSelection) player.playTracks(selection.tracks, 0);
+  };
+
   const renderSortHeader = (column: MP3SortBy) => {
     return (
       <SortableHeaderButton
@@ -112,6 +160,26 @@ export function LibraryPage() {
   };
 
   const columns: DataTableColumn<MP3Info>[] = [
+    {
+      key: 'select',
+      header: (
+        <Checkbox
+          label={allSelected ? 'Clear selection' : 'Select all'}
+          checked={allSelected}
+          indeterminate={hasSelection && !allSelected}
+          disabled={totalItems === 0 || selectingAll}
+          onChange={toggleSelectAll}
+        />
+      ),
+      width: '3.25rem',
+      render: (mp3, index) => (
+        <Checkbox
+          label={`Select ${mp3.title || mp3.filename}`}
+          checked={selection.isSelected(mp3.filename)}
+          onChange={(event) => selection.toggle(mp3, index, isShiftClick(event), mp3s)}
+        />
+      ),
+    },
     {
       key: 'cover',
       header: <span className="sr-only">Cover</span>,
@@ -216,13 +284,24 @@ export function LibraryPage() {
         columns={columns}
         items={mp3s}
         getRowKey={getTrackKey}
+        getRowClassName={(mp3) => (selection.isSelected(mp3.filename) ? 'is-selected' : undefined)}
+        className="library-table--selectable"
         emptyMessage={debouncedSearchQuery.trim() ? 'No matches' : 'No tracks yet'}
         loading={loading}
         loadingMore={loadingMore}
         hasMore={hasMore}
         onEndReached={loadMore}
         resetKey={queryParams}
-        toolbar={(
+        toolbar={hasSelection ? (
+          <>
+            <IconButton icon={X} label="Clear selection" onClick={selection.clear} />
+            <span className="library-selection-count" title="Selected">
+              <ListChecks aria-hidden="true" />
+              {selection.size}
+            </span>
+            <IconButton icon={Play} label="Play selected" onClick={playSelected} />
+          </>
+        ) : (
           <>
             <IconField
               icon={Search}
@@ -252,6 +331,7 @@ export function LibraryPage() {
           </>
         )}
       />
+
     </div>
   );
 }
