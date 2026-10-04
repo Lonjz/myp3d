@@ -69,7 +69,6 @@ const QUERY_DRAFT_KEY = 'query:draft';
 
 interface QueryDraft {
   searchQuery: string;
-  searchResults: YouTubeSearchResult[];
   selectedResult: YouTubeSearchResult | null;
   selectedVideoId: string;
   videoDuration: number | null;
@@ -84,7 +83,7 @@ export function QueryPage() {
   const [initialDraft] = useState(() => readStoredValue<Partial<QueryDraft>>(QUERY_DRAFT_KEY, {}));
   const [searchQuery, setSearchQuery] = useState(initialDraft.searchQuery ?? '');
   const [searching, setSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<YouTubeSearchResult[]>(initialDraft.searchResults ?? []);
+  const [searchResults, setSearchResults] = useState<YouTubeSearchResult[]>([]);
 
   const [selectedResult, setSelectedResult] = useState<YouTubeSearchResult | null>(initialDraft.selectedResult ?? null);
   const [selectedVideoId, setSelectedVideoId] = useState(initialDraft.selectedVideoId ?? '');
@@ -141,7 +140,6 @@ export function QueryPage() {
   const draft = useMemo<QueryDraft>(
     () => ({
       searchQuery,
-      searchResults,
       selectedResult,
       selectedVideoId,
       videoDuration,
@@ -153,7 +151,6 @@ export function QueryPage() {
     }),
     [
       searchQuery,
-      searchResults,
       selectedResult,
       selectedVideoId,
       videoDuration,
