@@ -11,13 +11,14 @@ import {
   Search,
   Shuffle,
   Square,
+  Timer,
   Trash2,
   TriangleAlert,
   Undo2,
   X,
 } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
-import type { MP3FilterBy, MP3Info, MP3SortBy } from '../api/mp3Api';
+import type { MP3DurationRange, MP3FilterBy, MP3Info, MP3SortBy } from '../api/mp3Api';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useInfiniteList } from '../hooks/useInfiniteList';
 import { usePersistentState } from '../hooks/usePersistentState';
@@ -25,7 +26,7 @@ import { usePresence } from '../hooks/usePresence';
 import { useSequentialDownload } from '../hooks/useSequentialDownload';
 import { useSortState } from '../hooks/useSortState';
 import { useTrackSelection } from '../hooks/useTrackSelection';
-import { formatBytes, formatDate, formatDateTime } from '../utils/formatters';
+import { formatBytes, formatDate, formatDateTime, formatDuration } from '../utils/formatters';
 import { emitAppEvent } from '../utils/appEvents';
 import { DataTable } from '../components/table/DataTable';
 import type { DataTableColumn } from '../components/table/DataTable';
@@ -47,8 +48,19 @@ const SORT_COLUMN_LABELS: Record<MP3SortBy, string> = {
   album: 'Album',
   filename: 'File Name',
   size: 'Size',
+  duration: 'Duration',
   date_added: 'Date Added',
 };
+
+const DURATION_OPTIONS: Array<[MP3DurationRange, string]> = [
+  ['any', 'Any length'],
+  ['under-2', 'Under 2 min'],
+  ['2-3', '2–3 min'],
+  ['3-4', '3–4 min'],
+  ['4-5', '4–5 min'],
+  ['5-7', '5–7 min'],
+  ['over-7', 'Over 7 min'],
+];
 
 const getTrackKey = (mp3: MP3Info) => mp3.filename;
 const trackCount = (count: number) => `${count} track${count === 1 ? '' : 's'}`;
@@ -59,6 +71,7 @@ export function LibraryPage() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = usePersistentState('library:search', '');
   const [filterBy, setFilterBy] = usePersistentState<MP3FilterBy>('library:filter', 'all');
+  const [durationRange, setDurationRange] = usePersistentState<MP3DurationRange>('library:duration', 'any');
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
 
   const { sortBy, sortDirection, handleSortClick } = useSortState<MP3SortBy>({
@@ -74,8 +87,9 @@ export function LibraryPage() {
       filterBy,
       sortBy,
       sortDirection,
+      durationRange,
     }),
-    [debouncedSearchQuery, filterBy, sortBy, sortDirection],
+    [debouncedSearchQuery, filterBy, sortBy, sortDirection, durationRange],
   );
 
   const {
@@ -112,8 +126,7 @@ export function LibraryPage() {
     setDeleteTargets(null);
   }, [clearSelection]);
 
-  const loadMatchingTracks = () =>
-    mp3Api.listAll({ search: debouncedSearchQuery, filterBy, sortBy, sortDirection });
+  const loadMatchingTracks = () => mp3Api.listAll(queryParams);
 
   const loadPlayableTracks = async () => {
     try {
@@ -288,6 +301,16 @@ export function LibraryPage() {
       render: (mp3) => <span className="table-cell-ellipsis" title={formatBytes(mp3.file_size)}>{formatBytes(mp3.file_size)}</span>,
     },
     {
+      key: 'duration',
+      header: renderSortHeader('duration'),
+      width: '96px',
+      hideBelow: 'md',
+      render: (mp3) => {
+        const length = formatDuration(mp3.duration == null ? null : Math.round(mp3.duration));
+        return <span className="table-cell-ellipsis" title={length}>{length}</span>;
+      },
+    },
+    {
       key: 'date_added',
       header: renderSortHeader('date_added'),
       width: '128px',
@@ -392,6 +415,18 @@ export function LibraryPage() {
                 <option value="artist">Artist</option>
                 <option value="album">Album</option>
                 <option value="filename">File name</option>
+              </select>
+            </label>
+            <label className="icon-field library-filter library-duration" title="Length">
+              <Timer className="icon-field__icon" aria-hidden="true" />
+              <select
+                aria-label="Length"
+                value={durationRange}
+                onChange={(e) => setDurationRange(e.target.value as MP3DurationRange)}
+              >
+                {DURATION_OPTIONS.map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
               </select>
             </label>
             <IconButton icon={Play} label="Play all" onClick={() => void playAll(false)} disabled={totalItems === 0} />

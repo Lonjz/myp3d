@@ -170,7 +170,8 @@ interface PaginatedAlbumResponse {
 }
 
 export type MP3FilterBy = 'all' | 'title' | 'artist' | 'filename' | 'album';
-export type MP3SortBy = 'date_added' | 'filename' | 'size' | 'artist' | 'title' | 'album';
+export type MP3SortBy = 'date_added' | 'filename' | 'size' | 'artist' | 'title' | 'album' | 'duration';
+export type MP3DurationRange = 'any' | 'under-2' | '2-3' | '3-4' | '4-5' | '5-7' | 'over-7';
 export type AlbumSortBy = 'album_name' | 'track_count' | 'total_size' | 'date_added';
 export type SortDirection = 'asc' | 'desc';
 
@@ -180,6 +181,7 @@ interface MP3ListPagedParams {
   search?: string;
   filterBy?: MP3FilterBy;
   sortBy?: MP3SortBy;
+  durationRange?: MP3DurationRange;
   sortDirection?: SortDirection;
 }
 
@@ -232,6 +234,7 @@ export const mp3Api = {
   listAllPaged(params: MP3ListPagedParams): Promise<PaginatedMP3Response> {
     const query = pagedQuery(params, { sortBy: 'date_added', sortDirection: 'desc' });
     query.set('filter_by', params.filterBy || 'all');
+    query.set('duration', params.durationRange || 'any');
     return apiFetch(`/mp3s/paged?${query.toString()}`, undefined, 'Failed to fetch paged MP3 list');
   },
 
@@ -241,6 +244,7 @@ export const mp3Api = {
       filter_by: params.filterBy || 'all',
       sort_by: params.sortBy || 'date_added',
       sort_direction: params.sortDirection || 'desc',
+      duration: params.durationRange || 'any',
     });
     return apiFetch(`/mp3s/all?${query.toString()}`, undefined, 'Failed to fetch MP3 list');
   },
