@@ -303,6 +303,10 @@ export const mp3Api = {
     return apiFetch('/mp3s/bulk/cover', { method: 'POST', body: formData }, 'Bulk cover update failed');
   },
 
+  bulkDelete(filenames: string[]): Promise<BulkResult> {
+    return apiFetch('/mp3s/bulk/delete', jsonInit('POST', { filenames }), 'Bulk delete failed');
+  },
+
   // List albums with server-side pagination/filter/sort
   listAlbumsPaged(params: AlbumListPagedParams): Promise<PaginatedAlbumResponse> {
     const query = pagedQuery(params, { sortBy: 'album_name', sortDirection: 'asc' });
