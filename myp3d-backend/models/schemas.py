@@ -42,6 +42,26 @@ class MetadataUpdate(BaseModel):
     new_filename: Optional[str] = None
 
 
+class BulkTracksRequest(BaseModel):
+    filenames: list[str] = Field(min_length=1)
+
+
+class BulkMetadataUpdate(BulkTracksRequest):
+    artist: Optional[str] = None
+    album: Optional[str] = None
+
+
+class BulkFailure(BaseModel):
+    filename: str
+    detail: str
+
+
+class BulkResult(BaseModel):
+    success: bool
+    updated: list[str]
+    failed: list[BulkFailure]
+
+
 class MP3Info(BaseModel):
     filename: str
     title: Optional[str] = None

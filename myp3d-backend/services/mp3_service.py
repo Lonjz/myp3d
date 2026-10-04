@@ -295,9 +295,13 @@ def get_album_group(album_key: str) -> Optional[AlbumGroup]:
     return groups.get(album_key)
 
 
-def set_album_name(filepaths: list[Path], album_name: str) -> None:
-    normalized_name = album_name.strip()
-    tag_album_value = normalized_name or None
+def set_track_tags(
+    filepaths: list[Path],
+    artist: Optional[str] = None,
+    album: Optional[str] = None,
+) -> None:
+    if artist is None and album is None:
+        return
 
     for filepath in filepaths:
         audio = eyed3.load(str(filepath))
@@ -305,7 +309,10 @@ def set_album_name(filepaths: list[Path], album_name: str) -> None:
             continue
         if audio.tag is None:
             audio.initTag()
-        audio.tag.album = tag_album_value
+        if artist is not None:
+            audio.tag.artist = artist.strip() or None
+        if album is not None:
+            audio.tag.album = album.strip() or None
         audio.tag.save(version=(2, 3, 0))
 
     invalidate_library_cache()

@@ -48,6 +48,9 @@ USE_SYSTEM_FFMPEG=false
 - `GET /mp3s/{filename}/cover` cover bytes
 - `DELETE /mp3s/{filename}` delete
 - `POST /mp3s/upload` upload MP3
+- `POST /mp3s/bulk/metadata` set artist/album on many tracks
+- `POST /mp3s/bulk/cover` set one cover on many tracks
+- `POST /mp3s/bulk/delete` delete many tracks
 - `GET /albums/paged` list albums
 - `GET /albums/{album_key}` album detail
 - `PUT /albums/{album_key}` rename album

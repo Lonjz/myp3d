@@ -2,10 +2,19 @@ import eyed3
 from pathlib import Path
 from typing import Literal, Optional
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Query, Response
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Query, Response
 from fastapi.responses import FileResponse
 
-from models.schemas import MP3Info, MetadataUpdate, PaginatedMP3Response, PaginationMeta
+from models.schemas import (
+    BulkFailure,
+    BulkMetadataUpdate,
+    BulkResult,
+    BulkTracksRequest,
+    MP3Info,
+    MetadataUpdate,
+    PaginatedMP3Response,
+    PaginationMeta,
+)
 from services.config import OUTPUT_DIR
 from services.cover_service import CoverSize, get_cover_variant
 from services.mp3_service import (
@@ -14,7 +23,9 @@ from services.mp3_service import (
     invalidate_library_cache,
     make_square_cover,
     query_mp3_infos,
+    set_album_cover,
     set_cover_images,
+    set_track_tags,
 )
 
 router = APIRouter(prefix="/mp3s", tags=["MP3s"])
@@ -75,6 +86,62 @@ async def list_all_mp3s(
     sort_direction: Literal["asc", "desc"] = Query("desc"),
 ):
     return filter_sort_mp3_infos(search, filter_by, sort_by, sort_direction)
+
+
+def _resolve_bulk_paths(filenames: list[str]) -> tuple[list[Path], list[BulkFailure]]:
+    paths: list[Path] = []
+    failed: list[BulkFailure] = []
+    for filename in dict.fromkeys(filenames):
+        try:
+            filepath = _resolve_mp3_path(filename)
+        except HTTPException as exc:
+            failed.append(BulkFailure(filename=filename, detail=exc.detail))
+            continue
+        if not filepath.exists() or filepath.suffix.lower() != ".mp3":
+            failed.append(BulkFailure(filename=filename, detail="MP3 file not found"))
+            continue
+        paths.append(filepath)
+    return paths, failed
+
+
+@router.post("/bulk/metadata", response_model=BulkResult)
+async def bulk_update_metadata(payload: BulkMetadataUpdate):
+    paths, failed = _resolve_bulk_paths(payload.filenames)
+    set_track_tags(paths, artist=payload.artist, album=payload.album)
+    return BulkResult(success=not failed, updated=[path.name for path in paths], failed=failed)
+
+
+@router.post("/bulk/cover", response_model=BulkResult)
+async def bulk_update_cover(cover: UploadFile = File(...), filenames: list[str] = Form(...)):
+    content_type = cover.content_type or ""
+    if not content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    image_data = await cover.read()
+    try:
+        processed_cover, mime_type = make_square_cover(image_data)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    paths, failed = _resolve_bulk_paths(filenames)
+    set_album_cover(paths, processed_cover, mime_type)
+    return BulkResult(success=not failed, updated=[path.name for path in paths], failed=failed)
+
+
+@router.post("/bulk/delete", response_model=BulkResult)
+async def bulk_delete(payload: BulkTracksRequest):
+    paths, failed = _resolve_bulk_paths(payload.filenames)
+    deleted: list[str] = []
+    for filepath in paths:
+        try:
+            filepath.unlink()
+        except OSError as exc:
+            failed.append(BulkFailure(filename=filepath.name, detail=exc.strerror or "Delete failed"))
+            continue
+        deleted.append(filepath.name)
+
+    invalidate_library_cache()
+    return BulkResult(success=not failed, updated=deleted, failed=failed)
 
 
 @router.get("/{filename}")
