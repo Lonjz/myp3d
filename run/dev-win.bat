@@ -12,4 +12,4 @@ if not exist "%PYTHON%" (
     exit /b 1
 )
 
-wt --window 0 new-tab --title "Backend" --suppressApplicationTitle -d "%BACKEND%" cmd /k "%PYTHON% main.py" ; new-tab --title "Frontend" --suppressApplicationTitle -d "%FRONTEND%" cmd /k "npm run dev"
+wt --window new new-tab --title "Backend" --suppressApplicationTitle -d "%BACKEND%" cmd /k "%PYTHON% main.py" ; new-tab --title "Frontend" --suppressApplicationTitle -d "%FRONTEND%" cmd /k "npm run dev"
