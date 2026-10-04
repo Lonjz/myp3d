@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { ArrowRight, CircleAlert, CircleCheck, DiscAlbum, HeartPulse, Image, MicVocal, Type } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { LibraryStats } from '../../api/mp3Api';
@@ -19,12 +20,13 @@ export function LibraryHealth({ health }: LibraryHealthProps) {
   return (
     <ChartCard title="Health" icon={HeartPulse}>
       <ul className="health-list">
-        {checks.map(({ label, icon: Icon, missing }) => {
+        {checks.map(({ label, icon: Icon, missing }, index) => {
           const ok = missing === 0;
           return (
             <li
               key={label}
-              className={`health-item ${ok ? 'is-ok' : 'is-warn'}`}
+              className={`health-item dash-rise ${ok ? 'is-ok' : 'is-warn'}`}
+              style={{ '--i': index } as CSSProperties}
               title={ok ? `${label}: all tagged` : `${label}: ${missing} missing`}
             >
               <span className="health-item__field">

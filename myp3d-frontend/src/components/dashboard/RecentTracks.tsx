@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { History } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { mp3Api } from '../../api/mp3Api';
@@ -31,7 +32,7 @@ export function RecentTracks({ tracks }: RecentTracksProps) {
       ) : (
         <ul className="recent-list">
           {tracks.map((track, index) => (
-            <li key={track.filename} className="recent-row">
+            <li key={track.filename} className="recent-row dash-rise" style={{ '--i': index } as CSSProperties}>
               <div className="recent-item__cover">
                 <CoverPlayButton
                   src={track.has_cover ? mp3Api.getCoverUrl(track.filename, 'thumb') : undefined}

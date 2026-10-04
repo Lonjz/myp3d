@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { DiscAlbum, Music, Pause, Play } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { mp3Api } from '../../api/mp3Api';
@@ -21,11 +22,15 @@ export function TopAlbums({ albums }: TopAlbumsProps) {
         <p className="chart-card__empty">No albums yet.</p>
       ) : (
         <div className="album-tile-grid">
-          {albums.map((album) => {
+          {albums.map((album, index) => {
             const isCurrent = player.currentTrack !== null && currentAlbumName === album.album_name.toLowerCase();
             const playingNow = isCurrent && player.state.isPlaying;
             return (
-              <div key={album.album_key} className={isCurrent ? 'album-tile-wrap is-current' : 'album-tile-wrap'}>
+              <div
+                key={album.album_key}
+                className={isCurrent ? 'album-tile-wrap dash-rise is-current' : 'album-tile-wrap dash-rise'}
+                style={{ '--i': index } as CSSProperties}
+              >
                 <Link to={`/albums/${encodeURIComponent(album.album_key)}`} className="album-tile">
                   <div className="album-tile__cover">
                     {album.has_cover ? (
