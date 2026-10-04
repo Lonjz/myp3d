@@ -25,6 +25,7 @@ import { emitAppEvent } from '../utils/appEvents';
 import { DataTable } from '../components/table/DataTable';
 import type { DataTableColumn } from '../components/table/DataTable';
 import { SortableHeaderButton } from '../components/table/SortableHeaderButton';
+import { BulkEditDialog } from '../components/library/BulkEditDialog';
 import { useToast } from '../components/messages/ToastProvider';
 import { CoverPlayButton } from '../components/player/CoverPlayButton';
 import { usePlayer } from '../components/player/playerContext';
@@ -90,6 +91,7 @@ export function LibraryPage() {
   const { showError } = useToast();
   const selection = useTrackSelection();
   const [selectingAll, setSelectingAll] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const loadMatchingTracks = () =>
     mp3Api.listAll({ search: debouncedSearchQuery, filterBy, sortBy, sortDirection });
@@ -146,6 +148,9 @@ export function LibraryPage() {
   const hasSelection = selection.size > 0;
   const playSelected = () => {
     if (hasSelection) player.playTracks(selection.tracks, 0);
+  };
+  const editSelected = () => {
+    if (hasSelection) setEditOpen(true);
   };
 
   const renderSortHeader = (column: MP3SortBy) => {
@@ -300,6 +305,7 @@ export function LibraryPage() {
               {selection.size}
             </span>
             <IconButton icon={Play} label="Play selected" onClick={playSelected} />
+            <IconButton icon={Pencil} label="Edit selected" onClick={editSelected} />
           </>
         ) : (
           <>
@@ -331,6 +337,17 @@ export function LibraryPage() {
           </>
         )}
       />
+
+      {editOpen && (
+        <BulkEditDialog
+          tracks={selection.tracks}
+          onClose={() => setEditOpen(false)}
+          onSaved={() => {
+            setEditOpen(false);
+            selection.clear();
+          }}
+        />
+      )}
 
     </div>
   );

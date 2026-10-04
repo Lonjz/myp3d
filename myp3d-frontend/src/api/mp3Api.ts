@@ -132,6 +132,17 @@ interface AlbumUpdateRequest {
   artist?: string;
 }
 
+export interface BulkTagUpdate {
+  artist?: string;
+  album?: string;
+}
+
+export interface BulkResult {
+  success: boolean;
+  updated: string[];
+  failed: Array<{ filename: string; detail: string }>;
+}
+
 interface AlbumUpdateResponse {
   success: boolean;
   album_key: string;
@@ -279,6 +290,17 @@ export const mp3Api = {
   // Delete MP3
   delete(filename: string): Promise<{ success: boolean }> {
     return apiFetch(`/mp3s/${encodeURIComponent(filename)}`, { method: 'DELETE' }, 'Delete failed');
+  },
+
+  bulkUpdateTags(filenames: string[], tags: BulkTagUpdate): Promise<BulkResult> {
+    return apiFetch('/mp3s/bulk/metadata', jsonInit('POST', { filenames, ...tags }), 'Bulk update failed');
+  },
+
+  bulkUpdateCover(filenames: string[], file: File): Promise<BulkResult> {
+    const formData = new FormData();
+    formData.append('cover', file);
+    filenames.forEach((filename) => formData.append('filenames', filename));
+    return apiFetch('/mp3s/bulk/cover', { method: 'POST', body: formData }, 'Bulk cover update failed');
   },
 
   // List albums with server-side pagination/filter/sort
