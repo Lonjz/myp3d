@@ -30,6 +30,7 @@ import { DataTable } from '../components/table/DataTable';
 import type { DataTableColumn } from '../components/table/DataTable';
 import { SortableHeaderButton } from '../components/table/SortableHeaderButton';
 import { BulkEditDialog } from '../components/library/BulkEditDialog';
+import { useLibrarySelectionCommands } from '../components/library/useLibrarySelectionCommands';
 import { useToast } from '../components/messages/ToastProvider';
 import { CoverPlayButton } from '../components/player/CoverPlayButton';
 import { usePlayer } from '../components/player/playerContext';
@@ -180,6 +181,15 @@ export function LibraryPage() {
   const deleteSelected = () => {
     if (hasSelection) setDeleteTargets(selection.filenames);
   };
+
+  useLibrarySelectionCommands(selection.size, {
+    selectAll: () => void selectAll(),
+    clear: selection.clear,
+    play: playSelected,
+    edit: editSelected,
+    download: downloadSelected,
+    remove: deleteSelected,
+  });
 
   const renderSortHeader = (column: MP3SortBy) => {
     return (
