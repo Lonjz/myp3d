@@ -21,6 +21,7 @@ import type { MP3FilterBy, MP3Info, MP3SortBy } from '../api/mp3Api';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useInfiniteList } from '../hooks/useInfiniteList';
 import { usePersistentState } from '../hooks/usePersistentState';
+import { usePresence } from '../hooks/usePresence';
 import { useSequentialDownload } from '../hooks/useSequentialDownload';
 import { useSortState } from '../hooks/useSortState';
 import { useTrackSelection } from '../hooks/useTrackSelection';
@@ -100,6 +101,7 @@ export function LibraryPage() {
   const downloads = useSequentialDownload();
   const [selectingAll, setSelectingAll] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const editPresence = usePresence(editOpen);
   const [deleteTargets, setDeleteTargets] = useState<string[] | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -394,9 +396,10 @@ export function LibraryPage() {
         )}
       />
 
-      {editOpen && (
+      {editPresence.mounted && (
         <BulkEditDialog
           tracks={selection.tracks}
+          closing={editPresence.closing}
           onClose={() => setEditOpen(false)}
           onSaved={() => {
             setEditOpen(false);

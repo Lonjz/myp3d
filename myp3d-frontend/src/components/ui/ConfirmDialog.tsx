@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { LucideIcon } from 'lucide-react';
+import { usePresence } from '../../hooks/usePresence';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -28,6 +29,12 @@ export function ConfirmDialog({
   onCancel,
 }: ConfirmDialogProps) {
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const { mounted, closing } = usePresence(open);
+  const [shownTitle, setShownTitle] = useState(title);
+
+  if (open && title !== shownTitle) {
+    setShownTitle(title);
+  }
 
   useEffect(() => {
     if (!open) return undefined;
@@ -45,10 +52,10 @@ export function ConfirmDialog({
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [open, onCancel]);
 
-  if (!open) return null;
+  if (!mounted) return null;
 
   return createPortal(
-    <div className="confirm-layer">
+    <div className="confirm-layer" data-state={closing ? 'closed' : 'open'}>
       <div className="confirm-scrim" onMouseDown={onCancel} />
       <div
         className={`confirm-dialog glass confirm-dialog--${tone}`}
@@ -60,7 +67,7 @@ export function ConfirmDialog({
           <Icon aria-hidden="true" />
         </span>
         <h2 id="confirm-dialog-title" className="confirm-dialog__title">
-          {title}
+          {shownTitle}
         </h2>
         <div className="confirm-dialog__actions">
           <button ref={cancelRef} type="button" className="confirm-btn" onClick={onCancel}>

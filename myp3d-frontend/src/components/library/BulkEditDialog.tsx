@@ -12,6 +12,7 @@ import { Spinner } from '../ui/Spinner';
 
 interface BulkEditDialogProps {
   tracks: MP3Info[];
+  closing: boolean;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -21,8 +22,9 @@ const sharedValue = (tracks: MP3Info[], pick: (track: MP3Info) => string | null 
   return tracks.every((track) => (pick(track) ?? '') === first) ? first : '';
 };
 
-export function BulkEditDialog({ tracks, onClose, onSaved }: BulkEditDialogProps) {
+export function BulkEditDialog({ tracks: selectedTracks, closing, onClose, onSaved }: BulkEditDialogProps) {
   const { showSuccess, showError, showInfo, clearToast } = useToast();
+  const [tracks] = useState(selectedTracks);
   const [initial] = useState(() => ({
     artist: sharedValue(tracks, (track) => track.artist),
     album: sharedValue(tracks, (track) => track.album),
@@ -55,7 +57,7 @@ export function BulkEditDialog({ tracks, onClose, onSaved }: BulkEditDialogProps
   const isDirty = hasTagChanges || coverFile !== null;
 
   useEffect(() => {
-    if (isCropModalOpen || saving) return undefined;
+    if (isCropModalOpen || saving || closing) return undefined;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -67,7 +69,7 @@ export function BulkEditDialog({ tracks, onClose, onSaved }: BulkEditDialogProps
 
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [isCropModalOpen, saving, onClose]);
+  }, [isCropModalOpen, saving, closing, onClose]);
 
   const handleSave = async () => {
     const filenames = tracks.map((track) => track.filename);
@@ -112,7 +114,7 @@ export function BulkEditDialog({ tracks, onClose, onSaved }: BulkEditDialogProps
         onApply={handleApplyCrop}
       />
     ) : (
-      <div className="confirm-layer">
+      <div className="confirm-layer" data-state={closing ? 'closed' : 'open'}>
         <div className="confirm-scrim" onMouseDown={saving ? undefined : onClose} />
         <div
           className="bulk-edit-dialog glass"

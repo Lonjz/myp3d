@@ -175,6 +175,32 @@
   }
 }
 
+.confirm-layer[data-state='closed'] {
+  pointer-events: none;
+}
+
+.confirm-layer[data-state='closed'] .confirm-scrim {
+  animation: confirm-fade-out 180ms ease-in both;
+}
+
+.confirm-layer[data-state='closed'] .confirm-dialog.glass,
+.confirm-layer[data-state='closed'] .bulk-edit-dialog.glass {
+  animation: confirm-panel-out 180ms ease-in both;
+}
+
+@keyframes confirm-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes confirm-panel-out {
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+}
+
 @keyframes confirm-fade-in {
   from {
     opacity: 0;
@@ -192,5 +218,10 @@
   .confirm-dialog.glass,
   .bulk-edit-dialog.glass {
     animation-name: confirm-fade-in;
+  }
+
+  .confirm-layer[data-state='closed'] .confirm-dialog.glass,
+  .confirm-layer[data-state='closed'] .bulk-edit-dialog.glass {
+    animation-name: confirm-fade-out;
   }
 }
