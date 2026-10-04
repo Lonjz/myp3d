@@ -1,5 +1,6 @@
 import { MicVocal } from 'lucide-react';
-import { Bar, BarChart, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, Rectangle, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import type { BarShapeProps } from 'recharts';
 import type { LibraryStats } from '../../api/mp3Api';
 import { ChartCard } from './ChartCard';
 import { ChartTooltip } from './ChartTooltip';
@@ -14,6 +15,28 @@ const MAX_NAME_LENGTH = 16;
 
 function truncate(name: string): string {
   return name.length > MAX_NAME_LENGTH ? `${name.slice(0, MAX_NAME_LENGTH - 1)}…` : name;
+}
+
+const LABEL_GAP = 6;
+
+function LabeledBar(props: BarShapeProps) {
+  const { x, y, width, height, value, isActive } = props;
+  const count = Array.isArray(value) ? value[1] : value;
+
+  return (
+    <g>
+      <Rectangle {...props} fill={isActive ? CHART_COLORS.seriesActive : CHART_COLORS.series} />
+      <text
+        x={x + width + LABEL_GAP}
+        y={y + height / 2}
+        dominantBaseline="central"
+        fill={CHART_COLORS.label}
+        fontSize={12}
+      >
+        {count}
+      </text>
+    </g>
+  );
 }
 
 export function TopArtistsChart({ artists }: TopArtistsChartProps) {
@@ -48,13 +71,12 @@ export function TopArtistsChart({ artists }: TopArtistsChartProps) {
             <Bar
               dataKey="track_count"
               fill={CHART_COLORS.series}
-              activeBar={{ fill: CHART_COLORS.seriesActive }}
+              activeBar
+              shape={LabeledBar}
               radius={ROW_RADIUS}
               maxBarSize={MAX_BAR_SIZE}
               isAnimationActive={ANIMATE_CHARTS}
-            >
-              <LabelList dataKey="track_count" position="right" fill={CHART_COLORS.label} fontSize={12} />
-            </Bar>
+            />
           </BarChart>
         </ResponsiveContainer>
       )}
