@@ -29,9 +29,6 @@
     radial-gradient(34% 32% at 84% 12%, color-mix(in srgb, var(--color-rose) 38%, transparent), transparent 72%),
     radial-gradient(46% 40% at 80% 86%, color-mix(in srgb, var(--color-peach) 42%, transparent), transparent 72%),
     radial-gradient(44% 46% at 12% 90%, color-mix(in srgb, var(--color-sky) 40%, transparent), transparent 72%);
-  filter: blur(48px);
-  animation: aurora-drift 60s ease-in-out infinite alternate;
-  will-change: transform;
 }
 
 @keyframes aurora-drift {

@@ -156,6 +156,11 @@
   }
 }
 
+.dashboard .glass {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
 .chart-card {
   display: flex;
   flex-direction: column;
@@ -229,7 +234,9 @@
 }
 
 .chart-tooltip {
-  background: var(--glass-sheen), var(--glass-tint-dark);
+  background: var(--glass-sheen), rgba(30, 23, 56, 0.92);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
   font-size: var(--text-sm);
