@@ -8,6 +8,7 @@ import { CoverCropModal } from '../components/cover/CoverCropModal';
 import { DownloadConfigSection } from '../components/download/DownloadConfigSection';
 import { TrimRangeSection } from '../components/download/TrimRangeSection';
 import { useToast } from '../components/messages/ToastProvider';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { Spinner } from '../components/ui/Spinner';
@@ -127,6 +128,7 @@ export function QueryPage() {
     handleCoverFileSelect,
     handleRemoveCover,
     cropModalProps,
+    overwriteDialogProps,
     submitDownload,
   } = useDownloadForm({
     zoomInputId: 'queryCropZoom',
@@ -604,6 +606,7 @@ export function QueryPage() {
       </div>
 
       <CoverCropModal {...cropModalProps} />
+      <ConfirmDialog {...overwriteDialogProps} />
     </div>
   );
 }

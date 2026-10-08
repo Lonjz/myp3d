@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { Pencil, TriangleAlert, Undo2 } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { DownloadRequest } from '../api/mp3Api';
 import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
@@ -27,6 +28,8 @@ export function useDownloadForm({ zoomInputId, onDownloaded, initialValues }: Us
   const [artist, setArtist] = useState(initialValues?.artist ?? '');
   const [album, setAlbum] = useState(initialValues?.album ?? '');
   const [loading, setLoading] = useState(false);
+  const [overwriteTarget, setOverwriteTarget] = useState<string | null>(null);
+  const overwriteResolverRef = useRef<((confirmed: boolean) => void) | null>(null);
   const { showSuccess, showError, clearToast } = useToast();
 
   const {
@@ -56,14 +59,37 @@ export function useDownloadForm({ zoomInputId, onDownloaded, initialValues }: Us
     resetCoverState();
   };
 
+  const confirmOverwrite = (filename: string) =>
+    new Promise<boolean>((resolve) => {
+      overwriteResolverRef.current = resolve;
+      setOverwriteTarget(filename);
+    });
+
+  const resolveOverwrite = (confirmed: boolean) => {
+    overwriteResolverRef.current?.(confirmed);
+    overwriteResolverRef.current = null;
+    setOverwriteTarget(null);
+  };
+
   const submitDownload = async (extra?: Partial<DownloadRequest>): Promise<boolean> => {
+    const requestedName = customFilename.trim().toLowerCase();
+    if (requestedName) {
+      const exists = await mp3Api.getInfo(`${requestedName}.mp3`).then(
+        () => true,
+        () => false,
+      );
+      if (exists && !(await confirmOverwrite(`${requestedName}.mp3`))) {
+        return false;
+      }
+    }
+
     setLoading(true);
     clearToast();
 
     try {
       const request: DownloadRequest = {
         url: url.trim(),
-        custom_filename: customFilename.trim() || undefined,
+        custom_filename: requestedName || undefined,
         title: title.trim() || undefined,
         artist: artist.trim() || undefined,
         album: album.trim() || undefined,
@@ -100,6 +126,19 @@ export function useDownloadForm({ zoomInputId, onDownloaded, initialValues }: Us
     onApply: handleApplyCrop,
   };
 
+  const overwriteDialogProps = {
+    open: overwriteTarget !== null,
+    icon: TriangleAlert,
+    title: overwriteTarget ? `Overwrite "${overwriteTarget}"?` : '',
+    cancelLabel: 'Keep',
+    cancelIcon: Undo2,
+    confirmLabel: 'Overwrite',
+    confirmIcon: Pencil,
+    tone: 'danger' as const,
+    onCancel: () => resolveOverwrite(false),
+    onConfirm: () => resolveOverwrite(true),
+  };
+
   return {
     url,
     setUrl,
@@ -117,6 +156,7 @@ export function useDownloadForm({ zoomInputId, onDownloaded, initialValues }: Us
     handleCoverFileSelect,
     handleRemoveCover,
     cropModalProps,
+    overwriteDialogProps,
     submitDownload,
     resetFields,
   };

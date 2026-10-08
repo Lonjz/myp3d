@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { DiscAlbum, FileAudio, Link, MicVocal, Type } from 'lucide-react';
 import { CoverUploadSquare } from '../cover/CoverUploadSquare';
 import { IconField } from '../ui/IconField';
+import { normalizeFilenameInput } from '../../utils/filenames';
 
 interface DownloadConfigSectionProps {
   idPrefix?: string;
@@ -88,7 +89,7 @@ export function DownloadConfigSection({
         icon={FileAudio}
         label="File name"
         value={customFilename}
-        onChange={(event) => onCustomFilenameChange(event.target.value)}
+        onChange={(event) => onCustomFilenameChange(normalizeFilenameInput(event.target.value))}
         disabled={disabled}
       />
     </div>

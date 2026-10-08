@@ -15,6 +15,7 @@ import { Spinner } from '../components/ui/Spinner';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { emitAppEvent, subscribeAppEvent } from '../utils/appEvents';
 import { getCachedMp3Info, setCachedMp3Info } from '../utils/detailCache';
+import { normalizeFilenameInput, stripMp3Extension } from '../utils/filenames';
 
 interface EditPageProps {
   filename: string;
@@ -65,7 +66,7 @@ export function EditPage({ filename, onBack }: EditPageProps) {
     setTitle(info.title || '');
     setArtist(info.artist || '');
     setAlbum(info.album || '');
-    setNewFilename(info.filename);
+    setNewFilename(stripMp3Extension(info.filename));
   };
 
   const loadMp3 = async (options?: { force?: boolean }) => {
@@ -105,7 +106,7 @@ export function EditPage({ filename, onBack }: EditPageProps) {
     (title !== (mp3.title || '') ||
       artist !== (mp3.artist || '') ||
       album !== (mp3.album || '') ||
-      newFilename !== mp3.filename ||
+      newFilename !== stripMp3Extension(mp3.filename) ||
       coverFile !== null);
 
   const { blocker, allowNavigation } = useUnsavedChangesGuard(isDirty);
@@ -121,7 +122,7 @@ export function EditPage({ filename, onBack }: EditPageProps) {
         title: title || undefined,
         artist: artist || undefined,
         album: album || undefined,
-        new_filename: newFilename !== filename ? newFilename : undefined,
+        new_filename: newFilename.trim() && newFilename !== stripMp3Extension(filename) ? `${newFilename.trim()}.mp3` : undefined,
       });
 
       // Update cover if changed
@@ -231,7 +232,7 @@ export function EditPage({ filename, onBack }: EditPageProps) {
                 icon={FileAudio}
                 label="File name"
                 value={newFilename}
-                onChange={(e) => setNewFilename(e.target.value)}
+                onChange={(e) => setNewFilename(normalizeFilenameInput(e.target.value))}
                 disabled={saving}
               />
               <IconField
