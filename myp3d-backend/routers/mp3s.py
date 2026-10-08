@@ -195,7 +195,7 @@ async def update_metadata(filename: str, metadata: MetadataUpdate):
     # Handle filename change
     new_filename = filename
     if metadata.new_filename and metadata.new_filename != filename:
-        new_name = _sanitize_filename(metadata.new_filename)
+        new_name = _sanitize_filename(metadata.new_filename).lower()
         if not new_name.lower().endswith(".mp3"):
             new_name += ".mp3"
         new_path = OUTPUT_DIR / new_name

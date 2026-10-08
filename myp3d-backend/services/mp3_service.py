@@ -444,8 +444,8 @@ def download_as_mp3(
 ) -> str:
     """Download YouTube video as MP3, optionally using yt-dlp download sections."""
     ffmpeg_path = get_ffmpeg_path()
-    
-    # Output template
+    custom_name = custom_name.strip().lower() if custom_name else None
+
     if custom_name:
         outtmpl = str(OUTPUT_DIR / f"{custom_name}.%(ext)s")
     else:
