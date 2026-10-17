@@ -7,7 +7,7 @@ router = APIRouter(tags=["Download"])
 
 
 @router.post("/download", response_model=DownloadResponse)
-async def download_mp3(request: DownloadRequest):
+def download_mp3(request: DownloadRequest):
     """Download a YouTube video as MP3 at 320kbps."""
     try:
         if (request.start_time is None) ^ (request.end_time is None):

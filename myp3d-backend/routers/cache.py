@@ -7,7 +7,7 @@ router = APIRouter(prefix="/cache", tags=["Cache"])
 
 
 @router.post("/clear")
-async def clear_cache():
+def clear_cache():
     invalidate_library_cache()
     clear_cover_cache()
     return {"success": True}

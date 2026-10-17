@@ -7,5 +7,5 @@ router = APIRouter(prefix="/stats", tags=["Stats"])
 
 
 @router.get("", response_model=LibraryStats)
-async def get_library_stats():
+def get_library_stats():
     return compute_library_stats()

@@ -1,3 +1,5 @@
+import shutil
+
 import eyed3
 from pathlib import Path
 from typing import Literal, Optional
@@ -50,7 +52,7 @@ def _resolve_mp3_path(filename: str) -> Path:
 
 
 @router.get("/paged", response_model=PaginatedMP3Response)
-async def list_mp3s_paged(
+def list_mp3s_paged(
     page: int = Query(1, ge=1),
     limit: int = Query(25, ge=1, le=200),
     search: str = Query(""),
@@ -83,7 +85,7 @@ async def list_mp3s_paged(
 
 
 @router.get("/all", response_model=list[MP3Info])
-async def list_all_mp3s(
+def list_all_mp3s(
     search: str = Query(""),
     filter_by: Literal["all", "title", "artist", "filename", "album"] = Query("all"),
     sort_by: MP3SortBy = Query("date_added"),
@@ -110,19 +112,19 @@ def _resolve_bulk_paths(filenames: list[str]) -> tuple[list[Path], list[BulkFail
 
 
 @router.post("/bulk/metadata", response_model=BulkResult)
-async def bulk_update_metadata(payload: BulkMetadataUpdate):
+def bulk_update_metadata(payload: BulkMetadataUpdate):
     paths, failed = _resolve_bulk_paths(payload.filenames)
     set_track_tags(paths, artist=payload.artist, album=payload.album)
     return BulkResult(success=not failed, updated=[path.name for path in paths], failed=failed)
 
 
 @router.post("/bulk/cover", response_model=BulkResult)
-async def bulk_update_cover(cover: UploadFile = File(...), filenames: list[str] = Form(...)):
+def bulk_update_cover(cover: UploadFile = File(...), filenames: list[str] = Form(...)):
     content_type = cover.content_type or ""
     if not content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
 
-    image_data = await cover.read()
+    image_data = cover.file.read()
     try:
         processed_cover, mime_type = make_square_cover(image_data)
     except ValueError as exc:
@@ -134,7 +136,7 @@ async def bulk_update_cover(cover: UploadFile = File(...), filenames: list[str] 
 
 
 @router.post("/bulk/delete", response_model=BulkResult)
-async def bulk_delete(payload: BulkTracksRequest):
+def bulk_delete(payload: BulkTracksRequest):
     paths, failed = _resolve_bulk_paths(payload.filenames)
     deleted: list[str] = []
     for filepath in paths:
@@ -150,7 +152,7 @@ async def bulk_delete(payload: BulkTracksRequest):
 
 
 @router.get("/{filename}")
-async def get_mp3(filename: str):
+def get_mp3(filename: str):
     """Get a specific MP3 file for download."""
     filepath = _resolve_mp3_path(filename)
     if not filepath.exists() or filepath.suffix.lower() != ".mp3":
@@ -164,7 +166,7 @@ async def get_mp3(filename: str):
 
 
 @router.get("/{filename}/info", response_model=MP3Info)
-async def get_mp3_metadata(filename: str):
+def get_mp3_metadata(filename: str):
     """Get metadata for a specific MP3 file."""
     filepath = _resolve_mp3_path(filename)
     if not filepath.exists() or filepath.suffix.lower() != ".mp3":
@@ -173,7 +175,7 @@ async def get_mp3_metadata(filename: str):
 
 
 @router.put("/{filename}/metadata")
-async def update_metadata(filename: str, metadata: MetadataUpdate):
+def update_metadata(filename: str, metadata: MetadataUpdate):
     """Update MP3 metadata (title, artist, album, filename)."""
     filepath = _resolve_mp3_path(filename)
     if not filepath.exists() or filepath.suffix.lower() != ".mp3":
@@ -210,7 +212,7 @@ async def update_metadata(filename: str, metadata: MetadataUpdate):
 
 
 @router.post("/{filename}/cover")
-async def update_cover(filename: str, cover: UploadFile = File(...)):
+def update_cover(filename: str, cover: UploadFile = File(...)):
     """Update the cover image for an MP3 file."""
     filepath = _resolve_mp3_path(filename)
     if not filepath.exists() or filepath.suffix.lower() != ".mp3":
@@ -224,7 +226,7 @@ async def update_cover(filename: str, cover: UploadFile = File(...)):
     if audio.tag is None:
         audio.initTag()
 
-    image_data = await cover.read()
+    image_data = cover.file.read()
     try:
         processed_cover, mime_type = make_square_cover(image_data)
     except ValueError as exc:
@@ -270,7 +272,7 @@ def get_cover(
 
 
 @router.delete("/{filename}")
-async def delete_mp3(filename: str):
+def delete_mp3(filename: str):
     """Delete an MP3 file."""
     filepath = _resolve_mp3_path(filename)
     if not filepath.exists() or filepath.suffix.lower() != ".mp3":
@@ -282,7 +284,7 @@ async def delete_mp3(filename: str):
 
 
 @router.post("/upload")
-async def upload_mp3(file: UploadFile = File(...)):
+def upload_mp3(file: UploadFile = File(...)):
     """Upload an MP3 file to the library."""
     if not file.filename:
         raise HTTPException(status_code=400, detail="Missing filename")
@@ -296,8 +298,7 @@ async def upload_mp3(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="A file with that name already exists")
     
     with open(filepath, "wb") as f:
-        content = await file.read()
-        f.write(content)
+        shutil.copyfileobj(file.file, f)
 
     invalidate_library_cache()
     return {"success": True, "filename": safe_name, "message": "File uploaded successfully"}

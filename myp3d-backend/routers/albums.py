@@ -36,7 +36,7 @@ def _get_album_group_or_404(album_key: str):
 
 
 @router.get("/paged", response_model=PaginatedAlbumResponse)
-async def list_album_groups_paged(
+def list_album_groups_paged(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=200),
     search: str = Query(""),
@@ -65,7 +65,7 @@ async def list_album_groups_paged(
 
 
 @router.get("/{album_key}", response_model=AlbumDetail)
-async def get_album(album_key: str):
+def get_album(album_key: str):
     """Get album summary and all tracks in that album."""
     album_group = _get_album_group_or_404(album_key)
     tracks = sorted(
@@ -76,7 +76,7 @@ async def get_album(album_key: str):
 
 
 @router.put("/{album_key}", response_model=AlbumUpdateResponse)
-async def update_album(album_key: str, payload: AlbumUpdate):
+def update_album(album_key: str, payload: AlbumUpdate):
     """Update album name for every track in the selected album."""
     album_group = _get_album_group_or_404(album_key)
     set_track_tags(album_group.filepaths, artist=payload.artist, album=payload.album_name)
@@ -93,7 +93,7 @@ async def update_album(album_key: str, payload: AlbumUpdate):
 
 
 @router.post("/{album_key}/cover")
-async def update_album_cover(album_key: str, cover: UploadFile = File(...)):
+def update_album_cover(album_key: str, cover: UploadFile = File(...)):
     """Set the same cover image on every track in the album."""
     album_group = _get_album_group_or_404(album_key)
 
@@ -101,7 +101,7 @@ async def update_album_cover(album_key: str, cover: UploadFile = File(...)):
     if not content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
 
-    image_data = await cover.read()
+    image_data = cover.file.read()
     try:
         processed_cover, mime_type = make_square_cover(image_data)
     except ValueError as exc:
