@@ -455,7 +455,32 @@ def get_mp3_info(filepath: Path) -> MP3Info:
     return info
 
 
+_download_locks: dict[str, threading.Lock] = {}
+_download_locks_guard = threading.Lock()
+
+
+def _download_lock(key: str) -> threading.Lock:
+    with _download_locks_guard:
+        lock = _download_locks.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _download_locks[key] = lock
+        return lock
+
+
 def download_as_mp3(
+    url: str,
+    metadata: Optional[dict] = None,
+    custom_name: Optional[str] = None,
+    start_time: Optional[float] = None,
+    end_time: Optional[float] = None,
+) -> str:
+    lock_key = custom_name.strip().lower() if custom_name and custom_name.strip() else url
+    with _download_lock(lock_key):
+        return _download_as_mp3(url, metadata, custom_name, start_time, end_time)
+
+
+def _download_as_mp3(
     url: str,
     metadata: Optional[dict] = None,
     custom_name: Optional[str] = None,
