@@ -57,9 +57,11 @@ class _LibraryCache:
     album_groups: Optional[dict[str, "AlbumGroup"]] = None
     built_at: float = 0.0
     dirty: bool = True
+    generation: int = 0
 
 
 _cache_lock = threading.Lock()
+_rebuild_lock = threading.Lock()
 _library_cache = _LibraryCache()
 
 
@@ -69,6 +71,7 @@ def invalidate_library_cache() -> None:
         _library_cache.album_groups = None
         _library_cache.built_at = 0.0
         _library_cache.dirty = True
+        _library_cache.generation += 1
 
 
 def _should_rebuild_cache(now: float) -> bool:
@@ -95,19 +98,34 @@ def list_mp3_filepaths() -> list[Path]:
     )
 
 
-def list_mp3_infos() -> list[MP3Info]:
-    now = time.monotonic()
+def _cached_mp3_infos() -> Optional[list[MP3Info]]:
     with _cache_lock:
-        if _library_cache.mp3_infos is not None and not _should_rebuild_cache(now):
+        if _library_cache.mp3_infos is not None and not _should_rebuild_cache(time.monotonic()):
             return list(_library_cache.mp3_infos)
+    return None
 
-    mp3_infos = [get_mp3_info(filepath) for filepath in list_mp3_filepaths()]
 
-    with _cache_lock:
-        _library_cache.mp3_infos = mp3_infos
-        _library_cache.album_groups = None
-        _library_cache.built_at = time.monotonic()
-        _library_cache.dirty = False
+def list_mp3_infos() -> list[MP3Info]:
+    cached = _cached_mp3_infos()
+    if cached is not None:
+        return cached
+
+    with _rebuild_lock:
+        cached = _cached_mp3_infos()
+        if cached is not None:
+            return cached
+
+        with _cache_lock:
+            generation = _library_cache.generation
+
+        mp3_infos = [get_mp3_info(filepath) for filepath in list_mp3_filepaths()]
+
+        with _cache_lock:
+            if _library_cache.generation == generation:
+                _library_cache.mp3_infos = mp3_infos
+                _library_cache.album_groups = None
+                _library_cache.built_at = time.monotonic()
+                _library_cache.dirty = False
 
     return list(mp3_infos)
 
@@ -117,6 +135,7 @@ def build_album_groups() -> dict[str, AlbumGroup]:
     with _cache_lock:
         if _library_cache.album_groups is not None and not _should_rebuild_cache(now):
             return _library_cache.album_groups
+        generation = _library_cache.generation
 
     groups: dict[str, AlbumGroup] = {}
 
@@ -159,7 +178,8 @@ def build_album_groups() -> dict[str, AlbumGroup]:
             group.album_name = album_value
 
     with _cache_lock:
-        _library_cache.album_groups = groups
+        if _library_cache.generation == generation:
+            _library_cache.album_groups = groups
 
     return groups
 
