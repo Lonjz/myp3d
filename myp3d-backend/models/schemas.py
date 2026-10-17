@@ -221,3 +221,4 @@ class SyncSessionInfo(BaseModel):
 class SyncManifestEntry(BaseModel):
     filename: str
     size: int
+    fingerprint: Optional[str] = None

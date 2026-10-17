@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import shutil
@@ -25,6 +26,7 @@ STALL_TIMEOUT_S = 120.0
 HTTP_TIMEOUT_S = 5.0
 TRANSFER_TIMEOUT_S = 60.0
 COPY_CHUNK_BYTES = 1024 * 1024
+FINGERPRINT_SAMPLE_BYTES = 64 * 1024
 
 
 class SyncError(Exception):
@@ -62,13 +64,21 @@ class _Session:
 _opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 _lock = threading.Lock()
 _session: Optional[_Session] = None
+_fingerprint_lock = threading.Lock()
+_fingerprints: dict[tuple[str, int, int], str] = {}
 
 
 def _peer_url(session: _Session, path: str) -> str:
     return f"http://{session.peer.host}:{session.port}{path}"
 
 
-def _request_json(session: _Session, method: str, path: str, payload: Optional[dict] = None) -> Any:
+def _request_json(
+    session: _Session,
+    method: str,
+    path: str,
+    payload: Optional[dict] = None,
+    timeout: float = HTTP_TIMEOUT_S,
+) -> Any:
     data = json.dumps(payload).encode("utf-8") if payload is not None else None
     request = urllib.request.Request(
         _peer_url(session, path),
@@ -77,7 +87,7 @@ def _request_json(session: _Session, method: str, path: str, payload: Optional[d
         headers={"Content-Type": "application/json"} if data is not None else {},
     )
     try:
-        with _opener.open(request, timeout=HTTP_TIMEOUT_S) as response:
+        with _opener.open(request, timeout=timeout) as response:
             body = response.read()
     except urllib.error.HTTPError as exc:
         try:
@@ -255,11 +265,44 @@ def dismiss() -> None:
         _session = None
 
 
+def _id3_tag_length(header: bytes) -> int:
+    if len(header) < 10 or header[:3] != b"ID3":
+        return 0
+    size = (header[6] & 0x7F) << 21 | (header[7] & 0x7F) << 14 | (header[8] & 0x7F) << 7 | (header[9] & 0x7F)
+    footer = 10 if header[5] & 0x10 else 0
+    return 10 + size + footer
+
+
+def _fingerprint(path: Path) -> Optional[str]:
+    try:
+        stats = path.stat()
+        key = (path.name, stats.st_size, stats.st_mtime_ns)
+        with _fingerprint_lock:
+            cached = _fingerprints.get(key)
+        if cached is not None:
+            return cached
+
+        digest = hashlib.sha1(str(stats.st_size).encode("ascii"))
+        with open(path, "rb") as handle:
+            head_length = _id3_tag_length(handle.read(10)) + FINGERPRINT_SAMPLE_BYTES
+            handle.seek(0)
+            digest.update(handle.read(head_length))
+            handle.seek(max(head_length, stats.st_size - FINGERPRINT_SAMPLE_BYTES))
+            digest.update(handle.read())
+    except OSError:
+        return None
+
+    fingerprint = digest.hexdigest()
+    with _fingerprint_lock:
+        _fingerprints[key] = fingerprint
+    return fingerprint
+
+
 def manifest(session_id: str) -> list[SyncManifestEntry]:
     with _lock:
         _require(session_id, ACTIVE_STATUSES)
     return [
-        SyncManifestEntry(filename=path.name, size=path.stat().st_size)
+        SyncManifestEntry(filename=path.name, size=path.stat().st_size, fingerprint=_fingerprint(path))
         for path in list_mp3_filepaths()
     ]
 
@@ -297,16 +340,16 @@ def _report(session: _Session) -> bool:
     return True
 
 
-def _download(session: _Session, filename: str) -> bool:
+def _download(session: _Session, filename: str, overwrite: bool) -> bool:
     destination = OUTPUT_DIR / filename
-    if destination.exists():
+    if destination.exists() and not overwrite:
         return True
     partial = OUTPUT_DIR / f".{filename}.part"
     url = _peer_url(session, f"/mp3s/{urllib.parse.quote(filename)}")
     try:
         with _opener.open(url, timeout=TRANSFER_TIMEOUT_S) as response, open(partial, "wb") as handle:
             shutil.copyfileobj(response, handle, COPY_CHUNK_BYTES)
-        if destination.exists():
+        if destination.exists() and not overwrite:
             partial.unlink(missing_ok=True)
         else:
             os.replace(partial, destination)
@@ -316,30 +359,51 @@ def _download(session: _Session, filename: str) -> bool:
         return False
 
 
+def _differs(local_path: Path, entry: dict) -> bool:
+    try:
+        if local_path.stat().st_size != entry.get("size"):
+            return True
+    except OSError:
+        return False
+    remote_fingerprint = entry.get("fingerprint")
+    return remote_fingerprint is not None and remote_fingerprint != _fingerprint(local_path)
+
+
 def _pull_worker(session: _Session) -> None:
     try:
-        entries = _request_json(session, "GET", f"/sync/manifest?session_id={session.id}")
+        entries = _request_json(
+            session,
+            "GET",
+            f"/sync/manifest?session_id={session.id}",
+            timeout=TRANSFER_TIMEOUT_S,
+        )
     except SyncError as exc:
         _fail(session, exc.detail)
         return
 
-    local_names = {path.name for path in list_mp3_filepaths()}
-    missing = [
-        entry["filename"]
-        for entry in entries or []
-        if isinstance(entry, dict) and _is_safe_filename(entry.get("filename")) and entry["filename"] not in local_names
-    ]
+    local_paths = {path.name: path for path in list_mp3_filepaths()}
+    overwrite_conflicts = session.direction == "outgoing"
+    pulls: list[tuple[str, bool]] = []
+    for entry in entries or []:
+        if not isinstance(entry, dict) or not _is_safe_filename(entry.get("filename")):
+            continue
+        filename = entry["filename"]
+        local_path = local_paths.get(filename)
+        if local_path is None:
+            pulls.append((filename, False))
+        elif overwrite_conflicts and _differs(local_path, entry):
+            pulls.append((filename, True))
 
     with _lock:
-        session.local.total = len(missing)
+        session.local.total = len(pulls)
     if not _report(session):
         return
 
     try:
-        for filename in missing:
+        for filename, overwrite in pulls:
             if not _still_syncing(session):
                 return
-            succeeded = _download(session, filename)
+            succeeded = _download(session, filename, overwrite)
             with _lock:
                 if succeeded:
                     session.local.done += 1
@@ -348,7 +412,7 @@ def _pull_worker(session: _Session) -> None:
             if not _report(session):
                 return
     finally:
-        if missing:
+        if pulls:
             invalidate_library_cache()
 
     with _lock:
