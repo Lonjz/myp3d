@@ -1,9 +1,9 @@
 import { useState, useEffect, useEffectEvent, useMemo, useRef } from 'react';
 import type { CSSProperties } from 'react';
-import { ArrowRight, Download, MonitorPlay, Search } from 'lucide-react';
+import { ArrowRight, Download, ListPlus, MonitorPlay, Search } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { mp3Api } from '../api/mp3Api';
-import type { YouTubeSearchResult } from '../api/mp3Api';
+import type { DownloadRequest, YouTubeSearchResult } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
 import { DownloadConfigSection } from '../components/download/DownloadConfigSection';
 import { TrimRangeSection } from '../components/download/TrimRangeSection';
@@ -124,6 +124,7 @@ export function QueryPage() {
     album,
     setAlbum,
     loading: downloading,
+    submitting,
     coverImageBase64,
     coverPreview,
     handleCoverFileSelect,
@@ -131,10 +132,11 @@ export function QueryPage() {
     cropModalProps,
     overwriteDialogProps,
     submitDownload,
+    queueDownload,
   } = useDownloadForm({
     zoomInputId: 'queryCropZoom',
     initialValues: initialDraft.form,
-    onDownloaded: () => {
+    onSubmitted: () => {
       resetTiming(null);
       setSelectedResult(null);
       setSelectedVideoId('');
@@ -421,15 +423,14 @@ export function QueryPage() {
     applySearchParams(searchParams);
   }, [searchParams]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const prepareSubmit = (): Partial<DownloadRequest> | null => {
     if (!url.trim()) {
       showError('Please select a YouTube video or enter a URL');
-      return;
+      return null;
     }
     if (hasDuration && !hasTrimRange) {
       showError('Trim end must be after start');
-      return;
+      return null;
     }
 
     if (playerRef.current) {
@@ -438,10 +439,21 @@ export function QueryPage() {
     stopMonitor();
     setIsSamplePlaying(false);
 
-    await submitDownload({
+    return {
       start_time: shouldTrim ? trimStart : undefined,
       end_time: shouldTrim ? trimEnd : undefined,
-    });
+    };
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const extra = prepareSubmit();
+    if (extra) await submitDownload(extra);
+  };
+
+  const handleQueue = async () => {
+    const extra = prepareSubmit();
+    if (extra) await queueDownload(extra);
   };
 
   const handleToggleSample = () => {
@@ -576,10 +588,18 @@ export function QueryPage() {
               onCoverClear={handleRemoveCover}
               disabled={downloading}
               action={(
-                <button type="submit" disabled={downloading} className="btn-primary">
-                  {downloading ? <Spinner inline /> : <Download aria-hidden="true" />}
-                  Download
-                </button>
+                <>
+                  <button type="submit" disabled={downloading} className="btn-primary">
+                    {submitting === 'download' ? <Spinner inline /> : <Download aria-hidden="true" />}
+                    Download
+                  </button>
+                  <IconButton
+                    icon={ListPlus}
+                    label="Add to queue"
+                    onClick={() => void handleQueue()}
+                    disabled={downloading}
+                  />
+                </>
               )}
             />
 

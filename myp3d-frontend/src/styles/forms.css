@@ -231,6 +231,10 @@
   padding-inline: var(--space-6);
 }
 
+.download-url-row .icon-btn {
+  --icon-btn-size: var(--download-row);
+}
+
 .trim-range-shell {
   display: flex;
   flex-direction: column;
