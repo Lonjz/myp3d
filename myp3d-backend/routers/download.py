@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 
 from models.schemas import DownloadRequest, DownloadResponse
-from services.mp3_service import download_as_mp3
+from services.mp3_service import download_as_mp3, validate_trim_range
 
 router = APIRouter(tags=["Download"])
 
@@ -10,13 +10,7 @@ router = APIRouter(tags=["Download"])
 def download_mp3(request: DownloadRequest):
     """Download a YouTube video as MP3 at 320kbps."""
     try:
-        if (request.start_time is None) ^ (request.end_time is None):
-            raise ValueError("Both start and end times are required for trimming")
-        if request.start_time is not None:
-            if request.start_time < 0:
-                raise ValueError("Trim start must be 0 or greater")
-            if request.end_time is None or request.end_time <= request.start_time:
-                raise ValueError("Trim end must be greater than start")
+        validate_trim_range(request.start_time, request.end_time)
 
         metadata = {
             "title": request.title,

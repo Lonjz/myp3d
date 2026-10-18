@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from io import BytesIO
-from typing import Literal, Optional
+from typing import Callable, Literal, Optional
 
 import eyed3
 from eyed3.id3 import frames as id3_frames
@@ -424,6 +424,10 @@ def make_square_cover(image_data: bytes) -> tuple[bytes, str]:
         raise ValueError("Uploaded cover is not a valid image") from exc
 
 
+def square_cover_from_base64(image_base64: str) -> tuple[bytes, str]:
+    return make_square_cover(_decode_base64_image(image_base64))
+
+
 def set_cover_images(tag: eyed3.id3.tag.Tag, image_data: bytes, mime_type: str) -> None:
     """Write cover art using a single APIC frame shaped like common iTunes files."""
     # Clear all existing APIC frames so stale descriptors/types do not confuse players.
@@ -468,16 +472,27 @@ def _download_lock(key: str) -> threading.Lock:
         return lock
 
 
+def validate_trim_range(start_time: Optional[float], end_time: Optional[float]) -> None:
+    if (start_time is None) ^ (end_time is None):
+        raise ValueError("Both start and end times are required for trimming")
+    if start_time is not None:
+        if start_time < 0:
+            raise ValueError("Trim start must be 0 or greater")
+        if end_time is None or end_time <= start_time:
+            raise ValueError("Trim end must be greater than start")
+
+
 def download_as_mp3(
     url: str,
     metadata: Optional[dict] = None,
     custom_name: Optional[str] = None,
     start_time: Optional[float] = None,
     end_time: Optional[float] = None,
+    progress_hook: Optional[Callable[[dict], None]] = None,
 ) -> str:
     lock_key = custom_name.strip().lower() if custom_name and custom_name.strip() else url
     with _download_lock(lock_key):
-        return _download_as_mp3(url, metadata, custom_name, start_time, end_time)
+        return _download_as_mp3(url, metadata, custom_name, start_time, end_time, progress_hook)
 
 
 def _download_as_mp3(
@@ -486,6 +501,7 @@ def _download_as_mp3(
     custom_name: Optional[str] = None,
     start_time: Optional[float] = None,
     end_time: Optional[float] = None,
+    progress_hook: Optional[Callable[[dict], None]] = None,
 ) -> str:
     """Download YouTube video as MP3, optionally using yt-dlp download sections."""
     ffmpeg_path = get_ffmpeg_path()
@@ -524,6 +540,9 @@ def _download_as_mp3(
     if ffmpeg_path:
         ydl_opts["ffmpeg_location"] = ffmpeg_path
 
+    if progress_hook:
+        ydl_opts["progress_hooks"] = [progress_hook]
+
     try:
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
@@ -553,9 +572,10 @@ def _download_as_mp3(
         if metadata.get("album"):
             audio.tag.album = metadata["album"]
         if metadata.get("cover_image_base64"):
-            cover_image_data = _decode_base64_image(metadata["cover_image_base64"])
-            processed_cover, mime_type = make_square_cover(cover_image_data)
+            processed_cover, mime_type = square_cover_from_base64(metadata["cover_image_base64"])
             set_cover_images(audio.tag, processed_cover, mime_type)
+        elif metadata.get("cover_image"):
+            set_cover_images(audio.tag, metadata["cover_image"], "image/jpeg")
         audio.tag.save(version=(2, 3, 0))
 
     invalidate_library_cache()
