@@ -12,11 +12,12 @@ import {
   Radio,
   X,
 } from 'lucide-react';
-import type { SyncProgress, SyncSession } from '../api/syncApi';
+import type { SyncSession } from '../api/syncApi';
 import { useSyncSession } from '../components/sync/useSyncSession';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
+import { ProgressRow } from '../components/ui/ProgressRow';
 import { Spinner } from '../components/ui/Spinner';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { usePersistentState } from '../hooks/usePersistentState';
@@ -29,28 +30,6 @@ const parsePort = (value: string) => {
   const port = Number(value);
   return Number.isInteger(port) && port >= MIN_PORT && port <= MAX_PORT ? port : null;
 };
-
-function ProgressRow({ icon: Icon, label, progress }: { icon: typeof ArrowDown; label: string; progress: SyncProgress }) {
-  const ratio = progress.total > 0 ? progress.done / progress.total : progress.finished ? 1 : 0;
-  return (
-    <div className="sync-progress" title={label}>
-      <Icon className="sync-progress__icon" aria-hidden="true" />
-      <div
-        className="sync-meter"
-        role="progressbar"
-        aria-label={label}
-        aria-valuemin={0}
-        aria-valuemax={progress.total}
-        aria-valuenow={progress.done}
-      >
-        <span style={{ width: `${Math.min(1, ratio) * 100}%` }} />
-      </div>
-      <span className="sync-progress__count">
-        {progress.done} / {progress.total}
-      </span>
-    </div>
-  );
-}
 
 function SessionPanel({
   session,
