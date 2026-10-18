@@ -13,7 +13,7 @@ from typing import Literal, Optional
 from models.schemas import BulkFailure, MP3Info, MusicDiff, MusicPair, MusicSyncInfo, MusicTrack
 from services.audio_fingerprint import audio_fingerprint, cover_hash, covers_match
 from services.config import BASE_DIR, OUTPUT_DIR
-from services.mp3_service import get_album_cover, list_mp3_infos, make_square_cover
+from services.mp3_service import get_album_cover, list_mp3_infos, make_square_cover, safe_path_part
 
 SyncStatusName = Literal["syncing", "done", "failed"]
 ChangeName = Literal["title", "artist", "album", "art"]
@@ -26,8 +26,6 @@ FIELD_SEP = "\x1f"
 RECORD_SEP = "\x1e"
 GROUP_SEP = "\x1d"
 NOT_AUTHORIZED_CODE = "-1743"
-UNSAFE_CHARS = set('/:\\*?"<>|')
-MAX_PART_LENGTH = 120
 
 
 class MusicError(Exception):
@@ -304,16 +302,10 @@ def diff(folder: str) -> MusicDiff:
     )
 
 
-def _safe_part(value: Optional[str], fallback: str) -> str:
-    cleaned = "".join("_" if char in UNSAFE_CHARS or ord(char) < 32 else char for char in value or "")
-    cleaned = cleaned.strip().strip(".").strip()[:MAX_PART_LENGTH].strip()
-    return cleaned or fallback
-
-
 def _copy_into(root: Path, source: Path, track: MP3Info) -> Path:
-    directory = root / _safe_part(track.artist, "Unknown Artist") / _safe_part(track.album, "Unknown Album")
+    directory = root / safe_path_part(track.artist, "Unknown Artist") / safe_path_part(track.album, "Unknown Album")
     directory.mkdir(parents=True, exist_ok=True)
-    stem = _safe_part(track.title, _safe_part(source.stem, "Unknown"))
+    stem = safe_path_part(track.title, safe_path_part(source.stem, "Unknown"))
     suffix = 0
     while True:
         target = directory / (f"{stem}.mp3" if suffix == 0 else f"{stem} {suffix}.mp3")

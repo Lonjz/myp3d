@@ -23,6 +23,8 @@ from services.config import OUTPUT_DIR, get_cookies_from_browser, get_ffmpeg_pat
 CACHE_TTL_SECONDS = 120.0
 COVER_SIZE = (500, 500)
 NO_ALBUM_LABEL = "(No Album)"
+UNSAFE_PATH_CHARS = set('/:\\*?"<>|')
+MAX_PATH_PART_LENGTH = 120
 
 
 @dataclass
@@ -84,6 +86,12 @@ def _normalize_album_value(album_name: Optional[str]) -> str:
 
 def _album_key(normalized_album: str) -> str:
     return hashlib.sha1(normalized_album.encode("utf-8")).hexdigest()
+
+
+def safe_path_part(value: Optional[str], fallback: str) -> str:
+    cleaned = "".join("_" if char in UNSAFE_PATH_CHARS or ord(char) < 32 else char for char in value or "")
+    cleaned = cleaned.strip().strip(".").strip()[:MAX_PATH_PART_LENGTH].strip()
+    return cleaned or fallback
 
 
 def make_album_key(album_name: Optional[str]) -> str:
