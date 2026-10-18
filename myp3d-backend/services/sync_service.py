@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Literal, Optional
 
 from models.schemas import SyncManifestEntry, SyncPeer, SyncProgress, SyncSessionInfo
+from services.audio_fingerprint import id3_tag_length
 from services.config import API_PORT, OUTPUT_DIR
 from services.device_service import get_device
 from services.discovery_service import discovery
@@ -265,14 +266,6 @@ def dismiss() -> None:
         _session = None
 
 
-def _id3_tag_length(header: bytes) -> int:
-    if len(header) < 10 or header[:3] != b"ID3":
-        return 0
-    size = (header[6] & 0x7F) << 21 | (header[7] & 0x7F) << 14 | (header[8] & 0x7F) << 7 | (header[9] & 0x7F)
-    footer = 10 if header[5] & 0x10 else 0
-    return 10 + size + footer
-
-
 def _fingerprint(path: Path) -> Optional[str]:
     try:
         stats = path.stat()
@@ -284,7 +277,7 @@ def _fingerprint(path: Path) -> Optional[str]:
 
         digest = hashlib.sha1(str(stats.st_size).encode("ascii"))
         with open(path, "rb") as handle:
-            head_length = _id3_tag_length(handle.read(10)) + FINGERPRINT_SAMPLE_BYTES
+            head_length = id3_tag_length(handle.read(10)) + FINGERPRINT_SAMPLE_BYTES
             handle.seek(0)
             digest.update(handle.read(head_length))
             handle.seek(max(head_length, stats.st_size - FINGERPRINT_SAMPLE_BYTES))

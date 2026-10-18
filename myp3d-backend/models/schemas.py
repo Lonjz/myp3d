@@ -222,3 +222,45 @@ class SyncManifestEntry(BaseModel):
     filename: str
     size: int
     fingerprint: Optional[str] = None
+
+
+class MusicStatus(BaseModel):
+    available: bool
+    detected_folder: Optional[str] = None
+
+
+class MusicFolderRequest(BaseModel):
+    folder: str = Field(min_length=1)
+
+
+class MusicTrack(BaseModel):
+    persistent_id: str
+    name: str
+    artist: Optional[str] = None
+    album: Optional[str] = None
+
+
+class MusicPair(BaseModel):
+    track: MP3Info
+    music: MusicTrack
+    changes: list[Literal["title", "artist", "album", "art"]] = Field(default_factory=list)
+
+
+class MusicDiff(BaseModel):
+    only_in_music: list[MusicTrack]
+    both: list[MusicPair]
+    only_in_library: list[MP3Info]
+
+
+class MusicSyncRequest(BulkTracksRequest):
+    folder: str = Field(min_length=1)
+
+
+class MusicSyncInfo(BaseModel):
+    status: Literal["syncing", "done", "failed"]
+    total: int = 0
+    added: int = 0
+    updated: int = 0
+    failed: list[BulkFailure] = Field(default_factory=list)
+    without_art: list[str] = Field(default_factory=list)
+    error: Optional[str] = None
