@@ -5,7 +5,7 @@ import {
   CircleAlert,
   CircleCheck,
   DiscAlbum,
-  FolderOpen,
+  Folder,
   Image as ImageIcon,
   ImageOff,
   MicVocal,
@@ -293,7 +293,7 @@ export function MusicPage() {
     <div className="page page--fill sync-page music-page">
       <div className="sync-toolbar glass">
         <IconField
-          icon={FolderOpen}
+          icon={Folder}
           label="Apple Music folder"
           className={`music-folder ${folderMissing ? 'is-invalid' : ''}`.trim()}
           value={folder}
