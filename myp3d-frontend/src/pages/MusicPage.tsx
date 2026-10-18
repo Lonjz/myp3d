@@ -227,7 +227,7 @@ export function MusicPage() {
 
   if (available === null) {
     return (
-      <div className="page sync-page">
+      <div className="page sync-page music-page">
         <div className="sync-empty glass">
           <Spinner />
         </div>
@@ -237,7 +237,7 @@ export function MusicPage() {
 
   if (!available) {
     return (
-      <div className="page sync-page">
+      <div className="page sync-page music-page">
         <div className="sync-empty glass">
           <span className="sync-radar" aria-hidden="true">
             <Command />
