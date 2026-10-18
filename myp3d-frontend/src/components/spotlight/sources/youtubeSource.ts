@@ -1,4 +1,5 @@
 import { Link2, MonitorPlay, Search } from 'lucide-react';
+import { hasSpotifyLink } from '../../../utils/spotify';
 import { getVideoIdFromUrl, getYouTubeThumbnailUrl, isYouTubeUrl } from '../../../utils/youtube';
 import type { InstantSpotlightSource } from '../spotlightTypes';
 
@@ -6,7 +7,7 @@ export const youtubeSource: InstantSpotlightSource = {
   id: 'youtube',
   search: (query) => {
     const value = query.trim();
-    if (!value) return [];
+    if (!value || hasSpotifyLink(value)) return [];
 
     if (isYouTubeUrl(value)) {
       const thumbnail = getYouTubeThumbnailUrl(getVideoIdFromUrl(value));

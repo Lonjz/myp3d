@@ -1,6 +1,6 @@
 import { ArrowLeftRight, DiscAlbum, Download, LayoutDashboard, ListMusic, MonitorPlay } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { AppleMusicIcon } from '../ui/BrandIcons';
+import { AppleMusicIcon, SpotifyIcon } from '../ui/BrandIcons';
 
 export interface NavItem {
   to: string;
@@ -24,6 +24,13 @@ export const NAV_ITEMS: NavItem[] = [
     icon: MonitorPlay,
     keywords: ['youtube', 'download'],
     isActive: (pathname) => pathname === '/query',
+  },
+  {
+    to: '/spotify',
+    label: 'Spotify',
+    icon: SpotifyIcon,
+    keywords: ['playlist', 'album', 'import', 'match'],
+    isActive: (pathname) => pathname === '/spotify',
   },
   {
     to: '/downloads',

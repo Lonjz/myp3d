@@ -25,6 +25,7 @@ export interface QueueItem {
 
 export interface QueueItemCreate extends DownloadRequest {
   overwrite?: boolean;
+  cover_url?: string;
 }
 
 export interface QueueItemUpdate {

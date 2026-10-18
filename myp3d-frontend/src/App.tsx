@@ -10,6 +10,7 @@ import { AlbumEditPage } from './pages/AlbumEditPage';
 import { SyncPage } from './pages/SyncPage';
 import { MusicPage } from './pages/MusicPage';
 import { DownloadsPage } from './pages/DownloadsPage';
+import { SpotifyPage } from './pages/SpotifyPage';
 import { ToastProvider } from './components/messages/ToastProvider';
 import { DownloadQueueProvider } from './components/downloads/DownloadQueueProvider';
 import { useDownloadQueue } from './components/downloads/downloadQueueContext';
@@ -67,6 +68,7 @@ function AlbumEditRoute() {
 const KEEP_ALIVE_PAGES: KeepAlivePage[] = [
   { path: '/dashboard', element: <DashboardPage /> },
   { path: '/query', element: <QueryPage /> },
+  { path: '/spotify', element: <SpotifyPage /> },
   { path: '/downloads', element: <DownloadsPage /> },
   { path: '/library', element: <LibraryPage /> },
   { path: '/albums', element: <AlbumsPage /> },
@@ -74,7 +76,7 @@ const KEEP_ALIVE_PAGES: KeepAlivePage[] = [
   { path: '/music', element: <MusicPage /> },
 ];
 
-const FILL_PATHS = new Set(['/library', '/albums', '/music', '/downloads']);
+const FILL_PATHS = new Set(['/library', '/albums', '/music', '/downloads', '/spotify']);
 
 function SidebarSearchButton() {
   const { open } = useSpotlight();
