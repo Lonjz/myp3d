@@ -41,3 +41,7 @@ export function formatDuration(value: number | null | undefined): string {
   }
   return `${minutes}:${secondsLabel}`;
 }
+
+export function formatTrackSubtitle(artist: string | null, album: string | null): string {
+  return [artist, album].filter(Boolean).join(' · ');
+}
