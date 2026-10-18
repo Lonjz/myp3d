@@ -11,6 +11,7 @@ import { SyncPage } from './pages/SyncPage';
 import { MusicPage } from './pages/MusicPage';
 import { DownloadsPage } from './pages/DownloadsPage';
 import { SpotifyPage } from './pages/SpotifyPage';
+import { ExportPage } from './pages/ExportPage';
 import { ToastProvider } from './components/messages/ToastProvider';
 import { DownloadQueueProvider } from './components/downloads/DownloadQueueProvider';
 import { useDownloadQueue } from './components/downloads/downloadQueueContext';
@@ -72,6 +73,7 @@ const KEEP_ALIVE_PAGES: KeepAlivePage[] = [
   { path: '/downloads', element: <DownloadsPage /> },
   { path: '/library', element: <LibraryPage /> },
   { path: '/albums', element: <AlbumsPage /> },
+  { path: '/export', element: <ExportPage /> },
   { path: '/sync', element: <SyncPage /> },
   { path: '/music', element: <MusicPage /> },
 ];

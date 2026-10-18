@@ -1,0 +1,61 @@
+.export-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.export-tile.glass {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-5);
+  min-height: 280px;
+  padding: var(--space-7) var(--space-5);
+  border-radius: var(--radius-xl);
+  animation: panel-rise 460ms var(--ease-spring) backwards;
+}
+
+.export-tile:nth-child(2) {
+  animation-delay: 60ms;
+}
+
+.export-tile__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--color-lavender) 16%, transparent);
+  color: var(--color-lavender);
+}
+
+.export-tile__icon svg {
+  width: 32px;
+  height: 32px;
+}
+
+.export-tile__download {
+  min-height: 2.75rem;
+  padding-inline: var(--space-6);
+}
+
+.export-tile__download[aria-disabled='true'] {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .export-tiles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .export-tile {
+    animation: none;
+  }
+}

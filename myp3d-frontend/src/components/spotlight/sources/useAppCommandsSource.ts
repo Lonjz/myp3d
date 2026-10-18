@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { DatabaseZap } from 'lucide-react';
+import { DatabaseZap, DiscAlbum, Music } from 'lucide-react';
+import { exportApi } from '../../../api/exportApi';
 import { mp3Api } from '../../../api/mp3Api';
 import { emitAppEvent } from '../../../utils/appEvents';
 import { useToast } from '../../messages/toastContext';
@@ -27,6 +28,20 @@ export function useAppCommandsSource(): InstantSpotlightSource {
             emitAppEvent('library-changed');
             showSuccess('Cache cleared');
           },
+        },
+        {
+          id: 'export-tracks',
+          title: 'Export all tracks',
+          icon: Music,
+          keywords: ['zip', 'backup', 'download', 'archive'],
+          run: () => exportApi.start(exportApi.tracksUrl()),
+        },
+        {
+          id: 'export-album-art',
+          title: 'Export album art',
+          icon: DiscAlbum,
+          keywords: ['zip', 'covers', 'images', 'artwork', 'archive'],
+          run: () => exportApi.start(exportApi.albumArtUrl()),
         },
       ]),
     [showError, showSuccess],

@@ -1,4 +1,4 @@
-import { ArrowLeftRight, DiscAlbum, Download, LayoutDashboard, ListMusic, MonitorPlay } from 'lucide-react';
+import { ArrowLeftRight, DiscAlbum, Download, FolderOpen, LayoutDashboard, ListMusic, MonitorPlay } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { AppleMusicIcon, SpotifyIcon } from '../ui/BrandIcons';
 
@@ -52,6 +52,13 @@ export const NAV_ITEMS: NavItem[] = [
     icon: DiscAlbum,
     keywords: ['records'],
     isActive: (pathname) => pathname === '/albums' || pathname.startsWith('/albums/'),
+  },
+  {
+    to: '/export',
+    label: 'Export',
+    icon: FolderOpen,
+    keywords: ['zip', 'backup', 'archive', 'covers'],
+    isActive: (pathname) => pathname === '/export',
   },
   {
     to: '/sync',
