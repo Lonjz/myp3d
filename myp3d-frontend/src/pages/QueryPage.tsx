@@ -116,6 +116,7 @@ export function QueryPage() {
     setUrl,
     customFilename,
     setCustomFilename,
+    filenameStatus,
     title,
     setTitle,
     artist,
@@ -563,6 +564,7 @@ export function QueryPage() {
               onUrlChange={applyUrl}
               customFilename={customFilename}
               onCustomFilenameChange={setCustomFilename}
+              filenameStatus={filenameStatus}
               title={title}
               onTitleChange={setTitle}
               artist={artist}

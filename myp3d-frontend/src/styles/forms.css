@@ -62,6 +62,34 @@
   opacity: 0.55;
 }
 
+.icon-field.is-taken {
+  border-color: color-mix(in srgb, var(--color-danger) 60%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-danger) 14%, transparent);
+}
+
+.filename-status {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.filename-status svg {
+  width: 18px;
+  height: 18px;
+}
+
+.filename-status--checking svg {
+  animation: spin 0.9s linear infinite;
+}
+
+.filename-status--available {
+  color: var(--color-success);
+}
+
+.filename-status--taken {
+  color: var(--color-danger);
+}
+
 .input-help {
   color: var(--color-text-muted);
   font-size: var(--text-sm);

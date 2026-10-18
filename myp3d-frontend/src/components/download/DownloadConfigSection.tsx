@@ -1,8 +1,26 @@
 import type { ReactNode } from 'react';
-import { DiscAlbum, FileAudio, Link, MicVocal, Type } from 'lucide-react';
+import { CircleAlert, CircleCheck, DiscAlbum, FileAudio, Link, LoaderCircle, MicVocal, Type } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { CoverUploadSquare } from '../cover/CoverUploadSquare';
 import { IconField } from '../ui/IconField';
+import type { FilenameStatus } from '../../hooks/useDownloadForm';
 import { normalizeFilenameInput } from '../../utils/filenames';
+
+const FILENAME_STATUS: Record<Exclude<FilenameStatus, null>, { icon: LucideIcon; label: string }> = {
+  checking: { icon: LoaderCircle, label: 'Checking file name' },
+  available: { icon: CircleCheck, label: 'File name available' },
+  taken: { icon: CircleAlert, label: 'File name taken' },
+};
+
+function FilenameStatusIcon({ status }: { status: FilenameStatus }) {
+  if (!status) return null;
+  const { icon: Icon, label } = FILENAME_STATUS[status];
+  return (
+    <span className={`filename-status filename-status--${status}`} role="status" aria-label={label} title={label}>
+      <Icon aria-hidden="true" />
+    </span>
+  );
+}
 
 interface DownloadConfigSectionProps {
   idPrefix?: string;
@@ -11,6 +29,7 @@ interface DownloadConfigSectionProps {
   onUrlChange: (value: string) => void;
   customFilename: string;
   onCustomFilenameChange: (value: string) => void;
+  filenameStatus?: FilenameStatus;
   title: string;
   onTitleChange: (value: string) => void;
   artist: string;
@@ -30,6 +49,7 @@ export function DownloadConfigSection({
   onUrlChange,
   customFilename,
   onCustomFilenameChange,
+  filenameStatus = null,
   title,
   onTitleChange,
   artist,
@@ -88,9 +108,12 @@ export function DownloadConfigSection({
       <IconField
         icon={FileAudio}
         label="File name"
+        className={filenameStatus === 'taken' ? 'is-taken' : undefined}
         value={customFilename}
         onChange={(event) => onCustomFilenameChange(normalizeFilenameInput(event.target.value))}
+        aria-invalid={filenameStatus === 'taken'}
         disabled={disabled}
+        trailing={<FilenameStatusIcon status={filenameStatus} />}
       />
     </div>
   );

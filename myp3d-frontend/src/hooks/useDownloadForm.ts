@@ -1,10 +1,21 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pencil, TriangleAlert, Undo2 } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { DownloadRequest } from '../api/mp3Api';
 import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
 import { useToast } from '../components/messages/ToastProvider';
-import { emitAppEvent } from '../utils/appEvents';
+import { emitAppEvent, subscribeAppEvent } from '../utils/appEvents';
+import { useDebouncedValue } from './useDebouncedValue';
+
+const FILENAME_CHECK_DELAY_MS = 300;
+
+export type FilenameStatus = 'checking' | 'available' | 'taken' | null;
+
+const filenameExists = (name: string) =>
+  mp3Api.getInfo(`${name}.mp3`).then(
+    () => true,
+    () => false,
+  );
 
 export interface DownloadFormValues {
   url: string;
@@ -30,7 +41,33 @@ export function useDownloadForm({ zoomInputId, onDownloaded, initialValues }: Us
   const [loading, setLoading] = useState(false);
   const [overwriteTarget, setOverwriteTarget] = useState<string | null>(null);
   const overwriteResolverRef = useRef<((confirmed: boolean) => void) | null>(null);
+  const [filenameCheck, setFilenameCheck] = useState<{ name: string; version: number; taken: boolean } | null>(null);
+  const [libraryVersion, setLibraryVersion] = useState(0);
   const { showSuccess, showError, clearToast } = useToast();
+
+  const requestedFilename = customFilename.trim().toLowerCase();
+  const debouncedFilename = useDebouncedValue(requestedFilename, FILENAME_CHECK_DELAY_MS);
+
+  useEffect(() => subscribeAppEvent('library-changed', () => setLibraryVersion((version) => version + 1)), []);
+
+  useEffect(() => {
+    if (!debouncedFilename) return undefined;
+    let cancelled = false;
+    void filenameExists(debouncedFilename).then((taken) => {
+      if (!cancelled) setFilenameCheck({ name: debouncedFilename, version: libraryVersion, taken });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedFilename, libraryVersion]);
+
+  const filenameStatus: FilenameStatus = !requestedFilename
+    ? null
+    : filenameCheck?.name === requestedFilename && filenameCheck.version === libraryVersion
+      ? filenameCheck.taken
+        ? 'taken'
+        : 'available'
+      : 'checking';
 
   const {
     coverImageBase64,
@@ -72,13 +109,9 @@ export function useDownloadForm({ zoomInputId, onDownloaded, initialValues }: Us
   };
 
   const submitDownload = async (extra?: Partial<DownloadRequest>): Promise<boolean> => {
-    const requestedName = customFilename.trim().toLowerCase();
-    if (requestedName) {
-      const exists = await mp3Api.getInfo(`${requestedName}.mp3`).then(
-        () => true,
-        () => false,
-      );
-      if (exists && !(await confirmOverwrite(`${requestedName}.mp3`))) {
+    if (requestedFilename) {
+      const exists = await filenameExists(requestedFilename);
+      if (exists && !(await confirmOverwrite(`${requestedFilename}.mp3`))) {
         return false;
       }
     }
@@ -89,7 +122,7 @@ export function useDownloadForm({ zoomInputId, onDownloaded, initialValues }: Us
     try {
       const request: DownloadRequest = {
         url: url.trim(),
-        custom_filename: requestedName || undefined,
+        custom_filename: requestedFilename || undefined,
         title: title.trim() || undefined,
         artist: artist.trim() || undefined,
         album: album.trim() || undefined,
@@ -144,6 +177,7 @@ export function useDownloadForm({ zoomInputId, onDownloaded, initialValues }: Us
     setUrl,
     customFilename,
     setCustomFilename,
+    filenameStatus,
     title,
     setTitle,
     artist,
