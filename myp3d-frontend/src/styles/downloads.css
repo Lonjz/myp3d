@@ -1,0 +1,166 @@
+.downloads-page {
+  width: 100%;
+}
+
+.downloads-run {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.downloads-list.glass {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: var(--space-2);
+  border-radius: var(--radius-xl);
+  animation: panel-rise 460ms var(--ease-spring) 60ms backwards;
+}
+
+.downloads-list .music-rows {
+  margin-top: 0;
+}
+
+.queue-row {
+  animation: row-rise 380ms var(--ease-standard) backwards;
+  animation-delay: calc(min(var(--row, 0), 14) * 40ms + 80ms);
+}
+
+.queue-row__thumb img {
+  opacity: 0.7;
+}
+
+.queue-row--failed .music-row__sub {
+  color: var(--color-danger-text);
+}
+
+.queue-row--done .music-row__title {
+  color: var(--color-text-secondary);
+}
+
+.queue-trim {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--color-lavender) 18%, transparent);
+  color: var(--color-lavender);
+}
+
+.queue-trim svg {
+  width: 14px;
+  height: 14px;
+}
+
+.queue-status {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  color: var(--color-text-muted);
+}
+
+.queue-status svg {
+  width: 18px;
+  height: 18px;
+}
+
+.queue-status--done {
+  color: var(--color-success);
+}
+
+.queue-status--failed {
+  color: var(--color-warning);
+}
+
+.queue-status__meter.sync-meter {
+  flex: none;
+  width: 6rem;
+}
+
+.queue-row__actions {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: var(--space-1);
+}
+
+.queue-dialog.glass {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: min(760px, 100%);
+  max-height: 100%;
+  padding: var(--space-5);
+  overflow-y: auto;
+  border-radius: var(--radius-xl);
+  background: var(--glass-sheen), var(--glass-tint-overlay);
+  -webkit-backdrop-filter: var(--glass-blur-heavy);
+  backdrop-filter: var(--glass-blur-heavy);
+  animation: confirm-panel-in 240ms var(--ease-spring) both;
+}
+
+.queue-dialog__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.queue-dialog__trim {
+  margin-right: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.queue-dialog__save {
+  min-height: 2.75rem;
+}
+
+.confirm-layer[data-state='closed'] .queue-dialog.glass {
+  animation: confirm-panel-out 180ms ease-in both;
+}
+
+.sidebar-link__activity {
+  position: absolute;
+  top: 0.55rem;
+  left: calc(var(--space-3) + 15px);
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, var(--color-rose), var(--color-lavender));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--color-rose) 70%, transparent);
+  animation: downloads-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes downloads-pulse {
+  50% {
+    opacity: 0.45;
+    transform: scale(0.8);
+  }
+}
+
+@media (max-width: 560px) {
+  .queue-trim {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .downloads-list,
+  .queue-row,
+  .sidebar-link__activity {
+    animation: none;
+  }
+
+  .queue-dialog.glass {
+    animation-name: confirm-fade-in;
+  }
+
+  .confirm-layer[data-state='closed'] .queue-dialog.glass {
+    animation-name: confirm-fade-out;
+  }
+}

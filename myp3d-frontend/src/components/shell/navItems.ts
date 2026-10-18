@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Command, DiscAlbum, LayoutDashboard, ListMusic, MonitorPlay } from 'lucide-react';
+import { ArrowLeftRight, Command, DiscAlbum, Download, LayoutDashboard, ListMusic, MonitorPlay } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export interface NavItem {
@@ -23,6 +23,13 @@ export const NAV_ITEMS: NavItem[] = [
     icon: MonitorPlay,
     keywords: ['youtube', 'download'],
     isActive: (pathname) => pathname === '/query',
+  },
+  {
+    to: '/downloads',
+    label: 'Downloads',
+    icon: Download,
+    keywords: ['queue', 'batch', 'pending'],
+    isActive: (pathname) => pathname === '/downloads',
   },
   {
     to: '/library',

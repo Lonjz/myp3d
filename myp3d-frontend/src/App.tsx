@@ -9,7 +9,10 @@ import { AlbumsPage } from './pages/AlbumsPage';
 import { AlbumEditPage } from './pages/AlbumEditPage';
 import { SyncPage } from './pages/SyncPage';
 import { MusicPage } from './pages/MusicPage';
+import { DownloadsPage } from './pages/DownloadsPage';
 import { ToastProvider } from './components/messages/ToastProvider';
+import { DownloadQueueProvider } from './components/downloads/DownloadQueueProvider';
+import { useDownloadQueue } from './components/downloads/downloadQueueContext';
 import { IconButton } from './components/ui/IconButton';
 import { AppBackdrop } from './components/shell/AppBackdrop';
 import { KeepAliveRoutes } from './components/shell/KeepAliveRoutes';
@@ -64,13 +67,14 @@ function AlbumEditRoute() {
 const KEEP_ALIVE_PAGES: KeepAlivePage[] = [
   { path: '/dashboard', element: <DashboardPage /> },
   { path: '/query', element: <QueryPage /> },
+  { path: '/downloads', element: <DownloadsPage /> },
   { path: '/library', element: <LibraryPage /> },
   { path: '/albums', element: <AlbumsPage /> },
   { path: '/sync', element: <SyncPage /> },
   { path: '/music', element: <MusicPage /> },
 ];
 
-const FILL_PATHS = new Set(['/library', '/albums', '/music']);
+const FILL_PATHS = new Set(['/library', '/albums', '/music', '/downloads']);
 
 function SidebarSearchButton() {
   const { open } = useSpotlight();
@@ -89,6 +93,12 @@ function SidebarSearchButton() {
       <kbd className="sidebar-search__kbd">{SPOTLIGHT_SHORTCUT_LABEL}</kbd>
     </button>
   );
+}
+
+function DownloadsActivity() {
+  const { active } = useDownloadQueue();
+  if (!active) return null;
+  return <span className="sidebar-link__activity" role="status" aria-label="Downloading" />;
 }
 
 function HeaderSearchButton() {
@@ -119,79 +129,82 @@ function App() {
     <ToastProvider>
       <SpotlightProvider>
         <PlayerProvider>
-          <AppBackdrop />
-          <div className="app-shell">
-            <aside
-              className={`sidebar glass ${isSidebarExpanded ? 'expanded' : 'collapsed'} ${
-                isMobileSidebarOpen ? 'mobile-open' : ''
-              }`}
-            >
-              <div className="sidebar-header">
-                <span className="sidebar-brand">
-                  <AudioLines aria-hidden="true" />
-                  <span>MYP3D</span>
-                </span>
-                <IconButton
-                  icon={ChevronLeft}
-                  label={isSidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
-                  variant="ghost"
-                  className="sidebar-collapse-btn"
-                  onClick={() => setIsSidebarExpanded((value) => !value)}
+          <DownloadQueueProvider>
+            <AppBackdrop />
+            <div className="app-shell">
+              <aside
+                className={`sidebar glass ${isSidebarExpanded ? 'expanded' : 'collapsed'} ${
+                  isMobileSidebarOpen ? 'mobile-open' : ''
+                }`}
+              >
+                <div className="sidebar-header">
+                  <span className="sidebar-brand">
+                    <AudioLines aria-hidden="true" />
+                    <span>MYP3D</span>
+                  </span>
+                  <IconButton
+                    icon={ChevronLeft}
+                    label={isSidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
+                    variant="ghost"
+                    className="sidebar-collapse-btn"
+                    onClick={() => setIsSidebarExpanded((value) => !value)}
+                  />
+                </div>
+
+                <SidebarSearchButton />
+
+                <nav className="sidebar-nav" aria-label="Primary navigation">
+                  {NAV_ITEMS.map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      className={() => (item.isActive(location.pathname) ? 'sidebar-link active' : 'sidebar-link')}
+                      title={item.label}
+                    >
+                      <item.icon aria-hidden="true" />
+                      <span className="sidebar-label">{item.label}</span>
+                      {item.to === '/downloads' && <DownloadsActivity />}
+                    </NavLink>
+                  ))}
+                </nav>
+              </aside>
+
+              {isMobileSidebarOpen && (
+                <button
+                  type="button"
+                  aria-label="Close navigation"
+                  className="sidebar-overlay"
+                  onClick={() => setIsMobileSidebarOpen(false)}
                 />
-              </div>
+              )}
 
-              <SidebarSearchButton />
+              <section className={isFillPage ? 'app-content app-content--fill' : 'app-content'}>
+                <header className="content-header glass">
+                  <IconButton
+                    icon={Menu}
+                    label="Open navigation"
+                    variant="ghost"
+                    onClick={() => setIsMobileSidebarOpen(true)}
+                  />
+                  <HeaderSearchButton />
+                </header>
 
-              <nav className="sidebar-nav" aria-label="Primary navigation">
-                {NAV_ITEMS.map((item) => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    className={() => (item.isActive(location.pathname) ? 'sidebar-link active' : 'sidebar-link')}
-                    title={item.label}
-                  >
-                    <item.icon aria-hidden="true" />
-                    <span className="sidebar-label">{item.label}</span>
-                  </NavLink>
-                ))}
-              </nav>
-            </aside>
+                <main className="content-main">
+                  <KeepAliveRoutes pages={KEEP_ALIVE_PAGES}>
+                    <Routes>
+                      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                      <Route path="/download" element={<Navigate to="/query" replace />} />
+                      <Route path="/details/:songName" element={<EditRoute />} />
+                      <Route path="/albums/:albumKey" element={<AlbumEditRoute />} />
+                      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                    </Routes>
+                  </KeepAliveRoutes>
+                </main>
 
-            {isMobileSidebarOpen && (
-              <button
-                type="button"
-                aria-label="Close navigation"
-                className="sidebar-overlay"
-                onClick={() => setIsMobileSidebarOpen(false)}
-              />
-            )}
-
-            <section className={isFillPage ? 'app-content app-content--fill' : 'app-content'}>
-              <header className="content-header glass">
-                <IconButton
-                  icon={Menu}
-                  label="Open navigation"
-                  variant="ghost"
-                  onClick={() => setIsMobileSidebarOpen(true)}
-                />
-                <HeaderSearchButton />
-              </header>
-
-              <main className="content-main">
-                <KeepAliveRoutes pages={KEEP_ALIVE_PAGES}>
-                  <Routes>
-                    <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                    <Route path="/download" element={<Navigate to="/query" replace />} />
-                    <Route path="/details/:songName" element={<EditRoute />} />
-                    <Route path="/albums/:albumKey" element={<AlbumEditRoute />} />
-                    <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                  </Routes>
-                </KeepAliveRoutes>
-              </main>
-
-              <PlayerBar />
-            </section>
-          </div>
+                <PlayerBar />
+              </section>
+            </div>
+          </DownloadQueueProvider>
         </PlayerProvider>
       </SpotlightProvider>
     </ToastProvider>
