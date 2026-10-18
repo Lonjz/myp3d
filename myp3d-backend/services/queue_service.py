@@ -1,5 +1,6 @@
 import sqlite3
 import threading
+import urllib.request
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -7,9 +8,10 @@ from typing import Iterator, Optional
 
 from models.schemas import QueueItem, QueueItemCreate, QueueItemUpdate
 from services.config import BASE_DIR, OUTPUT_DIR
-from services.mp3_service import download_as_mp3, square_cover_from_base64, validate_trim_range
+from services.mp3_service import download_as_mp3, make_square_cover, square_cover_from_base64, validate_trim_range
 
 DB_PATH = BASE_DIR / "myp3d.db"
+COVER_FETCH_TIMEOUT_S = 15
 EDITABLE_STATUSES = ("pending", "failed")
 
 SCHEMA = """
@@ -85,6 +87,17 @@ def _square_cover(image_base64: Optional[str]) -> Optional[bytes]:
     return square_cover_from_base64(image_base64)[0] if image_base64 else None
 
 
+def _remote_cover(url: str) -> Optional[bytes]:
+    if not url.startswith("https://"):
+        return None
+    request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    try:
+        with urllib.request.urlopen(request, timeout=COVER_FETCH_TIMEOUT_S) as response:
+            return make_square_cover(response.read())[0]
+    except (OSError, ValueError):
+        return None
+
+
 def _to_item(row: sqlite3.Row) -> QueueItem:
     data = dict(row)
     data["has_cover"] = bool(data["has_cover"])
@@ -117,11 +130,17 @@ def list_items() -> list[QueueItem]:
 
 def add_items(items: list[QueueItemCreate]) -> list[QueueItem]:
     prepared = []
+    remote_covers: dict[str, Optional[bytes]] = {}
     for item in items:
         url = _clean(item.url)
         if not url:
             raise ValueError("URL is required")
         validate_trim_range(item.start_time, item.end_time)
+        cover = _square_cover(item.cover_image_base64)
+        if cover is None and item.cover_url:
+            if item.cover_url not in remote_covers:
+                remote_covers[item.cover_url] = _remote_cover(item.cover_url)
+            cover = remote_covers[item.cover_url]
         prepared.append(
             (
                 url,
@@ -129,7 +148,7 @@ def add_items(items: list[QueueItemCreate]) -> list[QueueItem]:
                 _clean(item.title),
                 _clean(item.artist),
                 _clean(item.album),
-                _square_cover(item.cover_image_base64),
+                cover,
                 item.start_time,
                 item.end_time,
                 int(item.overwrite),
