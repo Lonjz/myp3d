@@ -4,7 +4,6 @@ import {
   Check,
   CircleAlert,
   CircleCheck,
-  Command,
   DiscAlbum,
   FolderOpen,
   Image as ImageIcon,
@@ -24,6 +23,7 @@ import { useMusicSync } from '../components/music/useMusicSync';
 import { Checkbox } from '../components/ui/Checkbox';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
+import { AppleMusicIcon } from '../components/ui/BrandIcons';
 import { ProgressRow } from '../components/ui/ProgressRow';
 import { Spinner } from '../components/ui/Spinner';
 
@@ -166,7 +166,7 @@ function SyncPanel({ job, busy, onDismiss }: { job: MusicSync; busy: boolean; on
         <Spinner />
         <div className="sync-panel__progress">
           <ProgressRow
-            icon={Command}
+            icon={AppleMusicIcon}
             label="Syncing with Apple Music"
             progress={{ total: job.total, done: job.added + job.updated + job.failed.length, finished: false }}
           />
@@ -240,7 +240,7 @@ export function MusicPage() {
       <div className="page sync-page music-page">
         <div className="sync-empty glass">
           <span className="sync-radar" aria-hidden="true">
-            <Command />
+            <AppleMusicIcon />
           </span>
           <p className="sync-empty__text">macOS only</p>
         </div>
@@ -331,13 +331,13 @@ export function MusicPage() {
             <Spinner />
           ) : (
             <span className="sync-radar" aria-hidden="true">
-              <Command />
+              <AppleMusicIcon />
             </span>
           )}
         </div>
       ) : (
         <div className={`music-columns ${scanning ? 'is-scanning' : ''}`.trim()} aria-busy={scanning}>
-          <Column icon={Command} label="Only in Apple Music" count={diff.only_in_music.length}>
+          <Column icon={AppleMusicIcon} label="Only in Apple Music" count={diff.only_in_music.length}>
             {diff.only_in_music.map((track) => (
               <MusicRow key={track.persistent_id} track={track} />
             ))}
