@@ -21,24 +21,24 @@
   margin-top: 0;
 }
 
-.queue-row {
+.downloads-row {
   animation: row-rise 380ms var(--ease-standard) backwards;
   animation-delay: calc(min(var(--row, 0), 14) * 40ms + 80ms);
 }
 
-.queue-row__thumb img {
+.downloads-row__thumb img {
   opacity: 0.7;
 }
 
-.queue-row--failed .music-row__sub {
+.downloads-row--failed .music-row__sub {
   color: var(--color-danger-text);
 }
 
-.queue-row--done .music-row__title {
+.downloads-row--done .music-row__title {
   color: var(--color-text-secondary);
 }
 
-.queue-trim {
+.downloads-trim {
   display: inline-flex;
   flex-shrink: 0;
   align-items: center;
@@ -50,12 +50,12 @@
   color: var(--color-lavender);
 }
 
-.queue-trim svg {
+.downloads-trim svg {
   width: 14px;
   height: 14px;
 }
 
-.queue-status {
+.downloads-status {
   display: inline-flex;
   flex-shrink: 0;
   align-items: center;
@@ -64,31 +64,31 @@
   color: var(--color-text-muted);
 }
 
-.queue-status svg {
+.downloads-status svg {
   width: 18px;
   height: 18px;
 }
 
-.queue-status--done {
+.downloads-status--done {
   color: var(--color-success);
 }
 
-.queue-status--failed {
+.downloads-status--failed {
   color: var(--color-warning);
 }
 
-.queue-status__meter.sync-meter {
+.downloads-status__meter.sync-meter {
   flex: none;
   width: 6rem;
 }
 
-.queue-row__actions {
+.downloads-row__actions {
   display: inline-flex;
   flex-shrink: 0;
   gap: var(--space-1);
 }
 
-.queue-dialog.glass {
+.downloads-dialog.glass {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -104,23 +104,23 @@
   animation: confirm-panel-in 240ms var(--ease-spring) both;
 }
 
-.queue-dialog__actions {
+.downloads-dialog__actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-2);
 }
 
-.queue-dialog__trim {
+.downloads-dialog__trim {
   margin-right: auto;
   font-variant-numeric: tabular-nums;
 }
 
-.queue-dialog__save {
+.downloads-dialog__save {
   min-height: 2.75rem;
 }
 
-.confirm-layer[data-state='closed'] .queue-dialog.glass {
+.confirm-layer[data-state='closed'] .downloads-dialog.glass {
   animation: confirm-panel-out 180ms ease-in both;
 }
 
@@ -144,23 +144,23 @@
 }
 
 @media (max-width: 560px) {
-  .queue-trim {
+  .downloads-trim {
     display: none;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .downloads-list,
-  .queue-row,
+  .downloads-row,
   .sidebar-link__activity {
     animation: none;
   }
 
-  .queue-dialog.glass {
+  .downloads-dialog.glass {
     animation-name: confirm-fade-in;
   }
 
-  .confirm-layer[data-state='closed'] .queue-dialog.glass {
+  .confirm-layer[data-state='closed'] .downloads-dialog.glass {
     animation-name: confirm-fade-out;
   }
 }

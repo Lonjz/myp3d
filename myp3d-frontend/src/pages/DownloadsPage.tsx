@@ -36,10 +36,10 @@ function QueueStatusIndicator({ item }: { item: QueueItem }) {
   if (item.status === 'running') {
     const progress = item.progress ?? 0;
     return (
-      <span className="queue-status" title="Downloading">
+      <span className="downloads-status" title="Downloading">
         {progress > 0 && progress < 1 ? (
           <span
-            className="sync-meter queue-status__meter"
+            className="sync-meter downloads-status__meter"
             role="progressbar"
             aria-label="Downloading"
             aria-valuemin={0}
@@ -56,7 +56,7 @@ function QueueStatusIndicator({ item }: { item: QueueItem }) {
   }
   if (item.status === 'queued') {
     return (
-      <span className="queue-status" title="Queued" aria-label="Queued">
+      <span className="downloads-status" title="Queued" aria-label="Queued">
         <Hourglass aria-hidden="true" />
       </span>
     );
@@ -64,14 +64,14 @@ function QueueStatusIndicator({ item }: { item: QueueItem }) {
   if (item.status === 'done') {
     const label = item.filename ? `Downloaded: ${item.filename}` : 'Downloaded';
     return (
-      <span className="queue-status queue-status--done" title={label} aria-label={label}>
+      <span className="downloads-status downloads-status--done" title={label} aria-label={label}>
         <CircleCheck aria-hidden="true" />
       </span>
     );
   }
   if (item.status === 'failed') {
     return (
-      <span className="queue-status queue-status--failed" title={item.error ?? 'Failed'} aria-label="Failed">
+      <span className="downloads-status downloads-status--failed" title={item.error ?? 'Failed'} aria-label="Failed">
         <CircleAlert aria-hidden="true" />
       </span>
     );
@@ -99,8 +99,8 @@ function QueueRow({ item, index, busy, onStart, onEdit, onRemove }: QueueRowProp
       : null;
 
   return (
-    <li className={`music-row queue-row queue-row--${item.status}`} style={{ '--row': index } as CSSProperties}>
-      <span className={`music-cover ${item.has_cover ? '' : 'queue-row__thumb'}`.trim()} aria-hidden="true">
+    <li className={`music-row downloads-row downloads-row--${item.status}`} style={{ '--row': index } as CSSProperties}>
+      <span className={`music-cover ${item.has_cover ? '' : 'downloads-row__thumb'}`.trim()} aria-hidden="true">
         {cover ? <img src={cover} alt="" loading="lazy" /> : <Music />}
       </span>
       <div className="music-row__text">
@@ -108,12 +108,12 @@ function QueueRow({ item, index, busy, onStart, onEdit, onRemove }: QueueRowProp
         {sub && <span className="music-row__sub" title={sub}>{sub}</span>}
       </div>
       {trimLabel && (
-        <span className="queue-trim" title={trimLabel} aria-label={`Trim ${trimLabel}`}>
+        <span className="downloads-trim" title={trimLabel} aria-label={`Trim ${trimLabel}`}>
           <Scissors aria-hidden="true" />
         </span>
       )}
       <QueueStatusIndicator item={item} />
-      <span className="queue-row__actions">
+      <span className="downloads-row__actions">
         {editable && (
           <IconButton
             icon={item.status === 'failed' ? RotateCcw : Play}

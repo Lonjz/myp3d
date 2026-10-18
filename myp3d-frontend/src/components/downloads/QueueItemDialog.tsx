@@ -112,7 +112,7 @@ export function QueueItemDialog({ item, closing, onClose, onSaved }: QueueItemDi
           <div className="confirm-layer" data-state={closing ? 'closed' : 'open'}>
             <div className="confirm-scrim" onMouseDown={saving ? undefined : onClose} />
             <form
-              className="queue-dialog glass"
+              className="downloads-dialog glass"
               role="dialog"
               aria-modal="true"
               aria-label="Edit download"
@@ -137,9 +137,9 @@ export function QueueItemDialog({ item, closing, onClose, onSaved }: QueueItemDi
                 disabled={saving}
               />
 
-              <div className="queue-dialog__actions">
+              <div className="downloads-dialog__actions">
                 {isTrimmed && (
-                  <span className="album-chip queue-dialog__trim" title="Trim">
+                  <span className="album-chip downloads-dialog__trim" title="Trim">
                     <Scissors aria-hidden="true" />
                     {formatDuration(item.start_time)} – {formatDuration(item.end_time)}
                   </span>
@@ -148,7 +148,7 @@ export function QueueItemDialog({ item, closing, onClose, onSaved }: QueueItemDi
                   <X aria-hidden="true" />
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary queue-dialog__save" disabled={saving}>
+                <button type="submit" className="btn-primary downloads-dialog__save" disabled={saving}>
                   {saving ? <Spinner inline /> : <Save aria-hidden="true" />}
                   Save
                 </button>
