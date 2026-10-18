@@ -12,16 +12,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, Optional
 
-from models.schemas import SyncManifestEntry, SyncPeer, SyncProgress, SyncSessionInfo
+from models.schemas import SyncDiff, SyncDiffTrack, SyncManifestEntry, SyncPeer, SyncProgress, SyncSessionInfo
 from services.audio_fingerprint import id3_tag_length
 from services.config import API_PORT, OUTPUT_DIR
 from services.device_service import get_device
 from services.discovery_service import discovery
-from services.mp3_service import invalidate_library_cache, list_mp3_filepaths
+from services.mp3_service import invalidate_library_cache, list_mp3_filepaths, list_mp3_infos
 
-SyncStatusName = Literal["requested", "incoming", "syncing", "done", "declined", "failed", "cancelled"]
+SyncStatusName = Literal["requested", "incoming", "paired", "syncing", "done", "declined", "failed", "cancelled"]
 
-ACTIVE_STATUSES = {"requested", "incoming", "syncing"}
+ACTIVE_STATUSES = {"requested", "incoming", "paired", "syncing"}
 REQUEST_TIMEOUT_S = 120.0
 STALL_TIMEOUT_S = 120.0
 HTTP_TIMEOUT_S = 5.0
@@ -211,13 +211,34 @@ def accept() -> SyncSessionInfo:
 
     with _lock:
         if _session is session and session.status == "incoming":
-            _start_syncing(session)
+            session.status = "paired"
         return session.info()
 
 
 def on_accepted(session_id: str) -> None:
     with _lock:
-        _start_syncing(_require(session_id, {"requested"}))
+        _require(session_id, {"requested"}).status = "paired"
+
+
+def start() -> SyncSessionInfo:
+    with _lock:
+        if _session is None or _session.status != "paired":
+            raise SyncError(409, "No device is paired")
+        session = _session
+
+    _request_json(session, "POST", f"/sync/sessions/{session.id}/start", {})
+
+    with _lock:
+        if _session is session and session.status == "paired":
+            _start_syncing(session)
+        return session.info()
+
+
+def on_start(session_id: str) -> None:
+    with _lock:
+        session = _require(session_id, {"paired", "syncing"})
+        if session.status == "paired":
+            _start_syncing(session)
 
 
 def decline() -> None:
@@ -236,7 +257,7 @@ def on_declined(session_id: str) -> None:
 
 def cancel() -> None:
     with _lock:
-        if _session is None or _session.status not in ("requested", "syncing"):
+        if _session is None or _session.status not in ("requested", "paired", "syncing"):
             raise SyncError(409, "There is no sync to cancel")
         session = _session
         session.status = "cancelled"
@@ -291,13 +312,33 @@ def _fingerprint(path: Path) -> Optional[str]:
     return fingerprint
 
 
+def _local_manifest() -> list[SyncManifestEntry]:
+    infos = {info.filename: info for info in list_mp3_infos()}
+    entries: list[SyncManifestEntry] = []
+    for path in list_mp3_filepaths():
+        try:
+            size = path.stat().st_size
+        except OSError:
+            continue
+        info = infos.get(path.name)
+        entries.append(
+            SyncManifestEntry(
+                filename=path.name,
+                size=size,
+                fingerprint=_fingerprint(path),
+                title=info.title if info else None,
+                artist=info.artist if info else None,
+                album=info.album if info else None,
+                has_cover=info.has_cover if info else False,
+            )
+        )
+    return entries
+
+
 def manifest(session_id: str) -> list[SyncManifestEntry]:
     with _lock:
         _require(session_id, ACTIVE_STATUSES)
-    return [
-        SyncManifestEntry(filename=path.name, size=path.stat().st_size, fingerprint=_fingerprint(path))
-        for path in list_mp3_filepaths()
-    ]
+    return _local_manifest()
 
 
 def _is_safe_filename(name: Any) -> bool:
@@ -307,6 +348,102 @@ def _is_safe_filename(name: Any) -> bool:
         and not name.startswith(".")
         and name.lower().endswith(".mp3")
     )
+
+
+def _remote_manifest(session: _Session) -> dict[str, dict]:
+    entries = _request_json(
+        session,
+        "GET",
+        f"/sync/manifest?session_id={session.id}",
+        timeout=TRANSFER_TIMEOUT_S,
+    )
+    if not isinstance(entries, list):
+        return {}
+    return {
+        entry["filename"]: entry
+        for entry in entries
+        if isinstance(entry, dict) and _is_safe_filename(entry.get("filename"))
+    }
+
+
+def _local_entries() -> dict[str, dict]:
+    return {entry.filename: entry.model_dump() for entry in _local_manifest()}
+
+
+def _differs(local: dict, remote: dict) -> bool:
+    if local.get("size") != remote.get("size"):
+        return True
+    remote_fingerprint = remote.get("fingerprint")
+    return remote_fingerprint is not None and remote_fingerprint != local.get("fingerprint")
+
+
+def _plan_pulls(local: dict[str, dict], remote: dict[str, dict], overwrite: bool) -> list[tuple[dict, bool]]:
+    pulls: list[tuple[dict, bool]] = []
+    for filename, entry in remote.items():
+        current = local.get(filename)
+        if current is None:
+            pulls.append((entry, False))
+        elif overwrite and _differs(current, entry):
+            pulls.append((entry, True))
+    return pulls
+
+
+def _text(value: Any) -> Optional[str]:
+    return value if isinstance(value, str) else None
+
+
+def _diff_track(entry: dict, replaces: bool = False) -> SyncDiffTrack:
+    return SyncDiffTrack(
+        filename=entry["filename"],
+        title=_text(entry.get("title")),
+        artist=_text(entry.get("artist")),
+        album=_text(entry.get("album")),
+        has_cover=entry.get("has_cover") is True,
+        replaces=replaces,
+    )
+
+
+def _diff_sort_key(track: SyncDiffTrack) -> tuple[str, str]:
+    return (track.artist or "").casefold(), (track.title or track.filename).casefold()
+
+
+def diff() -> SyncDiff:
+    with _lock:
+        if _session is None or _session.status != "paired":
+            raise SyncError(409, "No device is paired")
+        session = _session
+
+    remote = _remote_manifest(session)
+    local = _local_entries()
+    incoming = _plan_pulls(local, remote, session.direction == "outgoing")
+    outgoing = _plan_pulls(remote, local, session.direction == "incoming")
+    moving = {entry["filename"] for entry, _ in incoming + outgoing}
+
+    return SyncDiff(
+        incoming=sorted((_diff_track(entry, replaces) for entry, replaces in incoming), key=_diff_sort_key),
+        both=sorted(
+            (_diff_track(entry) for filename, entry in local.items() if filename in remote and filename not in moving),
+            key=_diff_sort_key,
+        ),
+        outgoing=sorted((_diff_track(entry, replaces) for entry, replaces in outgoing), key=_diff_sort_key),
+    )
+
+
+def peer_cover(filename: str, size: Optional[str]) -> tuple[bytes, str]:
+    if not _is_safe_filename(filename):
+        raise SyncError(404, "No cover image found")
+    with _lock:
+        if not _is_active(_session):
+            raise SyncError(404, "No cover image found")
+        session = _session
+
+    query = f"?size={urllib.parse.quote(size)}" if size else ""
+    url = _peer_url(session, f"/mp3s/{urllib.parse.quote(filename)}/cover{query}")
+    try:
+        with _opener.open(url, timeout=HTTP_TIMEOUT_S) as response:
+            return response.read(), response.headers.get_content_type()
+    except (urllib.error.URLError, OSError) as exc:
+        raise SyncError(404, "No cover image found") from exc
 
 
 def _still_syncing(session: _Session) -> bool:
@@ -352,40 +489,17 @@ def _download(session: _Session, filename: str, overwrite: bool) -> bool:
         return False
 
 
-def _differs(local_path: Path, entry: dict) -> bool:
-    try:
-        if local_path.stat().st_size != entry.get("size"):
-            return True
-    except OSError:
-        return False
-    remote_fingerprint = entry.get("fingerprint")
-    return remote_fingerprint is not None and remote_fingerprint != _fingerprint(local_path)
-
-
 def _pull_worker(session: _Session) -> None:
     try:
-        entries = _request_json(
-            session,
-            "GET",
-            f"/sync/manifest?session_id={session.id}",
-            timeout=TRANSFER_TIMEOUT_S,
-        )
+        remote = _remote_manifest(session)
     except SyncError as exc:
         _fail(session, exc.detail)
         return
 
-    local_paths = {path.name: path for path in list_mp3_filepaths()}
-    overwrite_conflicts = session.direction == "outgoing"
-    pulls: list[tuple[str, bool]] = []
-    for entry in entries or []:
-        if not isinstance(entry, dict) or not _is_safe_filename(entry.get("filename")):
-            continue
-        filename = entry["filename"]
-        local_path = local_paths.get(filename)
-        if local_path is None:
-            pulls.append((filename, False))
-        elif overwrite_conflicts and _differs(local_path, entry):
-            pulls.append((filename, True))
+    pulls = [
+        (entry["filename"], overwrite)
+        for entry, overwrite in _plan_pulls(_local_entries(), remote, session.direction == "outgoing")
+    ]
 
     with _lock:
         session.local.total = len(pulls)

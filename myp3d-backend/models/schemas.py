@@ -266,7 +266,7 @@ class SyncSessionInfo(BaseModel):
     id: str
     peer: SyncPeer
     direction: Literal["outgoing", "incoming"]
-    status: Literal["requested", "incoming", "syncing", "done", "declined", "failed", "cancelled"]
+    status: Literal["requested", "incoming", "paired", "syncing", "done", "declined", "failed", "cancelled"]
     local: SyncProgress
     remote: SyncProgress
     error: Optional[str] = None
@@ -276,6 +276,25 @@ class SyncManifestEntry(BaseModel):
     filename: str
     size: int
     fingerprint: Optional[str] = None
+    title: Optional[str] = None
+    artist: Optional[str] = None
+    album: Optional[str] = None
+    has_cover: bool = False
+
+
+class SyncDiffTrack(BaseModel):
+    filename: str
+    title: Optional[str] = None
+    artist: Optional[str] = None
+    album: Optional[str] = None
+    has_cover: bool = False
+    replaces: bool = False
+
+
+class SyncDiff(BaseModel):
+    incoming: list[SyncDiffTrack]
+    both: list[SyncDiffTrack]
+    outgoing: list[SyncDiffTrack]
 
 
 class MusicStatus(BaseModel):

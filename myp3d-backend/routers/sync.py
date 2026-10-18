@@ -1,8 +1,9 @@
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 
 from models.schemas import (
+    SyncDiff,
     SyncIncomingRequest,
     SyncManifestEntry,
     SyncPeer,
@@ -13,6 +14,7 @@ from models.schemas import (
     SyncStatus,
 )
 from services import sync_service
+from services.cover_service import CoverSize
 from services.device_service import get_device
 from services.discovery_service import discovery
 from services.sync_service import SyncError
@@ -76,6 +78,31 @@ def accept_sync_request():
         _raise(exc)
 
 
+@router.get("/session/diff", response_model=SyncDiff)
+def get_sync_diff():
+    try:
+        return sync_service.diff()
+    except SyncError as exc:
+        _raise(exc)
+
+
+@router.get("/session/cover/{filename}")
+def get_peer_cover(filename: str, size: Optional[CoverSize] = Query(None)):
+    try:
+        content, media_type = sync_service.peer_cover(filename, size)
+    except SyncError as exc:
+        _raise(exc)
+    return Response(content=content, media_type=media_type)
+
+
+@router.post("/session/start", response_model=SyncSessionInfo)
+def start_sync():
+    try:
+        return sync_service.start()
+    except SyncError as exc:
+        _raise(exc)
+
+
 @router.post("/session/decline")
 def decline_sync_request():
     try:
@@ -131,6 +158,15 @@ def receive_sync_request(payload: SyncIncomingRequest, request: Request):
 def peer_accepted(session_id: str):
     try:
         sync_service.on_accepted(session_id)
+    except SyncError as exc:
+        _raise(exc)
+    return {"success": True}
+
+
+@router.post("/sessions/{session_id}/start")
+def peer_started(session_id: str):
+    try:
+        sync_service.on_start(session_id)
     except SyncError as exc:
         _raise(exc)
     return {"success": True}

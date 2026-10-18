@@ -60,9 +60,12 @@ USE_SYSTEM_FFMPEG=false
 - `POST /sync/start` / `POST /sync/stop` start or stop discovery on a chosen UDP port
 - `GET /sync/peers` devices found on the same port
 - `GET /sync/session` current sync session
-- `POST /sync/requests` ask a device to sync
+- `POST /sync/requests` ask a device to pair
 - `POST /sync/session/accept|decline|cancel|dismiss` answer or end a session
-- `GET /sync/manifest`, `POST /sync/incoming`, `POST /sync/sessions/{id}/accepted|declined|cancelled|progress` device-to-device calls
+- `GET /sync/session/diff` songs each paired device will receive, and the ones they share
+- `GET /sync/session/cover/{filename}` cover art from the paired device
+- `POST /sync/session/start` start the sync on both paired devices
+- `GET /sync/manifest`, `POST /sync/incoming`, `POST /sync/sessions/{id}/accepted|start|declined|cancelled|progress` device-to-device calls
 
 ## Notes
 
