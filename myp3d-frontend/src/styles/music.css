@@ -1,0 +1,215 @@
+.music-page {
+  width: 100%;
+}
+
+.music-folder {
+  flex: 1;
+  min-width: 0;
+  max-width: 560px;
+}
+
+.music-folder input {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.music-folder.is-invalid {
+  border-color: color-mix(in srgb, var(--color-danger) 60%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-danger) 14%, transparent);
+}
+
+.music-add {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.music-columns {
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  min-height: 0;
+  transition: opacity var(--duration-base) var(--ease-standard);
+}
+
+.music-columns.is-scanning {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.music-column.glass {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: var(--space-2);
+  border-radius: var(--radius-xl);
+  animation: panel-rise 460ms var(--ease-spring) backwards;
+}
+
+.music-column:nth-child(2) {
+  animation-delay: 60ms;
+}
+
+.music-column:nth-child(3) {
+  animation-delay: 120ms;
+}
+
+.music-column__header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 2.75rem;
+  padding: var(--space-1) var(--space-3);
+}
+
+.music-column__heading {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.music-column__icon {
+  width: 20px;
+  height: 20px;
+  color: var(--color-lavender);
+}
+
+.music-column__count {
+  padding-block: var(--space-1);
+  font-variant-numeric: tabular-nums;
+}
+
+.music-column__empty {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  color: var(--color-text-muted);
+}
+
+.music-column__empty svg {
+  width: 28px;
+  height: 28px;
+}
+
+.music-rows {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  overscroll-behavior: contain;
+}
+
+.music-row {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 3.5rem;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 3.5rem;
+  transition: background var(--duration-fast) var(--ease-standard);
+}
+
+.music-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.music-cover {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-lavender) 16%, transparent);
+  color: var(--color-lavender);
+}
+
+.music-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.music-cover svg {
+  width: 18px;
+  height: 18px;
+}
+
+.music-row__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.music-row__title,
+.music-row__sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.music-row__title {
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+}
+
+.music-row__sub {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.music-changes {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: var(--space-1);
+}
+
+.music-change {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--color-rose) 18%, transparent);
+  color: var(--color-rose);
+}
+
+.music-change svg {
+  width: 14px;
+  height: 14px;
+}
+
+@media (max-width: 1100px) {
+  .music-columns {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: minmax(240px, 1fr);
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 560px) {
+  .music-folder {
+    flex-basis: 100%;
+    max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .music-column {
+    animation: none;
+  }
+}

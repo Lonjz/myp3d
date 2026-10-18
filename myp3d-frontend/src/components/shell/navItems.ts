@@ -1,4 +1,4 @@
-import { ArrowLeftRight, DiscAlbum, LayoutDashboard, ListMusic, MonitorPlay } from 'lucide-react';
+import { ArrowLeftRight, Command, DiscAlbum, LayoutDashboard, ListMusic, MonitorPlay } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export interface NavItem {
@@ -44,5 +44,12 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ArrowLeftRight,
     keywords: ['devices', 'network', 'share', 'lan'],
     isActive: (pathname) => pathname === '/sync',
+  },
+  {
+    to: '/music',
+    label: 'Apple',
+    icon: Command,
+    keywords: ['apple music', 'itunes', 'mac', 'import'],
+    isActive: (pathname) => pathname === '/music',
   },
 ];

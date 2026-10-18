@@ -8,6 +8,7 @@ import { EditPage } from './pages/EditPage';
 import { AlbumsPage } from './pages/AlbumsPage';
 import { AlbumEditPage } from './pages/AlbumEditPage';
 import { SyncPage } from './pages/SyncPage';
+import { MusicPage } from './pages/MusicPage';
 import { ToastProvider } from './components/messages/ToastProvider';
 import { IconButton } from './components/ui/IconButton';
 import { AppBackdrop } from './components/shell/AppBackdrop';
@@ -66,9 +67,10 @@ const KEEP_ALIVE_PAGES: KeepAlivePage[] = [
   { path: '/library', element: <LibraryPage /> },
   { path: '/albums', element: <AlbumsPage /> },
   { path: '/sync', element: <SyncPage /> },
+  { path: '/music', element: <MusicPage /> },
 ];
 
-const FILL_PATHS = new Set(['/library', '/albums']);
+const FILL_PATHS = new Set(['/library', '/albums', '/music']);
 
 function SidebarSearchButton() {
   const { open } = useSpotlight();
