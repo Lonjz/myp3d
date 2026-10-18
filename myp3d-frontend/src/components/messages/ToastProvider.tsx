@@ -1,15 +1,8 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { FeedbackToast, type FeedbackMessage } from './FeedbackToast';
-
-interface ToastContextValue {
-  showSuccess: (text: string) => void;
-  showError: (text: string) => void;
-  showInfo: (text: string) => void;
-  clearToast: () => void;
-}
-
-const ToastContext = createContext<ToastContextValue | undefined>(undefined);
+import { ToastContext } from './toastContext';
+import type { ToastContextValue } from './toastContext';
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [message, setMessage] = useState<FeedbackMessage | null>(null);
@@ -46,12 +39,4 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
     </ToastContext.Provider>
   );
-}
-
-export function useToast() {
-  const context = useContext(ToastContext);
-  if (!context) {
-    throw new Error('useToast must be used within ToastProvider');
-  }
-  return context;
 }

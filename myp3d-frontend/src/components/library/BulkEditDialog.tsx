@@ -6,7 +6,7 @@ import type { BulkResult, BulkTagUpdate, MP3Info } from '../../api/mp3Api';
 import { emitAppEvent } from '../../utils/appEvents';
 import { CoverCropModal } from '../cover/CoverCropModal';
 import { useCoverImageCrop } from '../cover/useCoverImageCrop';
-import { useToast } from '../messages/ToastProvider';
+import { useToast } from '../messages/toastContext';
 import { IconField } from '../ui/IconField';
 import { Spinner } from '../ui/Spinner';
 

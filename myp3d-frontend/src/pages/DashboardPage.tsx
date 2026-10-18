@@ -9,7 +9,7 @@ import { RecentTracks } from '../components/dashboard/RecentTracks';
 import { StatTile, StatTileSkeleton } from '../components/dashboard/StatTile';
 import { TopAlbums } from '../components/dashboard/TopAlbums';
 import { TopArtistsChart } from '../components/dashboard/TopArtistsChart';
-import { useToast } from '../components/messages/ToastProvider';
+import { useToast } from '../components/messages/toastContext';
 import { IconButton } from '../components/ui/IconButton';
 import { subscribeAppEvent } from '../utils/appEvents';
 import { formatBytes, formatHours } from '../utils/formatters';

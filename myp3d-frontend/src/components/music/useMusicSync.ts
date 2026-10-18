@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { musicApi } from '../../api/musicApi';
 import type { MusicDiff, MusicSync } from '../../api/musicApi';
 import { usePersistentState } from '../../hooks/usePersistentState';
-import { useToast } from '../messages/ToastProvider';
+import { useToast } from '../messages/toastContext';
 
 const SYNC_POLL_MS = 1000;
 

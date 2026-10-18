@@ -1,11 +1,11 @@
-import { useEffect, useReducer, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useReducer, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DiscAlbum, FileAudio, ImagePlus, MicVocal, Pause, Play, Save, Trash2, TriangleAlert, Type, Undo2 } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { MP3Info } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
 import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
-import { useToast } from '../components/messages/ToastProvider';
+import { useToast } from '../components/messages/toastContext';
 import { InfiniteSidebarList } from '../components/sidebar/InfiniteSidebarList';
 import { usePlayer } from '../components/player/playerContext';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -95,8 +95,12 @@ export function EditPage({ filename, onBack }: EditPageProps) {
     }
   };
 
-  useEffect(() => {
+  const loadCurrentMp3 = useEffectEvent(() => {
     void loadMp3();
+  });
+
+  useEffect(() => {
+    loadCurrentMp3();
   }, [filename]);
 
   useEffect(() => subscribeAppEvent('library-changed', refreshCoverPreview), []);

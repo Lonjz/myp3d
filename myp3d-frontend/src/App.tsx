@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { AudioLines, ChevronLeft, Menu, Search } from 'lucide-react';
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { DashboardPage } from './pages/DashboardPage';
@@ -119,11 +119,13 @@ function App() {
   const location = useLocation();
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [sidebarPathname, setSidebarPathname] = useState(location.pathname);
   const isFillPage = FILL_PATHS.has(location.pathname.replace(/(.)\/+$/, '$1'));
 
-  useEffect(() => {
+  if (sidebarPathname !== location.pathname) {
+    setSidebarPathname(location.pathname);
     setIsMobileSidebarOpen(false);
-  }, [location.pathname]);
+  }
 
   return (
     <ToastProvider>

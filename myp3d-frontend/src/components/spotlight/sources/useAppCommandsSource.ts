@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { DatabaseZap } from 'lucide-react';
 import { mp3Api } from '../../../api/mp3Api';
 import { emitAppEvent } from '../../../utils/appEvents';
-import { useToast } from '../../messages/ToastProvider';
+import { useToast } from '../../messages/toastContext';
 import { createCommandsSource } from './commandsSource';
 import type { InstantSpotlightSource } from '../spotlightTypes';
 

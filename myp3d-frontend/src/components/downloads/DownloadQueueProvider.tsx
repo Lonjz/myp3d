@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { queueApi } from '../../api/queueApi';
 import type { QueueItem, QueueItemUpdate } from '../../api/queueApi';
 import { emitAppEvent, subscribeAppEvent } from '../../utils/appEvents';
-import { useToast } from '../messages/ToastProvider';
+import { useToast } from '../messages/toastContext';
 import { DownloadQueueContext, isQueueItemActive } from './downloadQueueContext';
 import type { DownloadQueueContextValue } from './downloadQueueContext';
 

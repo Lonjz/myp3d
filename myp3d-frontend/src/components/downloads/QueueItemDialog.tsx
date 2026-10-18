@@ -8,7 +8,7 @@ import { useDownloadForm } from '../../hooks/useDownloadForm';
 import { formatDuration } from '../../utils/formatters';
 import { CoverCropModal } from '../cover/CoverCropModal';
 import { DownloadConfigSection } from '../download/DownloadConfigSection';
-import { useToast } from '../messages/ToastProvider';
+import { useToast } from '../messages/toastContext';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Spinner } from '../ui/Spinner';
 import { useDownloadQueue } from './downloadQueueContext';

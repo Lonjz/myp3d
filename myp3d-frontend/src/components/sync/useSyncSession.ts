@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { SYNC_ACTIVE_STATUSES, syncApi } from '../../api/syncApi';
 import type { SyncPeer, SyncSession, SyncStatus } from '../../api/syncApi';
 import { emitAppEvent } from '../../utils/appEvents';
-import { useToast } from '../messages/ToastProvider';
+import { useToast } from '../messages/toastContext';
 
 const SESSION_POLL_MS = 1000;
 const PEERS_POLL_MS = 2000;

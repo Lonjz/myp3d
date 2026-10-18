@@ -4,7 +4,7 @@ import { mp3Api } from '../api/mp3Api';
 import type { DownloadRequest } from '../api/mp3Api';
 import { queueApi } from '../api/queueApi';
 import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
-import { useToast } from '../components/messages/ToastProvider';
+import { useToast } from '../components/messages/toastContext';
 import { emitAppEvent, subscribeAppEvent } from '../utils/appEvents';
 import { useDebouncedValue } from './useDebouncedValue';
 

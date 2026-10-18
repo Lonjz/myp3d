@@ -73,7 +73,7 @@ export function InfiniteSidebarList<T>({
 
   const normalizedQuery = debouncedSearch.trim();
   const currentEntry = cacheByQuery[normalizedQuery];
-  const loadedItems = currentEntry?.items ?? [];
+  const loadedItems = useMemo(() => currentEntry?.items ?? [], [currentEntry]);
   const loadedCount = loadedItems.length;
   const totalCount = currentEntry?.total ?? 0;
   const maxLoadedPage = currentEntry?.loadedPages.length

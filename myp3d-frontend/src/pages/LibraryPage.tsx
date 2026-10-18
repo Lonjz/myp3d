@@ -33,7 +33,7 @@ import type { DataTableColumn } from '../components/table/DataTable';
 import { SortableHeaderButton } from '../components/table/SortableHeaderButton';
 import { BulkEditDialog } from '../components/library/BulkEditDialog';
 import { useLibrarySelectionCommands } from '../components/library/useLibrarySelectionCommands';
-import { useToast } from '../components/messages/ToastProvider';
+import { useToast } from '../components/messages/toastContext';
 import { CoverPlayButton } from '../components/player/CoverPlayButton';
 import { usePlayer } from '../components/player/playerContext';
 import { Checkbox } from '../components/ui/Checkbox';

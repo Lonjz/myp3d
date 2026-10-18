@@ -7,7 +7,7 @@ import type { DownloadRequest, YouTubeSearchResult } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
 import { DownloadConfigSection } from '../components/download/DownloadConfigSection';
 import { TrimRangeSection } from '../components/download/TrimRangeSection';
-import { useToast } from '../components/messages/ToastProvider';
+import { useToast } from '../components/messages/toastContext';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
@@ -19,17 +19,46 @@ import { formatDuration } from '../utils/formatters';
 import { emitAppEvent, subscribeAppEvent } from '../utils/appEvents';
 import { getVideoIdFromUrl } from '../utils/youtube';
 
-type YouTubePlayer = any;
+interface YouTubePlayer {
+  destroy?: () => void;
+  getCurrentTime?: () => number;
+  getDuration?: () => number;
+  seekTo?: (seconds: number, allowSeekAhead: boolean) => void;
+  playVideo?: () => void;
+  pauseVideo?: () => void;
+}
+
+interface YouTubePlayerOptions {
+  videoId: string;
+  height: string;
+  width: string;
+  playerVars: Record<string, string | number>;
+  events: {
+    onReady: () => void;
+    onStateChange: (event: { data: number }) => void;
+    onError: () => void;
+  };
+}
+
+interface YouTubeApi {
+  Player: new (element: HTMLElement, options: YouTubePlayerOptions) => YouTubePlayer;
+}
+
+type YouTubeWindow = Window & {
+  YT?: YouTubeApi;
+  onYouTubeIframeAPIReady?: () => void;
+};
 
 const loadYouTubeApi = (() => {
-  let promise: Promise<any> | null = null;
+  let promise: Promise<YouTubeApi> | null = null;
 
   return () => {
     if (typeof window === 'undefined') {
       return Promise.reject(new Error('YouTube API is only available in the browser'));
     }
 
-    const existing = (window as any).YT;
+    const youtubeWindow = window as YouTubeWindow;
+    const existing = youtubeWindow.YT;
     if (existing && existing.Player) {
       return Promise.resolve(existing);
     }
@@ -38,7 +67,7 @@ const loadYouTubeApi = (() => {
       return promise;
     }
 
-    promise = new Promise((resolve, reject) => {
+    promise = new Promise<YouTubeApi>((resolve, reject) => {
       const scriptId = 'youtube-iframe-api';
       const existingScript = document.getElementById(scriptId) as HTMLScriptElement | null;
 
@@ -51,10 +80,10 @@ const loadYouTubeApi = (() => {
         document.body.appendChild(script);
       }
 
-      const previousReady = (window as any).onYouTubeIframeAPIReady;
-      (window as any).onYouTubeIframeAPIReady = () => {
+      const previousReady = youtubeWindow.onYouTubeIframeAPIReady;
+      youtubeWindow.onYouTubeIframeAPIReady = () => {
         previousReady?.();
-        const ready = (window as any).YT;
+        const ready = youtubeWindow.YT;
         if (ready && ready.Player) {
           resolve(ready);
         } else {
@@ -249,6 +278,29 @@ export function QueryPage() {
           ? 'Select a trim range to enable playback.'
           : undefined;
 
+  const handlePlayerReady = useEffectEvent(() => {
+    setIsPlayerReady(true);
+    const duration = playerRef.current?.getDuration?.() ?? 0;
+    const knownDuration = videoDurationRef.current;
+    if (duration > 0 && !(knownDuration && knownDuration > 0)) {
+      resetTiming(duration);
+    }
+    playerRef.current?.seekTo?.(trimStart || 0, true);
+    playerRef.current?.pauseVideo?.();
+    setPlayheadTime(trimStart);
+  });
+
+  const handlePlayerStateChange = useEffectEvent((state: number) => {
+    if (state === 1) {
+      emitAppEvent('preview-play');
+      setIsSamplePlaying(true);
+      startMonitor();
+    } else if (state === 2 || state === 0) {
+      setIsSamplePlaying(false);
+      stopMonitor();
+    }
+  });
+
   useEffect(() => {
     if (!selectedVideoId || !playerContainerRef.current) {
       if (playerRef.current) {
@@ -295,27 +347,10 @@ export function QueryPage() {
           },
           events: {
             onReady: () => {
-              if (cancelled) return;
-              setIsPlayerReady(true);
-              const duration = playerRef.current?.getDuration?.() ?? 0;
-              const knownDuration = videoDurationRef.current;
-              if (duration > 0 && !(knownDuration && knownDuration > 0)) {
-                resetTiming(duration);
-              }
-              playerRef.current?.seekTo?.(trimStart || 0, true);
-              playerRef.current?.pauseVideo?.();
-              setPlayheadTime(trimStart);
+              if (!cancelled) handlePlayerReady();
             },
             onStateChange: (event: { data: number }) => {
-              if (cancelled) return;
-              if (event.data === 1) {
-                emitAppEvent('preview-play');
-                setIsSamplePlaying(true);
-                startMonitor();
-              } else if (event.data === 2 || event.data === 0) {
-                setIsSamplePlaying(false);
-                stopMonitor();
-              }
+              if (!cancelled) handlePlayerStateChange(event.data);
             },
             onError: () => {
               if (cancelled) return;

@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { mp3Api } from '../api/mp3Api';
-import { useToast } from '../components/messages/ToastProvider';
+import { useToast } from '../components/messages/toastContext';
 
 interface DownloadProgress {
   done: number;

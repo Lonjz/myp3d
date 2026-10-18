@@ -5,7 +5,7 @@ import type { MP3Info } from '../../api/mp3Api';
 import { readStoredValue, useStoredValueWriter, writeStoredValue } from '../../hooks/usePersistentState';
 import { emitAppEvent, subscribeAppEvent } from '../../utils/appEvents';
 import type { PlayRequest } from '../../utils/appEvents';
-import { useToast } from '../messages/ToastProvider';
+import { useToast } from '../messages/toastContext';
 import { PlayerContext, PlayerTimeContext } from './playerContext';
 import type { PlayerContextValue, PlayerTimeValue, PlayOptions } from './playerContext';
 import { playerReducer, restorePlayerState } from './playerReducer';

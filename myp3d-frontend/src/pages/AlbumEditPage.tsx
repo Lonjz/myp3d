@@ -1,11 +1,11 @@
-import { useEffect, useReducer, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useReducer, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DiscAlbum, HardDrive, ImagePlus, MicVocal, Music, Play, Save, Shuffle, Trash2, TriangleAlert, Undo2 } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { AlbumDetail, AlbumInfo } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
 import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
-import { useToast } from '../components/messages/ToastProvider';
+import { useToast } from '../components/messages/toastContext';
 import { InfiniteSidebarList } from '../components/sidebar/InfiniteSidebarList';
 import { usePlayer } from '../components/player/playerContext';
 import { TrackIndexButton } from '../components/player/TrackIndexButton';
@@ -99,9 +99,13 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
     }
   };
 
-  useEffect(() => {
+  const loadCurrentAlbum = useEffectEvent((targetKey: string) => {
     resetCoverState();
-    loadAlbum(albumKey);
+    void loadAlbum(targetKey);
+  });
+
+  useEffect(() => {
+    loadCurrentAlbum(albumKey);
   }, [albumKey]);
 
   useEffect(() => subscribeAppEvent('library-changed', refreshCoverPreview), []);
