@@ -33,7 +33,7 @@ export interface MusicSync {
   added: number;
   updated: number;
   failed: BulkResult['failed'];
-  without_art: string[];
+  without_art: BulkResult['failed'];
   error: string | null;
 }
 

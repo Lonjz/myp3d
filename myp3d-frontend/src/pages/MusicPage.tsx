@@ -152,7 +152,7 @@ function SyncPanel({ job, busy, onDismiss }: { job: MusicSync; busy: boolean; on
             </span>
           )}
           {job.without_art.length > 0 && (
-            <span className="album-chip" title={`No cover art set:\n${job.without_art.join('\n')}`}>
+            <span className="album-chip" title={`No cover art set:\n${job.without_art.map((item) => `${item.filename}: ${item.detail}`).join('\n')}`}>
               <ImageOff aria-hidden="true" />
               {job.without_art.length}
             </span>
@@ -256,7 +256,8 @@ export function MusicPage() {
         />
         <IconButton
           icon={ScanSearch}
-          label="Scan"
+          label="Compare again"
+          className="sync-toolbar__push"
           onClick={() => void scan()}
           disabled={scanning || folderMissing || jobOpen}
         />

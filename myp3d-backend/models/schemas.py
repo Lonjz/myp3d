@@ -335,7 +335,7 @@ class MusicSyncInfo(BaseModel):
     added: int = 0
     updated: int = 0
     failed: list[BulkFailure] = Field(default_factory=list)
-    without_art: list[str] = Field(default_factory=list)
+    without_art: list[BulkFailure] = Field(default_factory=list)
     error: Optional[str] = None
 
 

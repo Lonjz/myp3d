@@ -15,11 +15,37 @@ on run argv
 		if newAlbum is not "" then set album of targetTrack to newAlbum
 		set artState to "noart"
 		if artData is not missing value then
-			try
-				set data of artwork 1 of targetTrack to artData
-				set artState to "art"
-			end try
+			set artState to my setArtwork(targetTrack, artData)
+			if artState is not "art" then
+				delay 1
+				set artState to my setArtwork(targetTrack, artData)
+			end if
 		end if
 		return artState
 	end tell
 end run
+
+on setArtwork(targetTrack, artData)
+	tell application "Music"
+		try
+			set data of artwork 1 of targetTrack to artData
+		on error errMsg
+			return "noart:" & errMsg
+		end try
+	end tell
+	if hasReadableArtwork(targetTrack) then return "art"
+	tell application "Music"
+		return "noart:Music didn't keep the cover art"
+	end tell
+end setArtwork
+
+on hasReadableArtwork(targetTrack)
+	tell application "Music"
+		try
+			format of artwork 1 of targetTrack
+			return true
+		on error
+			return false
+		end try
+	end tell
+end hasReadableArtwork

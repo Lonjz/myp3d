@@ -63,7 +63,7 @@ class _SyncJob:
     added: int = 0
     updated: int = 0
     failed: list[BulkFailure] = field(default_factory=list)
-    without_art: list[str] = field(default_factory=list)
+    without_art: list[BulkFailure] = field(default_factory=list)
     error: Optional[str] = None
 
     def info(self) -> MusicSyncInfo:
@@ -336,7 +336,14 @@ def _write_cover(source: Path) -> Optional[str]:
     return art_path
 
 
-def _add_one(root: Path, source: Path, track: MP3Info, existing: Optional[Path]) -> bool:
+def _art_problem(state: str) -> Optional[str]:
+    if state == "art":
+        return None
+    _, _, reason = state.partition(":")
+    return reason.strip() or "Music didn't set the cover art"
+
+
+def _add_one(root: Path, source: Path, track: MP3Info, existing: Optional[Path]) -> Optional[str]:
     art_path = _write_cover(source)
     try:
         target = existing if existing is not None else _copy_into(root, source, track)
@@ -347,13 +354,13 @@ def _add_one(root: Path, source: Path, track: MP3Info, existing: Optional[Path])
             if existing is None and exc.status_code != 504:
                 target.unlink(missing_ok=True)
             raise
-        return art_path is None or result.endswith(f"{FIELD_SEP}art")
+        return None if art_path is None else _art_problem(result.partition(FIELD_SEP)[2])
     finally:
         if art_path:
             Path(art_path).unlink(missing_ok=True)
 
 
-def _update_one(source: Path, pair: _Pair) -> bool:
+def _update_one(source: Path, pair: _Pair) -> Optional[str]:
     art_path = _write_cover(source) if "art" in pair.changes else None
     try:
         args = [
@@ -363,7 +370,9 @@ def _update_one(source: Path, pair: _Pair) -> bool:
             (pair.track.album or "").strip() if "album" in pair.changes else "",
         ] + ([art_path] if art_path else [])
         result = _run_script("update_track", *args, timeout=TRACK_TIMEOUT_S)
-        return "art" not in pair.changes or result == "art"
+        if "art" not in pair.changes:
+            return None
+        return _art_problem(result) if art_path else "Couldn't read the cover art in myp3d"
     finally:
         if art_path:
             Path(art_path).unlink(missing_ok=True)
@@ -408,26 +417,26 @@ def _run_sync(job: _SyncJob, root: Path, filenames: list[str]) -> None:
     for pair in updates:
         source = OUTPUT_DIR / pair.track.filename
         try:
-            with_art = _update_one(source, pair)
+            art_problem = _update_one(source, pair)
         except Exception as exc:
             _record_failure(job, source.name, exc)
             continue
         with _sync_lock:
             job.updated += 1
-            if not with_art:
-                job.without_art.append(source.name)
+            if art_problem:
+                job.without_art.append(BulkFailure(filename=source.name, detail=art_problem))
 
     for track in adds:
         source = OUTPUT_DIR / track.filename
         try:
-            with_art = _add_one(root, source, track, matched.loose.get(track.filename))
+            art_problem = _add_one(root, source, track, matched.loose.get(track.filename))
         except Exception as exc:
             _record_failure(job, source.name, exc)
             continue
         with _sync_lock:
             job.added += 1
-            if not with_art:
-                job.without_art.append(source.name)
+            if art_problem:
+                job.without_art.append(BulkFailure(filename=source.name, detail=art_problem))
 
     _finish(job, "done")
 
