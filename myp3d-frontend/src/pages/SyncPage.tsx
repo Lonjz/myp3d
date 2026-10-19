@@ -7,12 +7,18 @@ import {
   CircleAlert,
   CircleCheck,
   CircleX,
+  Link as LinkIcon,
   MonitorSmartphone,
   MonitorUp,
   Radio,
+  Replace,
+  ScanSearch,
   X,
 } from 'lucide-react';
-import type { SyncSession } from '../api/syncApi';
+import { mp3Api } from '../api/mp3Api';
+import { syncApi } from '../api/syncApi';
+import type { SyncDiff, SyncDiffTrack, SyncSession } from '../api/syncApi';
+import { Cover, DiffColumn, TrackText } from '../components/diff/DiffColumns';
 import { useSyncSession } from '../components/sync/useSyncSession';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { IconButton } from '../components/ui/IconButton';
@@ -21,6 +27,7 @@ import { ProgressRow } from '../components/ui/ProgressRow';
 import { Spinner } from '../components/ui/Spinner';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { usePersistentState } from '../hooks/usePersistentState';
+import { formatTrackSubtitle } from '../utils/formatters';
 
 const DEFAULT_PORT = '47817';
 const MIN_PORT = 1024;
@@ -30,6 +37,69 @@ const parsePort = (value: string) => {
   const port = Number(value);
   return Number.isInteger(port) && port >= MIN_PORT && port <= MAX_PORT ? port : null;
 };
+
+const localCover = (filename: string) => mp3Api.getCoverUrl(filename, 'thumb');
+const peerCover = (filename: string) => syncApi.peerCoverUrl(filename, 'thumb');
+
+function DiffRow({
+  track,
+  coverUrl,
+  replacesLabel,
+}: {
+  track: SyncDiffTrack;
+  coverUrl: (filename: string) => string;
+  replacesLabel?: string;
+}) {
+  const title = track.title || track.filename;
+  return (
+    <li className="music-row">
+      <Cover src={track.has_cover ? coverUrl(track.filename) : undefined} />
+      <TrackText title={title} sub={formatTrackSubtitle(track.artist, track.album)} />
+      {track.replaces && replacesLabel && (
+        <span className="music-changes">
+          <span className="music-change" title={replacesLabel} aria-label={replacesLabel}>
+            <Replace aria-hidden="true" />
+          </span>
+        </span>
+      )}
+    </li>
+  );
+}
+
+function PairedColumns({ diff, loading, peerName }: { diff: SyncDiff | null; loading: boolean; peerName: string }) {
+  if (!diff) {
+    return (
+      <div className="sync-empty glass">
+        <Spinner />
+      </div>
+    );
+  }
+
+  return (
+    <div className={`music-columns ${loading ? 'is-scanning' : ''}`.trim()} aria-busy={loading}>
+      <DiffColumn icon={ArrowDown} label={`From ${peerName}`} count={diff.incoming.length}>
+        {diff.incoming.map((track) => (
+          <DiffRow key={track.filename} track={track} coverUrl={peerCover} replacesLabel="Replaces your copy" />
+        ))}
+      </DiffColumn>
+      <DiffColumn icon={Check} label="On both" count={diff.both.length}>
+        {diff.both.map((track) => (
+          <DiffRow key={track.filename} track={track} coverUrl={localCover} />
+        ))}
+      </DiffColumn>
+      <DiffColumn icon={ArrowUp} label={`To ${peerName}`} count={diff.outgoing.length}>
+        {diff.outgoing.map((track) => (
+          <DiffRow
+            key={track.filename}
+            track={track}
+            coverUrl={localCover}
+            replacesLabel={`Replaces the copy on ${peerName}`}
+          />
+        ))}
+      </DiffColumn>
+    </div>
+  );
+}
 
 function SessionPanel({
   session,
@@ -107,39 +177,89 @@ export function SyncPage() {
   const port = parsePort(debouncedPortInput);
   const portInvalid = parsePort(portInput) === null;
 
-  const { status, startError, peers, session, busy, requestSync, accept, decline, cancel, dismiss } = useSyncSession(port);
+  const {
+    status,
+    startError,
+    peers,
+    session,
+    busy,
+    diff,
+    diffLoading,
+    refreshDiff,
+    requestSync,
+    accept,
+    start,
+    decline,
+    cancel,
+    dismiss,
+    unpair,
+  } = useSyncSession(port);
   const listening = status?.port != null && status.port === port && !startError;
-  const showSession = session !== null && session.status !== 'incoming';
+  const paired = session?.status === 'paired' ? session : null;
+  const showSession = session !== null && session.status !== 'incoming' && !paired;
+  const pending = diff ? diff.incoming.length + diff.outgoing.length : 0;
 
   return (
-    <div className="page sync-page">
-      <div className="sync-toolbar glass">
+    <div className={`page sync-page ${paired ? 'page--fill sync-page--paired' : ''}`.trim()}>
+      <div className={`sync-toolbar glass ${paired ? 'is-paired' : ''}`.trim()}>
         <span className="album-chip sync-device" title="This device">
           <MonitorSmartphone aria-hidden="true" />
           <span className="album-chip__text">{status?.device.name ?? '…'}</span>
         </span>
-        <IconField
-          icon={Radio}
-          label="Port"
-          type="number"
-          inputMode="numeric"
-          min={MIN_PORT}
-          max={MAX_PORT}
-          className={`sync-port ${portInvalid || startError ? 'is-invalid' : ''}`.trim()}
-          value={portInput}
-          onChange={(e) => setPortInput(e.target.value)}
-          aria-invalid={portInvalid || Boolean(startError)}
-          disabled={showSession}
-        />
-        <span
-          className={`sync-live ${listening ? 'is-on' : ''}`.trim()}
-          title={startError ?? (listening ? `Listening on port ${port}` : 'Not listening')}
-        >
-          <MonitorUp aria-hidden="true" />
-        </span>
+        {paired ? (
+          <>
+            <LinkIcon className="sync-link" aria-label="Paired" />
+            <span className="album-chip sync-device" title="Paired device">
+              <MonitorSmartphone aria-hidden="true" />
+              <span className="album-chip__text">{paired.peer.name}</span>
+            </span>
+            <IconButton
+              icon={ScanSearch}
+              label="Compare again"
+              className="sync-toolbar__push"
+              onClick={() => void refreshDiff()}
+              disabled={busy || diffLoading}
+            />
+            <IconButton icon={X} label={`Unpair from ${paired.peer.name}`} onClick={() => void unpair()} disabled={busy} />
+            <button
+              type="button"
+              className="btn-primary sync-start"
+              onClick={() => void start()}
+              disabled={busy || diffLoading || pending === 0}
+              title={`Sync with ${paired.peer.name}`}
+            >
+              <ArrowLeftRight aria-hidden="true" />
+              {pending}
+            </button>
+          </>
+        ) : (
+          <>
+            <IconField
+              icon={Radio}
+              label="Port"
+              type="number"
+              inputMode="numeric"
+              min={MIN_PORT}
+              max={MAX_PORT}
+              className={`sync-port ${portInvalid || startError ? 'is-invalid' : ''}`.trim()}
+              value={portInput}
+              onChange={(e) => setPortInput(e.target.value)}
+              aria-invalid={portInvalid || Boolean(startError)}
+              disabled={showSession}
+            />
+            <span
+              className={`sync-live ${listening ? 'is-on' : ''}`.trim()}
+              title={startError ?? (listening ? `Listening on port ${port}` : 'Not listening')}
+            >
+              <MonitorUp aria-hidden="true" />
+            </span>
+          </>
+        )}
       </div>
 
-      {showSession ? (
+      {paired ? (
+        <PairedColumns diff={diff} loading={diffLoading} peerName={paired.peer.name} />
+      ) : showSession ? (
         <SessionPanel session={session} busy={busy} onCancel={() => void cancel()} onDismiss={() => void dismiss()} />
       ) : peers.length > 0 ? (
         <ul className="sync-peers">
@@ -153,8 +273,8 @@ export function SyncPage() {
                 <span className="sync-peer__host">{peer.host}</span>
               </div>
               <IconButton
-                icon={ArrowLeftRight}
-                label={`Sync with ${peer.name}`}
+                icon={LinkIcon}
+                label={`Pair with ${peer.name}`}
                 variant="primary"
                 onClick={() => void requestSync(peer)}
                 disabled={busy || session?.status === 'incoming'}
@@ -175,11 +295,11 @@ export function SyncPage() {
 
       <ConfirmDialog
         open={session?.status === 'incoming'}
-        icon={ArrowLeftRight}
-        title={session ? `Sync with ${session.peer.name}?` : ''}
+        icon={LinkIcon}
+        title={session ? `Pair with ${session.peer.name}?` : ''}
         cancelLabel="Decline"
         cancelIcon={X}
-        confirmLabel="Sync"
+        confirmLabel="Pair"
         confirmIcon={Check}
         onCancel={() => void decline()}
         onConfirm={() => void accept()}

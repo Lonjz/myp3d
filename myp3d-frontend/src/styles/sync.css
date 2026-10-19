@@ -20,6 +20,10 @@
   color: var(--color-text);
 }
 
+.sync-page--paired {
+  width: 100%;
+}
+
 .sync-port {
   width: 150px;
 }
@@ -38,6 +42,21 @@
 .sync-port.is-invalid {
   border-color: color-mix(in srgb, var(--color-danger) 60%, transparent);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-danger) 14%, transparent);
+}
+
+.sync-link {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  color: var(--color-lavender);
+}
+
+.sync-toolbar__push {
+  margin-left: auto;
+}
+
+.sync-start {
+  font-variant-numeric: tabular-nums;
 }
 
 .sync-live {
@@ -285,6 +304,14 @@
 
   .sync-port {
     flex: 1;
+  }
+
+  .sync-toolbar.is-paired .sync-device {
+    flex: 1 1 0;
+  }
+
+  .sync-toolbar.is-paired .sync-toolbar__push {
+    margin-left: 0;
   }
 }
 

@@ -1,4 +1,5 @@
-import { apiFetch, jsonInit } from './mp3Api';
+import { API_BASE, apiFetch, jsonInit } from './mp3Api';
+import type { CoverSize } from './mp3Api';
 
 export interface SyncDevice {
   id: string;
@@ -21,7 +22,7 @@ export interface SyncProgress {
   finished: boolean;
 }
 
-export type SyncSessionStatus = 'requested' | 'incoming' | 'syncing' | 'done' | 'declined' | 'failed' | 'cancelled';
+export type SyncSessionStatus = 'requested' | 'incoming' | 'paired' | 'syncing' | 'done' | 'declined' | 'failed' | 'cancelled';
 
 export interface SyncSession {
   id: string;
@@ -33,7 +34,22 @@ export interface SyncSession {
   error: string | null;
 }
 
-export const SYNC_ACTIVE_STATUSES: ReadonlySet<SyncSessionStatus> = new Set(['requested', 'incoming', 'syncing']);
+export const SYNC_ACTIVE_STATUSES: ReadonlySet<SyncSessionStatus> = new Set(['requested', 'incoming', 'paired', 'syncing']);
+
+export interface SyncDiffTrack {
+  filename: string;
+  title: string | null;
+  artist: string | null;
+  album: string | null;
+  has_cover: boolean;
+  replaces: boolean;
+}
+
+export interface SyncDiff {
+  incoming: SyncDiffTrack[];
+  both: SyncDiffTrack[];
+  outgoing: SyncDiffTrack[];
+}
 
 const post = <T>(path: string, body: unknown, fallbackError: string) =>
   apiFetch<T>(path, jsonInit('POST', body), fallbackError);
@@ -65,6 +81,19 @@ export const syncApi = {
 
   accept(): Promise<SyncSession> {
     return post('/sync/session/accept', {}, 'Failed to accept sync');
+  },
+
+  diff(): Promise<SyncDiff> {
+    return apiFetch('/sync/session/diff', undefined, 'Failed to compare libraries');
+  },
+
+  startSync(): Promise<SyncSession> {
+    return post('/sync/session/start', {}, 'Failed to start sync');
+  },
+
+  peerCoverUrl(filename: string, size?: CoverSize): string {
+    const query = size ? `?size=${size}` : '';
+    return `${API_BASE}/sync/session/cover/${encodeURIComponent(filename)}${query}`;
   },
 
   decline(): Promise<{ success: boolean }> {
