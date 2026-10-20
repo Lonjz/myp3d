@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import albums, cache, download, export, mp3s, music, queue, search, spotify, stats, sync, youtube
+from routers import albums, cache, download, export, mp3s, music, peer, queue, search, spotify, stats, sync, youtube
 from services import queue_service
 from services.config import API_PORT
 from services.discovery_service import discovery
@@ -40,6 +40,7 @@ app.include_router(stats.router)
 app.include_router(search.router)
 app.include_router(cache.router)
 app.include_router(sync.router)
+app.include_router(peer.router)
 app.include_router(music.router)
 app.include_router(queue.router)
 app.include_router(spotify.router)

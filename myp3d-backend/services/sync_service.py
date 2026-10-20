@@ -22,6 +22,7 @@ from services.mp3_service import invalidate_library_cache, list_mp3_filepaths, l
 SyncStatusName = Literal["requested", "incoming", "paired", "syncing", "done", "declined", "failed", "cancelled"]
 
 ACTIVE_STATUSES = {"requested", "incoming", "paired", "syncing"}
+PEER_STATUSES = {"paired", "syncing"}
 REQUEST_TIMEOUT_S = 120.0
 STALL_TIMEOUT_S = 120.0
 HTTP_TIMEOUT_S = 5.0
@@ -122,8 +123,8 @@ def _expire(session: _Session) -> None:
         session.error = f"Lost connection to {session.peer.name}"
 
 
-def _require(session_id: str, statuses: set[str]) -> _Session:
-    if _session is None or _session.id != session_id:
+def _require(session_id: str, statuses: set[str], host: str) -> _Session:
+    if _session is None or _session.id != session_id or _session.peer.host != host:
         raise SyncError(404, "Unknown sync session")
     if _session.status not in statuses:
         raise SyncError(409, "The sync session is not in a state for that")
@@ -165,7 +166,7 @@ def request_sync(peer_id: str) -> SyncSessionInfo:
         _request_json(
             session,
             "POST",
-            "/sync/incoming",
+            "/peer/incoming",
             {"session_id": session.id, "device": get_device(), "port": API_PORT},
         )
     except SyncError:
@@ -206,18 +207,23 @@ def accept() -> SyncSessionInfo:
         if _session is None or _session.status != "incoming":
             raise SyncError(409, "There is no sync request to accept")
         session = _session
+        session.status = "paired"
 
-    _request_json(session, "POST", f"/sync/sessions/{session.id}/accepted", {})
+    try:
+        _request_json(session, "POST", f"/peer/sessions/{session.id}/accepted", {})
+    except SyncError:
+        with _lock:
+            if _session is session and session.status == "paired":
+                session.status = "incoming"
+        raise
 
     with _lock:
-        if _session is session and session.status == "incoming":
-            session.status = "paired"
         return session.info()
 
 
-def on_accepted(session_id: str) -> None:
+def on_accepted(session_id: str, host: str) -> None:
     with _lock:
-        _require(session_id, {"requested"}).status = "paired"
+        _require(session_id, {"requested"}, host).status = "paired"
 
 
 def start() -> SyncSessionInfo:
@@ -226,7 +232,7 @@ def start() -> SyncSessionInfo:
             raise SyncError(409, "No device is paired")
         session = _session
 
-    _request_json(session, "POST", f"/sync/sessions/{session.id}/start", {})
+    _request_json(session, "POST", f"/peer/sessions/{session.id}/start", {})
 
     with _lock:
         if _session is session and session.status == "paired":
@@ -234,9 +240,9 @@ def start() -> SyncSessionInfo:
         return session.info()
 
 
-def on_start(session_id: str) -> None:
+def on_start(session_id: str, host: str) -> None:
     with _lock:
-        session = _require(session_id, {"paired", "syncing"})
+        session = _require(session_id, PEER_STATUSES, host)
         if session.status == "paired":
             _start_syncing(session)
 
@@ -247,12 +253,12 @@ def decline() -> None:
             raise SyncError(409, "There is no sync request to decline")
         session = _session
         session.status = "declined"
-    _notify(session, f"/sync/sessions/{session.id}/declined")
+    _notify(session, f"/peer/sessions/{session.id}/declined")
 
 
-def on_declined(session_id: str) -> None:
+def on_declined(session_id: str, host: str) -> None:
     with _lock:
-        _require(session_id, {"requested"}).status = "declined"
+        _require(session_id, {"requested"}, host).status = "declined"
 
 
 def cancel() -> None:
@@ -261,19 +267,19 @@ def cancel() -> None:
             raise SyncError(409, "There is no sync to cancel")
         session = _session
         session.status = "cancelled"
-    _notify(session, f"/sync/sessions/{session.id}/cancelled")
+    _notify(session, f"/peer/sessions/{session.id}/cancelled")
 
 
-def on_cancelled(session_id: str) -> None:
+def on_cancelled(session_id: str, host: str) -> None:
     with _lock:
-        session = _require(session_id, ACTIVE_STATUSES)
+        session = _require(session_id, ACTIVE_STATUSES, host)
         session.status = "cancelled"
         session.error = f"The sync was stopped on {session.peer.name}"
 
 
-def on_progress(session_id: str, progress: SyncProgress) -> None:
+def on_progress(session_id: str, host: str, progress: SyncProgress) -> None:
     with _lock:
-        session = _require(session_id, ACTIVE_STATUSES)
+        session = _require(session_id, ACTIVE_STATUSES, host)
         session.remote = progress
         session.remote_updated_at = time.monotonic()
         _maybe_finish(session)
@@ -335,9 +341,9 @@ def _local_manifest() -> list[SyncManifestEntry]:
     return entries
 
 
-def manifest(session_id: str) -> list[SyncManifestEntry]:
+def manifest(session_id: str, host: str) -> list[SyncManifestEntry]:
     with _lock:
-        _require(session_id, ACTIVE_STATUSES)
+        _require(session_id, PEER_STATUSES, host)
     return _local_manifest()
 
 
@@ -350,11 +356,20 @@ def _is_safe_filename(name: Any) -> bool:
     )
 
 
+def peer_file(session_id: str, host: str, filename: str) -> Path:
+    with _lock:
+        _require(session_id, PEER_STATUSES, host)
+    path = OUTPUT_DIR / filename
+    if not _is_safe_filename(filename) or not path.is_file():
+        raise SyncError(404, "MP3 file not found")
+    return path
+
+
 def _remote_manifest(session: _Session) -> dict[str, dict]:
     entries = _request_json(
         session,
         "GET",
-        f"/sync/manifest?session_id={session.id}",
+        f"/peer/sessions/{session.id}/manifest",
         timeout=TRANSFER_TIMEOUT_S,
     )
     if not isinstance(entries, list):
@@ -438,7 +453,7 @@ def peer_cover(filename: str, size: Optional[str]) -> tuple[bytes, str]:
         session = _session
 
     query = f"?size={urllib.parse.quote(size)}" if size else ""
-    url = _peer_url(session, f"/mp3s/{urllib.parse.quote(filename)}/cover{query}")
+    url = _peer_url(session, f"/peer/sessions/{session.id}/covers/{urllib.parse.quote(filename)}{query}")
     try:
         with _opener.open(url, timeout=HTTP_TIMEOUT_S) as response:
             return response.read(), response.headers.get_content_type()
@@ -456,14 +471,14 @@ def _fail(session: _Session, message: str) -> None:
         if _session is session and session.status == "syncing":
             session.status = "failed"
             session.error = message
-    _notify(session, f"/sync/sessions/{session.id}/cancelled")
+    _notify(session, f"/peer/sessions/{session.id}/cancelled")
 
 
 def _report(session: _Session) -> bool:
     with _lock:
         payload = session.local.model_dump()
     try:
-        _request_json(session, "POST", f"/sync/sessions/{session.id}/progress", payload)
+        _request_json(session, "POST", f"/peer/sessions/{session.id}/progress", payload)
     except SyncError as exc:
         _fail(session, exc.detail)
         return False
@@ -475,7 +490,7 @@ def _download(session: _Session, filename: str, overwrite: bool) -> bool:
     if destination.exists() and not overwrite:
         return True
     partial = OUTPUT_DIR / f".{filename}.part"
-    url = _peer_url(session, f"/mp3s/{urllib.parse.quote(filename)}")
+    url = _peer_url(session, f"/peer/sessions/{session.id}/files/{urllib.parse.quote(filename)}")
     try:
         with _opener.open(url, timeout=TRANSFER_TIMEOUT_S) as response, open(partial, "wb") as handle:
             shutil.copyfileobj(response, handle, COPY_CHUNK_BYTES)

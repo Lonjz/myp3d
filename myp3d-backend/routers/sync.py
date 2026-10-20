@@ -1,13 +1,10 @@
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, Request, Response
+from fastapi import APIRouter, HTTPException, Query, Response
 
 from models.schemas import (
     SyncDiff,
-    SyncIncomingRequest,
-    SyncManifestEntry,
     SyncPeer,
-    SyncProgress,
     SyncRequestCreate,
     SyncSessionInfo,
     SyncStartRequest,
@@ -125,75 +122,6 @@ def cancel_sync():
 def dismiss_sync():
     try:
         sync_service.dismiss()
-    except SyncError as exc:
-        _raise(exc)
-    return {"success": True}
-
-
-@router.get("/manifest", response_model=list[SyncManifestEntry])
-def get_sync_manifest(session_id: str = Query(...)):
-    try:
-        return sync_service.manifest(session_id)
-    except SyncError as exc:
-        _raise(exc)
-
-
-@router.post("/incoming", response_model=SyncSessionInfo)
-def receive_sync_request(payload: SyncIncomingRequest, request: Request):
-    host = request.client.host if request.client else ""
-    if not host:
-        raise HTTPException(status_code=400, detail="Unknown sender")
-    try:
-        return sync_service.receive_request(
-            payload.session_id,
-            payload.device.model_dump(),
-            payload.port,
-            host,
-        )
-    except SyncError as exc:
-        _raise(exc)
-
-
-@router.post("/sessions/{session_id}/accepted")
-def peer_accepted(session_id: str):
-    try:
-        sync_service.on_accepted(session_id)
-    except SyncError as exc:
-        _raise(exc)
-    return {"success": True}
-
-
-@router.post("/sessions/{session_id}/start")
-def peer_started(session_id: str):
-    try:
-        sync_service.on_start(session_id)
-    except SyncError as exc:
-        _raise(exc)
-    return {"success": True}
-
-
-@router.post("/sessions/{session_id}/declined")
-def peer_declined(session_id: str):
-    try:
-        sync_service.on_declined(session_id)
-    except SyncError as exc:
-        _raise(exc)
-    return {"success": True}
-
-
-@router.post("/sessions/{session_id}/cancelled")
-def peer_cancelled(session_id: str):
-    try:
-        sync_service.on_cancelled(session_id)
-    except SyncError as exc:
-        _raise(exc)
-    return {"success": True}
-
-
-@router.post("/sessions/{session_id}/progress")
-def peer_progress(session_id: str, payload: SyncProgress):
-    try:
-        sync_service.on_progress(session_id, payload)
     except SyncError as exc:
         _raise(exc)
     return {"success": True}
