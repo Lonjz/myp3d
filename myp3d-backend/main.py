@@ -1,12 +1,27 @@
+import ipaddress
 from contextlib import asynccontextmanager
+from typing import Optional
+from urllib.parse import urlsplit
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from routers import albums, cache, download, export, mp3s, music, peer, queue, search, spotify, stats, sync, youtube
 from services import queue_service
 from services.config import API_PORT
 from services.discovery_service import discovery
+
+PEER_PREFIX = "/peer/"
+
+
+def _is_loopback(host: Optional[str]) -> bool:
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host or "").is_loopback
+    except ValueError:
+        return False
 
 
 @asynccontextmanager
@@ -30,6 +45,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def local_only(request: Request, call_next):
+    if request.url.path.startswith(PEER_PREFIX):
+        return await call_next(request)
+    client = request.client.host if request.client else None
+    host_header = urlsplit(f"//{request.headers.get('host', '')}").hostname
+    if _is_loopback(client) and _is_loopback(host_header):
+        return await call_next(request)
+    return JSONResponse(status_code=403, content={"detail": "Only this device can use the app"})
+
 
 # Include routers
 app.include_router(download.router)
