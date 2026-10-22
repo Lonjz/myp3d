@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Literal, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class DownloadRequest(BaseModel):
@@ -291,10 +291,64 @@ class SyncDiffTrack(BaseModel):
     replaces: bool = False
 
 
+class SyncDiffRecord(BaseModel):
+    kind: Literal["playlist", "download"]
+    key: str
+    name: str
+    deleted: bool = False
+    replaces: bool = False
+
+
 class SyncDiff(BaseModel):
     incoming: list[SyncDiffTrack]
     both: list[SyncDiffTrack]
     outgoing: list[SyncDiffTrack]
+    incoming_records: list[SyncDiffRecord] = Field(default_factory=list)
+    both_records: list[SyncDiffRecord] = Field(default_factory=list)
+    outgoing_records: list[SyncDiffRecord] = Field(default_factory=list)
+
+
+class SyncRecordTimes(BaseModel):
+    created_at: str
+    updated_at: str
+    deleted_at: Optional[str] = None
+
+    @field_validator("created_at", "updated_at", "deleted_at")
+    @classmethod
+    def _check_time(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None:
+            datetime.fromisoformat(value)
+        return value
+
+
+class SyncPlaylistRecord(SyncRecordTimes):
+    id: str = Field(pattern=r"^[0-9a-f]{32}$")
+    name: str = Field(min_length=1)
+    description: str = ""
+    filenames: list[str] = Field(default_factory=list)
+    cover_hash: Optional[str] = None
+
+
+class SyncQueueRecord(SyncRecordTimes):
+    uid: str = Field(pattern=r"^[0-9a-f]{32}$")
+    url: str = Field(min_length=1)
+    custom_filename: Optional[str] = None
+    title: Optional[str] = None
+    artist: Optional[str] = None
+    album: Optional[str] = None
+    cover_hash: Optional[str] = None
+    start_time: Optional[float] = None
+    end_time: Optional[float] = None
+    overwrite: bool = False
+    status: Literal["pending", "failed", "done"]
+    error: Optional[str] = None
+    filename: Optional[str] = None
+    finished_at: Optional[str] = None
+
+
+class SyncDatabase(BaseModel):
+    playlists: list[SyncPlaylistRecord] = Field(default_factory=list)
+    downloads: list[SyncQueueRecord] = Field(default_factory=list)
 
 
 class MusicStatus(BaseModel):

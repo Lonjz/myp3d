@@ -3,7 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse
 
-from models.schemas import SyncIncomingRequest, SyncManifestEntry, SyncProgress, SyncSessionInfo
+from models.schemas import SyncDatabase, SyncIncomingRequest, SyncManifestEntry, SyncProgress, SyncSessionInfo
 from services import sync_service
 from services.cover_service import CoverSize, get_cover_variant
 from services.mp3_service import get_album_cover
@@ -42,6 +42,23 @@ def get_sync_manifest(session_id: str, request: Request):
         return sync_service.manifest(session_id, _client_host(request))
     except SyncError as exc:
         _raise(exc)
+
+
+@router.get("/sessions/{session_id}/database", response_model=SyncDatabase)
+def get_sync_database(session_id: str, request: Request):
+    try:
+        return sync_service.database(session_id, _client_host(request))
+    except SyncError as exc:
+        _raise(exc)
+
+
+@router.get("/sessions/{session_id}/records/{kind}/{key}/cover")
+def get_sync_record_cover(session_id: str, kind: str, key: str, request: Request):
+    try:
+        cover = sync_service.record_cover(session_id, _client_host(request), kind, key)
+    except SyncError as exc:
+        _raise(exc)
+    return Response(content=cover, media_type="image/jpeg")
 
 
 @router.get("/sessions/{session_id}/files/{filename}")

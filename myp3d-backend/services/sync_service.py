@@ -12,8 +12,21 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, Optional
 
-from models.schemas import SyncDiff, SyncDiffTrack, SyncManifestEntry, SyncPeer, SyncProgress, SyncSessionInfo
+from pydantic import ValidationError
+
+from models.schemas import (
+    SyncDatabase,
+    SyncDiff,
+    SyncDiffRecord,
+    SyncDiffTrack,
+    SyncManifestEntry,
+    SyncPeer,
+    SyncProgress,
+    SyncSessionInfo,
+)
+from services import database_sync
 from services.audio_fingerprint import id3_tag_length
+from services.database_sync import RecordKind, RecordPull
 from services.config import API_PORT, OUTPUT_DIR
 from services.device_service import get_device
 from services.discovery_service import discovery
@@ -347,6 +360,21 @@ def manifest(session_id: str, host: str) -> list[SyncManifestEntry]:
     return _local_manifest()
 
 
+def database(session_id: str, host: str) -> SyncDatabase:
+    with _lock:
+        _require(session_id, PEER_STATUSES, host)
+    return database_sync.local_database()
+
+
+def record_cover(session_id: str, host: str, kind: str, key: str) -> bytes:
+    with _lock:
+        _require(session_id, PEER_STATUSES, host)
+    cover = database_sync.local_cover(kind, key) if kind in ("playlist", "download") else None
+    if cover is None:
+        raise SyncError(404, "No cover image found")
+    return cover
+
+
 def _is_safe_filename(name: Any) -> bool:
     return (
         isinstance(name, str)
@@ -379,6 +407,25 @@ def _remote_manifest(session: _Session) -> dict[str, dict]:
         for entry in entries
         if isinstance(entry, dict) and _is_safe_filename(entry.get("filename"))
     }
+
+
+def _remote_database(session: _Session) -> SyncDatabase:
+    try:
+        payload = _request_json(session, "GET", f"/peer/sessions/{session.id}/database", timeout=TRANSFER_TIMEOUT_S)
+    except SyncError as exc:
+        if exc.status_code == 404:
+            raise SyncError(409, f"Update myp3d on {session.peer.name} to sync playlists and downloads") from exc
+        raise
+    try:
+        return SyncDatabase.model_validate(payload)
+    except ValidationError as exc:
+        raise SyncError(502, f"{session.peer.name} sent playlists or downloads that couldn't be read") from exc
+
+
+def _fetch_record_cover(session: _Session, kind: RecordKind, key: str) -> bytes:
+    url = _peer_url(session, f"/peer/sessions/{session.id}/records/{kind}/{urllib.parse.quote(key)}/cover")
+    with _opener.open(url, timeout=TRANSFER_TIMEOUT_S) as response:
+        return response.read()
 
 
 def _local_entries() -> dict[str, dict]:
@@ -434,6 +481,20 @@ def diff() -> SyncDiff:
     outgoing = _plan_pulls(remote, local, session.direction == "incoming")
     moving = {entry["filename"] for entry, _ in incoming + outgoing}
 
+    remote_database = _remote_database(session)
+    local_database = database_sync.local_database()
+    incoming_records = database_sync.plan_pulls(
+        local_database, remote_database, session.direction == "outgoing", database_sync.busy_downloads()
+    )
+    outgoing_records = database_sync.plan_pulls(remote_database, local_database, session.direction == "incoming")
+    moving_records = {(pull.kind, pull.key) for pull in incoming_records + outgoing_records}
+
+    def visible(pulls: list[RecordPull]) -> list[SyncDiffRecord]:
+        return sorted(
+            (database_sync.diff_record(pull.kind, pull.record, pull.replaces) for pull in pulls if database_sync.is_visible(pull)),
+            key=lambda record: (record.kind, record.name.casefold()),
+        )
+
     return SyncDiff(
         incoming=sorted((_diff_track(entry, replaces) for entry, replaces in incoming), key=_diff_sort_key),
         both=sorted(
@@ -441,6 +502,12 @@ def diff() -> SyncDiff:
             key=_diff_sort_key,
         ),
         outgoing=sorted((_diff_track(entry, replaces) for entry, replaces in outgoing), key=_diff_sort_key),
+        incoming_records=visible(incoming_records),
+        both_records=sorted(
+            database_sync.shared_records(local_database, remote_database, moving_records),
+            key=lambda record: (record.kind, record.name.casefold()),
+        ),
+        outgoing_records=visible(outgoing_records),
     )
 
 
@@ -504,9 +571,30 @@ def _download(session: _Session, filename: str, overwrite: bool) -> bool:
         return False
 
 
+def _apply_records(session: _Session, pulls: list[RecordPull]) -> bool:
+    local_database = database_sync.local_database()
+    for pull in pulls:
+        if not _still_syncing(session):
+            return False
+        try:
+            database_sync.apply_pull(pull, local_database, lambda kind, key: _fetch_record_cover(session, kind, key))
+            succeeded = True
+        except Exception:
+            succeeded = False
+        with _lock:
+            if succeeded:
+                session.local.done += 1
+            else:
+                session.local.failed += 1
+        if not _report(session):
+            return False
+    return True
+
+
 def _pull_worker(session: _Session) -> None:
     try:
         remote = _remote_manifest(session)
+        remote_database = _remote_database(session)
     except SyncError as exc:
         _fail(session, exc.detail)
         return
@@ -515,9 +603,15 @@ def _pull_worker(session: _Session) -> None:
         (entry["filename"], overwrite)
         for entry, overwrite in _plan_pulls(_local_entries(), remote, session.direction == "outgoing")
     ]
+    record_pulls = database_sync.plan_pulls(
+        database_sync.local_database(),
+        remote_database,
+        session.direction == "outgoing",
+        database_sync.busy_downloads(),
+    )
 
     with _lock:
-        session.local.total = len(pulls)
+        session.local.total = len(pulls) + len(record_pulls)
     if not _report(session):
         return
 
@@ -536,6 +630,9 @@ def _pull_worker(session: _Session) -> None:
     finally:
         if pulls:
             invalidate_library_cache()
+
+    if not _apply_records(session, record_pulls):
+        return
 
     with _lock:
         session.local.finished = True

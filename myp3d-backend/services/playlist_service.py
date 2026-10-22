@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Optional
 
-from models.schemas import MP3Info, PlaylistDetail, PlaylistInfo
+from models.schemas import MP3Info, PlaylistDetail, PlaylistInfo, SyncPlaylistRecord
 from services.db import connect as _connect
 from services.mp3_service import list_mp3_filepaths, list_mp3_infos
 
@@ -47,6 +47,7 @@ class PlaylistState:
     description: str
     filenames: list[str]
     cover_hash: Optional[str]
+    created_at: str
     updated_at: str
     deleted_at: Optional[str]
 
@@ -152,7 +153,9 @@ def list_playlists() -> list[PlaylistInfo]:
 
 def list_states() -> list[PlaylistState]:
     with _connect() as conn:
-        rows = conn.execute("SELECT id, name, description, cover, updated_at, deleted_at FROM playlists ORDER BY id").fetchall()
+        rows = conn.execute(
+            "SELECT id, name, description, cover, created_at, updated_at, deleted_at FROM playlists ORDER BY id"
+        ).fetchall()
         tracks: dict[str, list[str]] = {}
         for track in conn.execute("SELECT playlist_id, filename FROM playlist_tracks ORDER BY playlist_id, position"):
             tracks.setdefault(track["playlist_id"], []).append(track["filename"])
@@ -163,6 +166,7 @@ def list_states() -> list[PlaylistState]:
             description=row["description"],
             filenames=tracks.get(row["id"], []),
             cover_hash=cover_digest(row["cover"]) if row["cover"] is not None else None,
+            created_at=row["created_at"],
             updated_at=row["updated_at"],
             deleted_at=row["deleted_at"],
         )
@@ -289,3 +293,52 @@ def remove_tracks(filenames: list[str]) -> None:
     removed = set(filenames)
     with _lock, _connect() as conn:
         _rewrite_containing(conn, filenames, lambda current: [filename for filename in current if filename not in removed])
+
+
+def sync_records() -> list[SyncPlaylistRecord]:
+    return [
+        SyncPlaylistRecord(
+            id=state.id,
+            name=state.name,
+            description=state.description,
+            filenames=state.filenames,
+            cover_hash=state.cover_hash,
+            created_at=state.created_at,
+            updated_at=state.updated_at,
+            deleted_at=state.deleted_at,
+        )
+        for state in list_states()
+    ]
+
+
+def cover_by_id(playlist_id: str) -> Optional[bytes]:
+    with _connect() as conn:
+        row = conn.execute("SELECT cover FROM playlists WHERE id = ?", (playlist_id,)).fetchone()
+    return row["cover"] if row is not None else None
+
+
+def apply_record(record: SyncPlaylistRecord, cover: Optional[bytes]) -> None:
+    filenames = _clean_filenames(record.filenames)
+    values = (
+        record.name,
+        record.description,
+        cover,
+        record.created_at,
+        record.updated_at,
+        record.deleted_at,
+    )
+    with _lock, _connect() as conn:
+        exists = conn.execute("SELECT 1 FROM playlists WHERE id = ?", (record.id,)).fetchone() is not None
+        if exists:
+            conn.execute(
+                "UPDATE playlists SET name = ?, description = ?, cover = ?, created_at = ?, updated_at = ?, "
+                "deleted_at = ? WHERE id = ?",
+                (*values, record.id),
+            )
+        else:
+            conn.execute(
+                "INSERT INTO playlists (name, description, cover, created_at, updated_at, deleted_at, id) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (*values, record.id),
+            )
+        _write_tracks(conn, record.id, filenames)

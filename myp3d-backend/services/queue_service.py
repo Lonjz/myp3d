@@ -1,21 +1,25 @@
 import sqlite3
+import hashlib
 import threading
 import urllib.request
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from models.schemas import QueueItem, QueueItemCreate, QueueItemUpdate
+from models.schemas import QueueItem, QueueItemCreate, QueueItemUpdate, SyncQueueRecord
 from services.config import OUTPUT_DIR
 from services.db import connect as _connect
 from services.mp3_service import download_as_mp3, make_square_cover, square_cover_from_base64, validate_trim_range
 
 COVER_FETCH_TIMEOUT_S = 15
 EDITABLE_STATUSES = ("pending", "failed")
+ACTIVE_STATUSES = ("queued", "running")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS queue_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    uid TEXT,
     position INTEGER NOT NULL,
     url TEXT NOT NULL,
     custom_filename TEXT,
@@ -31,9 +35,15 @@ CREATE TABLE IF NOT EXISTS queue_items (
     filename TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    finished_at TEXT
+    finished_at TEXT,
+    deleted_at TEXT
 )
 """
+
+SYNC_COLUMNS = (
+    "uid, url, custom_filename, title, artist, album, cover, start_time, end_time, overwrite, status, error, "
+    "filename, created_at, updated_at, finished_at, deleted_at"
+)
 
 ITEM_COLUMNS = (
     "id, url, custom_filename, title, artist, album, cover IS NOT NULL AS has_cover, start_time, end_time, "
@@ -95,7 +105,10 @@ def _to_item(row: sqlite3.Row) -> QueueItem:
 
 
 def _select(conn: sqlite3.Connection, where: str = "1", params: tuple = ()) -> list[sqlite3.Row]:
-    return conn.execute(f"SELECT {ITEM_COLUMNS} FROM queue_items WHERE {where} ORDER BY position, id", params).fetchall()
+    return conn.execute(
+        f"SELECT {ITEM_COLUMNS} FROM queue_items WHERE deleted_at IS NULL AND ({where}) ORDER BY position, id",
+        params,
+    ).fetchall()
 
 
 def _require(conn: sqlite3.Connection, item_id: int) -> sqlite3.Row:
@@ -108,6 +121,13 @@ def _require(conn: sqlite3.Connection, item_id: int) -> sqlite3.Row:
 def init() -> None:
     with _connect() as conn:
         conn.execute(SCHEMA)
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(queue_items)")}
+        for column in ("uid", "deleted_at"):
+            if column not in columns:
+                conn.execute(f"ALTER TABLE queue_items ADD COLUMN {column} TEXT")
+        for row in conn.execute("SELECT id FROM queue_items WHERE uid IS NULL").fetchall():
+            conn.execute("UPDATE queue_items SET uid = ? WHERE id = ?", (uuid.uuid4().hex, row["id"]))
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS queue_items_uid ON queue_items(uid)")
         conn.execute("UPDATE queue_items SET status = 'pending' WHERE status IN ('queued', 'running')")
 
 
@@ -150,9 +170,9 @@ def add_items(items: list[QueueItemCreate]) -> list[QueueItem]:
         for values in prepared:
             position += 1
             cursor = conn.execute(
-                "INSERT INTO queue_items (position, url, custom_filename, title, artist, album, cover, start_time, "
-                "end_time, overwrite, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (position, *values, now, now),
+                "INSERT INTO queue_items (uid, position, url, custom_filename, title, artist, album, cover, start_time, "
+                "end_time, overwrite, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (uuid.uuid4().hex, position, *values, now, now),
             )
             ids.append(cursor.lastrowid)
         placeholders = ", ".join("?" for _ in ids)
@@ -190,12 +210,16 @@ def delete_item(item_id: int) -> None:
     with _lock, _connect() as conn:
         if _require(conn, item_id)["status"] == "running":
             raise QueueError(409, "This download is running")
-        conn.execute("DELETE FROM queue_items WHERE id = ?", (item_id,))
+        now = _now()
+        conn.execute(
+            "UPDATE queue_items SET cover = NULL, updated_at = ?, deleted_at = ? WHERE id = ?",
+            (now, now, item_id),
+        )
 
 
 def get_cover(item_id: int) -> Optional[bytes]:
     with _connect() as conn:
-        row = conn.execute("SELECT cover FROM queue_items WHERE id = ?", (item_id,)).fetchone()
+        row = conn.execute("SELECT cover FROM queue_items WHERE id = ? AND deleted_at IS NULL", (item_id,)).fetchone()
     if row is None:
         raise QueueError(404, "Download not found")
     return row["cover"]
@@ -206,14 +230,15 @@ def start(ids: Optional[list[int]] = None) -> list[QueueItem]:
         with _connect() as conn:
             if ids is None:
                 conn.execute(
-                    "UPDATE queue_items SET status = 'queued', error = NULL, updated_at = ? WHERE status = 'pending'",
+                    "UPDATE queue_items SET status = 'queued', error = NULL, updated_at = ? "
+                    "WHERE status = 'pending' AND deleted_at IS NULL",
                     (_now(),),
                 )
             elif ids:
                 placeholders = ", ".join("?" for _ in ids)
                 conn.execute(
                     "UPDATE queue_items SET status = 'queued', error = NULL, updated_at = ? "
-                    f"WHERE status IN ('pending', 'failed') AND id IN ({placeholders})",
+                    f"WHERE status IN ('pending', 'failed') AND deleted_at IS NULL AND id IN ({placeholders})",
                     (_now(), *ids),
                 )
         _ensure_worker()
@@ -222,13 +247,20 @@ def start(ids: Optional[list[int]] = None) -> list[QueueItem]:
 
 def stop() -> list[QueueItem]:
     with _lock, _connect() as conn:
-        conn.execute("UPDATE queue_items SET status = 'pending', updated_at = ? WHERE status = 'queued'", (_now(),))
+        conn.execute(
+            "UPDATE queue_items SET status = 'pending', updated_at = ? WHERE status = 'queued' AND deleted_at IS NULL",
+            (_now(),),
+        )
     return list_items()
 
 
 def clear_done() -> list[QueueItem]:
     with _lock, _connect() as conn:
-        conn.execute("DELETE FROM queue_items WHERE status = 'done'")
+        now = _now()
+        conn.execute(
+            "UPDATE queue_items SET cover = NULL, updated_at = ?, deleted_at = ? WHERE status = 'done' AND deleted_at IS NULL",
+            (now, now),
+        )
     return list_items()
 
 
@@ -243,7 +275,7 @@ def _claim_next() -> Optional[sqlite3.Row]:
     global _worker
     with _lock, _connect() as conn:
         row = conn.execute(
-            "SELECT * FROM queue_items WHERE status = 'queued' ORDER BY position, id LIMIT 1"
+            "SELECT * FROM queue_items WHERE status = 'queued' AND deleted_at IS NULL ORDER BY position, id LIMIT 1"
         ).fetchone()
         if row is None:
             _worker = None
@@ -297,3 +329,73 @@ def _run_worker() -> None:
         if row is None:
             return
         _run_item(row)
+
+
+def _cover_hash(cover: Optional[bytes]) -> Optional[str]:
+    return hashlib.sha1(cover).hexdigest() if cover is not None else None
+
+
+def sync_records() -> list[SyncQueueRecord]:
+    with _connect() as conn:
+        rows = conn.execute(f"SELECT {SYNC_COLUMNS} FROM queue_items ORDER BY position, id").fetchall()
+    return [
+        SyncQueueRecord(
+            **{name: row[name] for name in row.keys() if name not in ("cover", "overwrite", "status")},
+            cover_hash=_cover_hash(row["cover"]),
+            overwrite=bool(row["overwrite"]),
+            status="pending" if row["status"] in ACTIVE_STATUSES else row["status"],
+        )
+        for row in rows
+    ]
+
+
+def active_uids() -> set[str]:
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT uid FROM queue_items WHERE status IN ('queued', 'running') AND deleted_at IS NULL"
+        ).fetchall()
+    return {row["uid"] for row in rows}
+
+
+def cover_by_uid(uid: str) -> Optional[bytes]:
+    with _connect() as conn:
+        row = conn.execute("SELECT cover FROM queue_items WHERE uid = ?", (uid,)).fetchone()
+    return row["cover"] if row is not None else None
+
+
+def apply_record(record: SyncQueueRecord, cover: Optional[bytes]) -> bool:
+    if record.custom_filename is not None and Path(record.custom_filename).name != record.custom_filename:
+        raise ValueError("Invalid file name")
+    values = {
+        "url": record.url,
+        "custom_filename": record.custom_filename,
+        "title": record.title,
+        "artist": record.artist,
+        "album": record.album,
+        "cover": cover,
+        "start_time": record.start_time,
+        "end_time": record.end_time,
+        "overwrite": int(record.overwrite),
+        "status": record.status,
+        "error": record.error,
+        "filename": record.filename,
+        "created_at": record.created_at,
+        "updated_at": record.updated_at,
+        "finished_at": record.finished_at,
+        "deleted_at": record.deleted_at,
+    }
+    with _lock, _connect() as conn:
+        row = conn.execute("SELECT id, status, deleted_at FROM queue_items WHERE uid = ?", (record.uid,)).fetchone()
+        if row is not None and row["deleted_at"] is None and row["status"] in ACTIVE_STATUSES:
+            return False
+        if row is None:
+            position = conn.execute("SELECT COALESCE(MAX(position), 0) FROM queue_items").fetchone()[0] + 1
+            names = ["uid", "position", *values]
+            conn.execute(
+                f"INSERT INTO queue_items ({', '.join(names)}) VALUES ({', '.join('?' for _ in names)})",
+                (record.uid, position, *values.values()),
+            )
+        else:
+            assignments = ", ".join(f"{name} = ?" for name in values)
+            conn.execute(f"UPDATE queue_items SET {assignments} WHERE id = ?", (*values.values(), row["id"]))
+    return True
