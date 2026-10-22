@@ -2,33 +2,35 @@ import { useState } from 'react';
 import {
   Check,
   CircleAlert,
-  CircleCheck,
   DiscAlbum,
   Folder,
   Image as ImageIcon,
   ImageOff,
+  ListMusic,
   MicVocal,
   Music,
   PencilLine,
   Plus,
   RefreshCw,
   ScanSearch,
+  Trash2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
-import type { MP3Info } from '../api/mp3Api';
-import type { MusicChange, MusicDiff, MusicPair, MusicSync, MusicTrack } from '../api/musicApi';
+import type { BulkResult, MP3Info } from '../api/mp3Api';
+import type { MusicChange, MusicPair, MusicTrack } from '../api/musicApi';
 import { Cover, DiffColumn, TrackText } from '../components/diff/DiffColumns';
+import { MusicJobPanel } from '../components/music/MusicJobPanel';
+import { PlaylistColumns } from '../components/music/PlaylistColumns';
 import { useMusicSync } from '../components/music/useMusicSync';
-import { Checkbox } from '../components/ui/Checkbox';
+import { usePlaylistMusicSync } from '../components/music/usePlaylistMusicSync';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { AppleMusicIcon } from '../components/ui/BrandIcons';
-import { ProgressRow } from '../components/ui/ProgressRow';
 import { Spinner } from '../components/ui/Spinner';
 import { formatTrackSubtitle } from '../utils/formatters';
 
-const EMPTY_NAMES: ReadonlySet<string> = new Set();
+type MusicStep = 'songs' | 'playlists';
 
 const CHANGE_ICONS: Record<MusicChange, LucideIcon> = {
   title: Music,
@@ -48,21 +50,10 @@ const changeTitle = (change: MusicChange, { track, music }: MusicPair) => {
   return 'Cover art';
 };
 
-interface Selection {
-  checked: boolean;
-  onToggle: () => void;
-}
-
-function RowCheckbox({ title, selection }: { title: string; selection?: Selection }) {
-  if (!selection) return null;
-  return <Checkbox label={`Sync ${title}`} checked={selection.checked} onChange={selection.onToggle} />;
-}
-
-function LocalRow({ track, selection }: { track: MP3Info; selection?: Selection }) {
+function LocalRow({ track }: { track: MP3Info }) {
   const title = track.title || track.filename;
   return (
     <li className="music-row">
-      <RowCheckbox title={title} selection={selection} />
       <Cover src={track.has_cover ? mp3Api.getCoverUrl(track.filename, 'thumb') : undefined} />
       <TrackText title={title} sub={formatTrackSubtitle(track.artist, track.album)} />
       <span className="music-changes">
@@ -74,12 +65,11 @@ function LocalRow({ track, selection }: { track: MP3Info; selection?: Selection 
   );
 }
 
-function PairRow({ pair, selection }: { pair: MusicPair; selection?: Selection }) {
+function PairRow({ pair }: { pair: MusicPair }) {
   const { track, changes } = pair;
   const title = track.title || track.filename;
   return (
     <li className="music-row">
-      <RowCheckbox title={title} selection={selection} />
       <Cover src={track.has_cover ? mp3Api.getCoverUrl(track.filename, 'thumb') : undefined} />
       <TrackText title={title} sub={formatTrackSubtitle(track.artist, track.album)} />
       {changes.length > 0 && (
@@ -108,71 +98,46 @@ function MusicRow({ track }: { track: MusicTrack }) {
   );
 }
 
-function SyncPanel({ job, busy, onDismiss }: { job: MusicSync; busy: boolean; onDismiss: () => void }) {
-  if (job.status === 'syncing') {
-    return (
-      <section className="sync-panel glass" aria-live="polite">
-        <Spinner />
-        <div className="sync-panel__progress">
-          <ProgressRow
-            icon={AppleMusicIcon}
-            label="Syncing with Apple Music"
-            progress={{ total: job.total, done: job.added + job.updated + job.failed.length, finished: false }}
-          />
-        </div>
-      </section>
-    );
-  }
+const failureList = (failures: BulkResult['failed']) => failures.map((item) => `${item.filename}: ${item.detail}`).join('\n');
 
-  const failedTitle = job.failed.map((failure) => `${failure.filename}: ${failure.detail}`).join('\n');
-  const outcomeOk = job.status === 'done' && job.failed.length === 0;
-  const OutcomeIcon = outcomeOk ? CircleCheck : CircleAlert;
-
+function FailureChips({ failed, withoutArt }: { failed: BulkResult['failed']; withoutArt: BulkResult['failed'] }) {
   return (
-    <section className="sync-panel glass" aria-live="polite">
-      <OutcomeIcon
-        className={`sync-panel__outcome sync-panel__outcome--${outcomeOk ? 'success' : 'warning'}`}
-        aria-hidden="true"
-      />
-      {job.status === 'failed' && <h2 className="sync-panel__title" title={job.error ?? ''}>{job.error ?? 'Sync failed'}</h2>}
-      {job.status === 'done' && (
-        <div className="album-chips sync-panel__chips">
-          <span className="album-chip" title="Added">
-            <Plus aria-hidden="true" />
-            {job.added}
-          </span>
-          <span className="album-chip" title="Updated">
-            <PencilLine aria-hidden="true" />
-            {job.updated}
-          </span>
-          {job.failed.length > 0 && (
-            <span className="album-chip" title={failedTitle}>
-              <CircleAlert aria-hidden="true" />
-              {job.failed.length}
-            </span>
-          )}
-          {job.without_art.length > 0 && (
-            <span className="album-chip" title={`No cover art set:\n${job.without_art.map((item) => `${item.filename}: ${item.detail}`).join('\n')}`}>
-              <ImageOff aria-hidden="true" />
-              {job.without_art.length}
-            </span>
-          )}
-        </div>
+    <>
+      {failed.length > 0 && (
+        <span className="album-chip" title={failureList(failed)}>
+          <CircleAlert aria-hidden="true" />
+          {failed.length}
+        </span>
       )}
-      <button type="button" className="btn-primary" onClick={onDismiss} disabled={busy}>
-        <Check aria-hidden="true" />
-        Done
-      </button>
-    </section>
+      {withoutArt.length > 0 && (
+        <span className="album-chip" title={`No cover art set:\n${failureList(withoutArt)}`}>
+          <ImageOff aria-hidden="true" />
+          {withoutArt.length}
+        </span>
+      )}
+    </>
+  );
+}
+
+function MusicEmpty({ scanning }: { scanning: boolean }) {
+  return (
+    <div className="sync-empty glass">
+      {scanning ? (
+        <Spinner />
+      ) : (
+        <span className="sync-radar" aria-hidden="true">
+          <AppleMusicIcon />
+        </span>
+      )}
+    </div>
   );
 }
 
 export function MusicPage() {
-  const { available, folder, setFolder, diff, scanning, job, busy, scan, startSync, dismiss } = useMusicSync();
-  const [excluded, setExcluded] = useState<{ diff: MusicDiff | null; names: ReadonlySet<string> }>({
-    diff: null,
-    names: EMPTY_NAMES,
-  });
+  const songs = useMusicSync();
+  const { available, folder, setFolder } = songs;
+  const [step, setStep] = useState<MusicStep>('songs');
+  const playlists = usePlaylistMusicSync(folder, available === true && step === 'playlists');
 
   if (available === null) {
     return (
@@ -197,50 +162,150 @@ export function MusicPage() {
     );
   }
 
-  const excludedNames = excluded.diff === diff ? excluded.names : EMPTY_NAMES;
-  const inBoth = (diff?.both ?? []).filter((pair) => !hasChanges(pair));
+  const inBoth = (songs.diff?.both ?? []).filter((pair) => !hasChanges(pair));
   const toSync = [
-    ...(diff?.both ?? []).filter(hasChanges),
-    ...(diff?.only_in_library ?? []).map((track) => ({ track, music: null, changes: [] })),
+    ...(songs.diff?.both ?? []).filter(hasChanges),
+    ...(songs.diff?.only_in_library ?? []).map((track) => ({ track, music: null, changes: [] })),
   ].sort((a, b) => trackSortKey(a.track).localeCompare(trackSortKey(b.track)));
-  const selected = toSync.map((entry) => entry.track).filter((track) => !excludedNames.has(track.filename));
-  const jobOpen = job !== null;
+  const playlistChanges = (playlists.diff?.only_in_music.length ?? 0) + (playlists.diff?.to_sync.length ?? 0);
+
+  const active = step === 'songs' ? songs : playlists;
+  const pendingCount = step === 'songs' ? toSync.length : playlistChanges;
+  const jobOpen = active.job !== null;
+  const anySyncing = songs.job?.status === 'syncing' || playlists.job?.status === 'syncing';
   const folderMissing = !folder.trim();
+  const songsPending = songs.diff !== null && toSync.length > 0;
+  const songsBlocking = step === 'playlists' && (playlists.diff?.songs_pending ?? 0) > 0;
 
-  const setExcludedNames = (names: ReadonlySet<string>) => setExcluded({ diff, names });
+  const switchStep = (next: MusicStep) => {
+    if (next === step) return;
+    setStep(next);
+    const target = next === 'songs' ? songs : playlists;
+    if (target.diff && !target.job) void target.scan();
+  };
 
-  const selectionFor = (filename: string): Selection => ({
-    checked: !excludedNames.has(filename),
-    onToggle: () => {
-      const next = new Set(excludedNames);
-      if (next.has(filename)) next.delete(filename);
-      else next.add(filename);
-      setExcludedNames(next);
-    },
-  });
+  const startSync = () => {
+    if (step === 'songs') void songs.startSync();
+    else void playlists.startSync();
+  };
 
-  const selectAll = (tracks: MP3Info[]) => {
-    const included = tracks.filter((track) => !excludedNames.has(track.filename)).length;
-    const allSelected = tracks.length > 0 && included === tracks.length;
-    const toggle = () => {
-      const next = new Set(excludedNames);
-      tracks.forEach((track) => (allSelected ? next.add(track.filename) : next.delete(track.filename)));
-      setExcludedNames(next);
-    };
+  const renderBody = () => {
+    if (step === 'playlists') {
+      if (playlists.job) {
+        const { job } = playlists;
+        return (
+          <MusicJobPanel
+            status={job.status}
+            error={job.error}
+            total={job.total}
+            done={job.created + job.updated + job.deleted + job.failed.length}
+            failed={job.failed.length}
+            busy={playlists.busy}
+            onDismiss={() => void playlists.dismiss()}
+          >
+            <span className="album-chip" title="Added">
+              <Plus aria-hidden="true" />
+              {job.created}
+            </span>
+            <span className="album-chip" title="Updated">
+              <PencilLine aria-hidden="true" />
+              {job.updated}
+            </span>
+            {job.deleted > 0 && (
+              <span className="album-chip" title="Deleted">
+                <Trash2 aria-hidden="true" />
+                {job.deleted}
+              </span>
+            )}
+            <FailureChips failed={job.failed} withoutArt={job.without_art} />
+          </MusicJobPanel>
+        );
+      }
+      if (!playlists.diff) return <MusicEmpty scanning={playlists.scanning} />;
+      return (
+        <PlaylistColumns diff={playlists.diff} scanning={playlists.scanning} />
+      );
+    }
+
+    if (songs.job) {
+      const { job } = songs;
+      return (
+        <MusicJobPanel
+          status={job.status}
+          error={job.error}
+          total={job.total}
+          done={job.added + job.updated + job.failed.length}
+          failed={job.failed.length}
+          busy={songs.busy}
+          onDismiss={() => void songs.dismiss()}
+        >
+          <span className="album-chip" title="Added">
+            <Plus aria-hidden="true" />
+            {job.added}
+          </span>
+          <span className="album-chip" title="Updated">
+            <PencilLine aria-hidden="true" />
+            {job.updated}
+          </span>
+          <FailureChips failed={job.failed} withoutArt={job.without_art} />
+        </MusicJobPanel>
+      );
+    }
+    if (!songs.diff) return <MusicEmpty scanning={songs.scanning} />;
+    const { diff } = songs;
     return (
-      <Checkbox
-        label="Select all"
-        checked={allSelected}
-        indeterminate={included > 0 && !allSelected}
-        onChange={toggle}
-        disabled={tracks.length === 0}
-      />
+      <div className={`music-columns ${songs.scanning ? 'is-scanning' : ''}`.trim()} aria-busy={songs.scanning}>
+        <DiffColumn icon={AppleMusicIcon} label="Only in Apple Music" count={diff.only_in_music.length}>
+          {diff.only_in_music.map((track) => (
+            <MusicRow key={track.persistent_id} track={track} />
+          ))}
+        </DiffColumn>
+        <DiffColumn icon={Check} label="In both" count={inBoth.length}>
+          {inBoth.map((pair) => (
+            <PairRow key={pair.track.filename} pair={pair} />
+          ))}
+        </DiffColumn>
+        <DiffColumn icon={RefreshCw} label="To sync" count={toSync.length}>
+          {toSync.map((entry) =>
+            entry.music ? (
+              <PairRow key={entry.track.filename} pair={entry} />
+            ) : (
+              <LocalRow key={entry.track.filename} track={entry.track} />
+            ),
+          )}
+        </DiffColumn>
+      </div>
     );
   };
 
   return (
     <div className="page page--fill sync-page music-page">
       <div className="sync-toolbar glass">
+        <div className="music-steps" role="group" aria-label="Sync step">
+          <button
+            type="button"
+            className={`music-step ${step === 'songs' ? 'is-active' : ''}`.trim()}
+            aria-pressed={step === 'songs'}
+            aria-label="Songs"
+            title="Songs"
+            onClick={() => switchStep('songs')}
+            disabled={anySyncing}
+          >
+            <Music aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className={`music-step ${step === 'playlists' ? 'is-active' : ''}`.trim()}
+            aria-pressed={step === 'playlists'}
+            aria-label={songsPending ? 'Playlists (songs still to sync)' : 'Playlists'}
+            title={songsPending ? 'Playlists (songs still to sync)' : 'Playlists'}
+            onClick={() => switchStep('playlists')}
+            disabled={anySyncing}
+          >
+            <ListMusic aria-hidden="true" />
+            {songsPending && <span className="music-step__dot" aria-hidden="true" />}
+          </button>
+        </div>
         <IconField
           icon={Folder}
           label="Apple Music folder"
@@ -248,7 +313,7 @@ export function MusicPage() {
           value={folder}
           onChange={(e) => setFolder(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') void scan();
+            if (e.key === 'Enter') void active.scan();
           }}
           aria-invalid={folderMissing}
           disabled={jobOpen}
@@ -258,61 +323,22 @@ export function MusicPage() {
           icon={ScanSearch}
           label="Compare again"
           className="sync-toolbar__push"
-          onClick={() => void scan()}
-          disabled={scanning || folderMissing || jobOpen}
+          onClick={() => void active.scan()}
+          disabled={active.scanning || folderMissing || jobOpen}
         />
         <button
           type="button"
           className="btn-primary music-add"
-          onClick={() => void startSync(selected.map((track) => track.filename))}
-          disabled={busy || scanning || jobOpen || selected.length === 0}
-          title="Sync with Apple Music"
+          onClick={startSync}
+          disabled={active.busy || active.scanning || jobOpen || anySyncing || songsBlocking || pendingCount === 0}
+          title={songsBlocking ? 'Sync songs first' : 'Sync with Apple Music'}
         >
           <RefreshCw aria-hidden="true" />
-          {selected.length}
+          {pendingCount}
         </button>
       </div>
 
-      {job ? (
-        <SyncPanel job={job} busy={busy} onDismiss={() => void dismiss()} />
-      ) : !diff ? (
-        <div className="sync-empty glass">
-          {scanning ? (
-            <Spinner />
-          ) : (
-            <span className="sync-radar" aria-hidden="true">
-              <AppleMusicIcon />
-            </span>
-          )}
-        </div>
-      ) : (
-        <div className={`music-columns ${scanning ? 'is-scanning' : ''}`.trim()} aria-busy={scanning}>
-          <DiffColumn icon={AppleMusicIcon} label="Only in Apple Music" count={diff.only_in_music.length}>
-            {diff.only_in_music.map((track) => (
-              <MusicRow key={track.persistent_id} track={track} />
-            ))}
-          </DiffColumn>
-          <DiffColumn icon={Check} label="In both" count={inBoth.length}>
-            {inBoth.map((pair) => (
-              <PairRow key={pair.track.filename} pair={pair} />
-            ))}
-          </DiffColumn>
-          <DiffColumn
-            icon={RefreshCw}
-            label="To sync"
-            count={toSync.length}
-            leading={selectAll(toSync.map((entry) => entry.track))}
-          >
-            {toSync.map((entry) =>
-              entry.music ? (
-                <PairRow key={entry.track.filename} pair={entry} selection={selectionFor(entry.track.filename)} />
-              ) : (
-                <LocalRow key={entry.track.filename} track={entry.track} selection={selectionFor(entry.track.filename)} />
-              ),
-            )}
-          </DiffColumn>
-        </div>
-      )}
+      {renderBody()}
     </div>
   );
 }

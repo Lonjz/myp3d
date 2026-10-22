@@ -2,10 +2,10 @@ import type { ReactNode } from 'react';
 import { Check, Music } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
-export function Cover({ src }: { src?: string }) {
+export function Cover({ src, icon: Icon = Music }: { src?: string; icon?: LucideIcon }) {
   return (
     <span className="music-cover" aria-hidden="true">
-      {src ? <img src={src} alt="" loading="lazy" /> : <Music />}
+      {src ? <img src={src} alt="" loading="lazy" /> : <Icon />}
     </span>
   );
 }
@@ -23,19 +23,16 @@ export function DiffColumn({
   icon: Icon,
   label,
   count,
-  leading,
   children,
 }: {
   icon: LucideIcon;
   label: string;
   count: number;
-  leading?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <section className="music-column glass" aria-label={label}>
       <header className="music-column__header">
-        {leading}
         <span className="music-column__heading" title={label}>
           <Icon className="music-column__icon" aria-hidden="true" />
           <span className="album-chip music-column__count">{count}</span>

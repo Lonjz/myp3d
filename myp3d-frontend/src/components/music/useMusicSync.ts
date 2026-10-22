@@ -81,19 +81,16 @@ export function useMusicSync() {
     };
   }, [syncing]);
 
-  const startSync = useCallback(
-    async (filenames: string[]) => {
-      setBusy(true);
-      try {
-        setJob(await musicApi.startSync(filenames, folderRef.current.trim()));
-      } catch (err) {
-        showError(errorMessage(err, 'Failed to sync with Apple Music'));
-      } finally {
-        setBusy(false);
-      }
-    },
-    [showError],
-  );
+  const startSync = useCallback(async () => {
+    setBusy(true);
+    try {
+      setJob(await musicApi.startSync(folderRef.current.trim()));
+    } catch (err) {
+      showError(errorMessage(err, 'Failed to sync with Apple Music'));
+    } finally {
+      setBusy(false);
+    }
+  }, [showError]);
 
   const dismiss = useCallback(async () => {
     setBusy(true);
