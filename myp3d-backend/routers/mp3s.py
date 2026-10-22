@@ -17,6 +17,7 @@ from models.schemas import (
     PaginatedMP3Response,
     PaginationMeta,
 )
+from services import playlist_service
 from services.config import OUTPUT_DIR
 from services.cover_service import CoverSize, get_cover_variant
 from services.mp3_service import (
@@ -147,6 +148,7 @@ def bulk_delete(payload: BulkTracksRequest):
             continue
         deleted.append(filepath.name)
 
+    playlist_service.remove_tracks(deleted)
     invalidate_library_cache()
     return BulkResult(success=not failed, updated=deleted, failed=failed)
 
@@ -204,6 +206,7 @@ def update_metadata(filename: str, metadata: MetadataUpdate):
         if new_path.exists():
             raise HTTPException(status_code=400, detail="A file with that name already exists")
         filepath.rename(new_path)
+        playlist_service.rename_track(filepath.name, new_name)
         new_filename = new_name
 
     invalidate_library_cache()
@@ -279,6 +282,7 @@ def delete_mp3(filename: str):
         raise HTTPException(status_code=404, detail="MP3 file not found")
     
     filepath.unlink()
+    playlist_service.remove_tracks([filepath.name])
     invalidate_library_cache()
     return {"success": True, "message": f"Deleted: {filename}"}
 

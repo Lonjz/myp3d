@@ -38,6 +38,22 @@ def _render_variant(image_data: bytes, size: CoverSize) -> bytes:
     return output.getvalue()
 
 
+def _cached_variant(key: tuple[str, int, str]) -> Optional[bytes]:
+    with _cache_lock:
+        cached = _cache.get(key)
+        if cached is not None:
+            _cache.move_to_end(key)
+        return cached
+
+
+def _remember_variant(key: tuple[str, int, str], variant: bytes) -> None:
+    with _cache_lock:
+        _cache[key] = variant
+        _cache.move_to_end(key)
+        while len(_cache) > _MAX_CACHE_ENTRIES:
+            _cache.popitem(last=False)
+
+
 def get_cover_variant(filepaths: list[Path], size: CoverSize) -> Optional[tuple[bytes, str]]:
     for filepath in filepaths:
         try:
@@ -46,22 +62,26 @@ def get_cover_variant(filepaths: list[Path], size: CoverSize) -> Optional[tuple[
             continue
 
         key = (str(filepath), modified, size)
-        with _cache_lock:
-            cached = _cache.get(key)
-            if cached is not None:
-                _cache.move_to_end(key)
-                return cached, WEBP_MIME_TYPE
+        cached = _cached_variant(key)
+        if cached is not None:
+            return cached, WEBP_MIME_TYPE
 
         cover = get_album_cover([filepath])
         if cover is None:
             continue
 
         variant = _render_variant(cover[0], size)
-        with _cache_lock:
-            _cache[key] = variant
-            _cache.move_to_end(key)
-            while len(_cache) > _MAX_CACHE_ENTRIES:
-                _cache.popitem(last=False)
+        _remember_variant(key, variant)
         return variant, WEBP_MIME_TYPE
 
     return None
+
+
+def get_image_variant(cache_key: str, image_data: bytes, size: CoverSize) -> tuple[bytes, str]:
+    key = (cache_key, 0, size)
+    cached = _cached_variant(key)
+    if cached is not None:
+        return cached, WEBP_MIME_TYPE
+    variant = _render_variant(image_data, size)
+    _remember_variant(key, variant)
+    return variant, WEBP_MIME_TYPE
