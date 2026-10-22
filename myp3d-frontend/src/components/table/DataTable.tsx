@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, HTMLAttributes, ReactNode } from 'react';
 import { rowOpenProps } from '../../utils/rowOpen';
 import { Spinner } from '../ui/Spinner';
 
@@ -17,6 +17,7 @@ interface DataTableProps<T> {
   items: T[];
   getRowKey: (item: T) => string;
   getRowClassName?: (item: T) => string | undefined;
+  getRowProps?: (item: T, index: number) => HTMLAttributes<HTMLTableRowElement>;
   onRowOpen?: (item: T) => void;
   emptyMessage: string;
   className?: string;
@@ -34,6 +35,7 @@ export function DataTable<T>({
   items,
   getRowKey,
   getRowClassName,
+  getRowProps,
   onRowOpen,
   emptyMessage,
   className,
@@ -135,6 +137,7 @@ export function DataTable<T>({
                 items.map((item, index) => (
                   <tr
                     key={getRowKey(item)}
+                    {...getRowProps?.(item, index)}
                     {...(onRowOpen ? rowOpenProps<HTMLTableRowElement>(() => onRowOpen(item)) : undefined)}
                     className={[getRowClassName?.(item), onRowOpen ? 'is-clickable' : ''].filter(Boolean).join(' ') || undefined}
                     style={{ '--row': index } as CSSProperties}

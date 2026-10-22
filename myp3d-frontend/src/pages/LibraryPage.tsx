@@ -5,6 +5,7 @@ import {
   Download,
   ListChecks,
   ListFilter,
+  ListPlus,
   Pencil,
   Play,
   RefreshCw,
@@ -33,6 +34,7 @@ import type { DataTableColumn } from '../components/table/DataTable';
 import { SortableHeaderButton } from '../components/table/SortableHeaderButton';
 import { BulkEditDialog } from '../components/library/BulkEditDialog';
 import { useLibrarySelectionCommands } from '../components/library/useLibrarySelectionCommands';
+import { AddToPlaylistDialog } from '../components/playlists/AddToPlaylistDialog';
 import { useToast } from '../components/messages/toastContext';
 import { CoverPlayButton } from '../components/player/CoverPlayButton';
 import { usePlayer } from '../components/player/playerContext';
@@ -116,6 +118,8 @@ export function LibraryPage() {
   const [selectingAll, setSelectingAll] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const editPresence = usePresence(editOpen);
+  const [playlistOpen, setPlaylistOpen] = useState(false);
+  const playlistPresence = usePresence(playlistOpen);
   const [deleteTargets, setDeleteTargets] = useState<string[] | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { clear: clearSelection } = selection;
@@ -197,6 +201,9 @@ export function LibraryPage() {
   const editSelected = () => {
     if (hasSelection) setEditOpen(true);
   };
+  const addSelectedToPlaylist = () => {
+    if (hasSelection) setPlaylistOpen(true);
+  };
   const downloadSelected = () => {
     if (hasSelection) void downloads.start(selection.filenames);
   };
@@ -209,6 +216,7 @@ export function LibraryPage() {
     clear: selection.clear,
     play: playSelected,
     edit: editSelected,
+    addToPlaylist: addSelectedToPlaylist,
     download: downloadSelected,
     remove: deleteSelected,
   });
@@ -387,6 +395,7 @@ export function LibraryPage() {
             </span>
             <IconButton icon={Play} label="Play selected" onClick={playSelected} />
             <IconButton icon={Pencil} label="Edit selected" onClick={editSelected} disabled={deleting} />
+            <IconButton icon={ListPlus} label="Add to playlist" onClick={addSelectedToPlaylist} disabled={deleting} />
             {downloadControl}
             <IconButton icon={Trash2} label="Delete selected" variant="danger" onClick={deleteSelected} disabled={deleting} />
           </Fragment>
@@ -441,6 +450,18 @@ export function LibraryPage() {
           onClose={() => setEditOpen(false)}
           onSaved={() => {
             setEditOpen(false);
+            selection.clear();
+          }}
+        />
+      )}
+
+      {playlistPresence.mounted && (
+        <AddToPlaylistDialog
+          filenames={selection.filenames}
+          closing={playlistPresence.closing}
+          onClose={() => setPlaylistOpen(false)}
+          onAdded={() => {
+            setPlaylistOpen(false);
             selection.clear();
           }}
         />

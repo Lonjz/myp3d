@@ -21,6 +21,35 @@
   background: rgba(255, 255, 255, 0.1);
 }
 
+.icon-field--area {
+  align-items: flex-start;
+  padding-block: var(--space-3);
+  border-radius: var(--radius-lg);
+}
+
+.icon-field--area .icon-field__icon {
+  margin-top: 2px;
+}
+
+.icon-field--area textarea {
+  flex: 1;
+  min-width: 0;
+  min-height: 2.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  resize: vertical;
+  outline: none;
+}
+
+.icon-field--area textarea::placeholder {
+  color: var(--color-text-muted);
+}
+
 .icon-field:focus-within {
   border-color: color-mix(in srgb, var(--color-accent) 70%, transparent);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-accent) 18%, transparent);

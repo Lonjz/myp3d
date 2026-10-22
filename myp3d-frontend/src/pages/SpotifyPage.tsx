@@ -6,7 +6,7 @@ import {
   ChevronDown,
   CircleAlert,
   CircleCheck,
-  ListMusic,
+  Library,
   ListPlus,
   ListX,
   MonitorPlay,
@@ -49,7 +49,7 @@ function RowStatus({ row }: { row: SpotifyRow }) {
   if (row.match?.in_library) {
     return (
       <span className="spotify-status" title="Already in library" aria-label="Already in library">
-        <ListMusic aria-hidden="true" />
+        <Library aria-hidden="true" />
       </span>
     );
   }

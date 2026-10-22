@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { Download, ListChecks, Pencil, Play, Trash2, X } from 'lucide-react';
+import { Download, ListChecks, ListPlus, Pencil, Play, Trash2, X } from 'lucide-react';
 import { useSpotlightCommands } from '../spotlight/useSpotlightCommands';
 import type { SpotlightCommand } from '../spotlight/spotlightTypes';
 
@@ -8,6 +8,7 @@ interface LibrarySelectionActions {
   clear: () => void;
   play: () => void;
   edit: () => void;
+  addToPlaylist: () => void;
   download: () => void;
   remove: () => void;
 }
@@ -34,6 +35,7 @@ export function useLibrarySelectionCommands(count: number, actions: LibrarySelec
       selectAll,
       { id: 'play-selected', title: `Play ${target}`, icon: Play, keywords: ['bulk', 'queue'], run: () => actionsRef.current.play() },
       { id: 'edit-selected', title: `Edit ${target}`, icon: Pencil, keywords: ['bulk', 'artist', 'album', 'cover'], run: () => actionsRef.current.edit() },
+      { id: 'add-selected-to-playlist', title: `Add ${target} to a playlist`, icon: ListPlus, keywords: ['bulk', 'playlist', 'collection'], run: () => actionsRef.current.addToPlaylist() },
       { id: 'download-selected', title: `Download ${target}`, icon: Download, keywords: ['bulk', 'save', 'export'], run: () => actionsRef.current.download() },
       { id: 'delete-selected', title: `Delete ${target}`, icon: Trash2, keywords: ['bulk', 'remove'], run: () => actionsRef.current.remove() },
       { id: 'clear-selection', title: 'Clear selection', icon: X, keywords: ['deselect', 'none'], run: () => actionsRef.current.clear() },

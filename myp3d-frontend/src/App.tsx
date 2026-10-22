@@ -7,6 +7,8 @@ import { LibraryPage } from './pages/LibraryPage';
 import { EditPage } from './pages/EditPage';
 import { AlbumsPage } from './pages/AlbumsPage';
 import { AlbumEditPage } from './pages/AlbumEditPage';
+import { PlaylistsPage } from './pages/PlaylistsPage';
+import { PlaylistEditPage } from './pages/PlaylistEditPage';
 import { SyncPage } from './pages/SyncPage';
 import { MusicPage } from './pages/MusicPage';
 import { DownloadsPage } from './pages/DownloadsPage';
@@ -66,6 +68,22 @@ function AlbumEditRoute() {
   );
 }
 
+function PlaylistEditRoute() {
+  const { playlistId } = useParams();
+  const navigate = useNavigate();
+
+  if (!playlistId) {
+    return <Navigate to="/playlists" replace />;
+  }
+
+  return (
+    <PlaylistEditPage
+      playlistId={safeDecode(playlistId)}
+      onBack={() => navigate('/playlists')}
+    />
+  );
+}
+
 const KEEP_ALIVE_PAGES: KeepAlivePage[] = [
   { path: '/dashboard', element: <DashboardPage /> },
   { path: '/query', element: <QueryPage /> },
@@ -73,12 +91,13 @@ const KEEP_ALIVE_PAGES: KeepAlivePage[] = [
   { path: '/downloads', element: <DownloadsPage /> },
   { path: '/library', element: <LibraryPage /> },
   { path: '/albums', element: <AlbumsPage /> },
+  { path: '/playlists', element: <PlaylistsPage /> },
   { path: '/export', element: <ExportPage /> },
   { path: '/sync', element: <SyncPage /> },
   { path: '/music', element: <MusicPage /> },
 ];
 
-const FILL_PATHS = new Set(['/library', '/albums', '/music', '/downloads', '/spotify']);
+const FILL_PATHS = new Set(['/library', '/albums', '/playlists', '/music', '/downloads', '/spotify']);
 
 function SidebarSearchButton() {
   const { open } = useSpotlight();
@@ -202,6 +221,7 @@ function App() {
                       <Route path="/download" element={<Navigate to="/query" replace />} />
                       <Route path="/details/:songName" element={<EditRoute />} />
                       <Route path="/albums/:albumKey" element={<AlbumEditRoute />} />
+                      <Route path="/playlists/:playlistId" element={<PlaylistEditRoute />} />
                       <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </Routes>
                   </KeepAliveRoutes>
