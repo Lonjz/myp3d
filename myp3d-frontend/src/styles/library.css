@@ -152,6 +152,15 @@
   background: var(--color-surface-hover);
 }
 
+.library-table tbody tr.is-clickable {
+  cursor: pointer;
+}
+
+.library-table tbody tr.is-clickable:focus-visible {
+  background: var(--selected-bg);
+  outline: none;
+}
+
 .library-table tbody tr.is-selected {
   background: color-mix(in srgb, var(--color-lavender) 16%, transparent);
 }

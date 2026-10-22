@@ -7,7 +7,6 @@ import {
   Download,
   Hourglass,
   Music,
-  Pencil,
   Play,
   RotateCcw,
   Scissors,
@@ -22,6 +21,7 @@ import { IconButton } from '../components/ui/IconButton';
 import { Spinner } from '../components/ui/Spinner';
 import { usePresence } from '../hooks/usePresence';
 import { formatDuration } from '../utils/formatters';
+import { rowOpenProps } from '../utils/rowOpen';
 import { getVideoIdFromUrl, getYouTubeThumbnailUrl } from '../utils/youtube';
 
 const subtitle = (item: QueueItem) => [item.artist, item.album].filter(Boolean).join(' · ');
@@ -99,7 +99,11 @@ function QueueRow({ item, index, busy, onStart, onEdit, onRemove }: QueueRowProp
       : null;
 
   return (
-    <li className={`music-row downloads-row downloads-row--${item.status}`} style={{ '--row': index } as CSSProperties}>
+    <li
+      className={`music-row downloads-row downloads-row--${item.status}${editable && !busy ? ' is-clickable' : ''}`}
+      style={{ '--row': index } as CSSProperties}
+      {...(editable && !busy ? rowOpenProps<HTMLLIElement>(onEdit) : undefined)}
+    >
       <span className={`music-cover ${item.has_cover ? '' : 'downloads-row__thumb'}`.trim()} aria-hidden="true">
         {cover ? <img src={cover} alt="" loading="lazy" /> : <Music />}
       </span>
@@ -124,7 +128,6 @@ function QueueRow({ item, index, busy, onStart, onEdit, onRemove }: QueueRowProp
             disabled={busy}
           />
         )}
-        {editable && <IconButton icon={Pencil} label="Edit" size="sm" variant="ghost" onClick={onEdit} disabled={busy} />}
         {item.status !== 'running' && (
           <IconButton icon={X} label="Remove" size="sm" variant="ghost" onClick={onRemove} disabled={busy} />
         )}

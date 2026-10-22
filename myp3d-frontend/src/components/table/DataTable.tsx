@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
+import { rowOpenProps } from '../../utils/rowOpen';
 import { Spinner } from '../ui/Spinner';
 
 export interface DataTableColumn<T> {
@@ -7,6 +8,7 @@ export interface DataTableColumn<T> {
   header: ReactNode;
   width?: string;
   hideBelow?: 'md' | 'sm';
+  noRowOpen?: boolean;
   render: (item: T, index: number) => ReactNode;
 }
 
@@ -15,6 +17,7 @@ interface DataTableProps<T> {
   items: T[];
   getRowKey: (item: T) => string;
   getRowClassName?: (item: T) => string | undefined;
+  onRowOpen?: (item: T) => void;
   emptyMessage: string;
   className?: string;
   fill?: boolean;
@@ -31,6 +34,7 @@ export function DataTable<T>({
   items,
   getRowKey,
   getRowClassName,
+  onRowOpen,
   emptyMessage,
   className,
   fill = false,
@@ -131,11 +135,12 @@ export function DataTable<T>({
                 items.map((item, index) => (
                   <tr
                     key={getRowKey(item)}
-                    className={getRowClassName?.(item)}
+                    {...(onRowOpen ? rowOpenProps<HTMLTableRowElement>(() => onRowOpen(item)) : undefined)}
+                    className={[getRowClassName?.(item), onRowOpen ? 'is-clickable' : ''].filter(Boolean).join(' ') || undefined}
                     style={{ '--row': index } as CSSProperties}
                   >
                     {columns.map((column) => (
-                      <td key={column.key} data-hide={column.hideBelow}>
+                      <td key={column.key} data-hide={column.hideBelow} data-no-row-open={column.noRowOpen || undefined}>
                         {column.render(item, index)}
                       </td>
                     ))}

@@ -237,6 +237,7 @@ export function LibraryPage() {
         />
       ),
       width: '3.25rem',
+      noRowOpen: true,
       render: (mp3, index) => (
         <Checkbox
           label={`Select ${mp3.title || mp3.filename}`}
@@ -320,15 +321,9 @@ export function LibraryPage() {
     {
       key: 'actions',
       header: <span className="sr-only">Actions</span>,
-      width: '148px',
+      width: '108px',
       render: (mp3) => (
         <div className="table-actions">
-          <IconButton
-            icon={Pencil}
-            label="Edit"
-            size="sm"
-            onClick={() => navigate(`/details/${encodeURIComponent(mp3.filename)}`)}
-          />
           <a
             href={mp3Api.getFileUrl(mp3.filename)}
             download
@@ -374,6 +369,7 @@ export function LibraryPage() {
         columns={columns}
         items={mp3s}
         getRowKey={getTrackKey}
+        onRowOpen={(mp3) => navigate(`/details/${encodeURIComponent(mp3.filename)}`)}
         getRowClassName={(mp3) => (selection.isSelected(mp3.filename) ? 'is-selected' : undefined)}
         className="library-table--selectable"
         emptyMessage={debouncedSearchQuery.trim() ? 'No matches' : 'No tracks yet'}

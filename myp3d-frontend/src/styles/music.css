@@ -122,6 +122,16 @@
   background: rgba(255, 255, 255, 0.05);
 }
 
+.music-row.is-clickable {
+  cursor: pointer;
+}
+
+.music-row.is-clickable:focus-visible {
+  background: var(--selected-bg);
+  box-shadow: var(--selected-shadow);
+  outline: none;
+}
+
 .music-cover {
   display: inline-flex;
   flex-shrink: 0;

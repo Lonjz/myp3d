@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Pencil, RefreshCw, Search } from 'lucide-react';
+import { RefreshCw, Search } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { AlbumInfo, AlbumSortBy } from '../api/mp3Api';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
@@ -131,21 +131,6 @@ export function AlbumsPage() {
       hideBelow: 'sm',
       render: (album) => <span className="library-date" title={formatDateTime(album.date_added)}>{formatDate(album.date_added)}</span>,
     },
-    {
-      key: 'actions',
-      header: <span className="sr-only">Actions</span>,
-      width: '72px',
-      render: (album) => (
-        <div className="table-actions">
-          <IconButton
-            icon={Pencil}
-            label="Edit album"
-            size="sm"
-            onClick={() => navigate(`/albums/${encodeURIComponent(album.album_key)}`)}
-          />
-        </div>
-      ),
-    },
   ];
 
   return (
@@ -157,6 +142,7 @@ export function AlbumsPage() {
         columns={columns}
         items={albums}
         getRowKey={getAlbumKey}
+        onRowOpen={(album) => navigate(`/albums/${encodeURIComponent(album.album_key)}`)}
         emptyMessage={debouncedSearchQuery.trim() ? 'No matches' : 'No albums yet'}
         loading={loading}
         loadingMore={loadingMore}
