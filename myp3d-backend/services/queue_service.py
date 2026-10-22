@@ -1,16 +1,15 @@
 import sqlite3
 import threading
 import urllib.request
-from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Optional
 
 from models.schemas import QueueItem, QueueItemCreate, QueueItemUpdate
-from services.config import BASE_DIR, OUTPUT_DIR
+from services.config import OUTPUT_DIR
+from services.db import connect as _connect
 from services.mp3_service import download_as_mp3, make_square_cover, square_cover_from_base64, validate_trim_range
 
-DB_PATH = BASE_DIR / "myp3d.db"
 COVER_FETCH_TIMEOUT_S = 15
 EDITABLE_STATUSES = ("pending", "failed")
 
@@ -52,17 +51,6 @@ class QueueError(Exception):
 _lock = threading.Lock()
 _progress: dict[int, float] = {}
 _worker: Optional[threading.Thread] = None
-
-
-@contextmanager
-def _connect() -> Iterator[sqlite3.Connection]:
-    conn = sqlite3.connect(DB_PATH, timeout=10)
-    conn.row_factory = sqlite3.Row
-    try:
-        with conn:
-            yield conn
-    finally:
-        conn.close()
 
 
 def _now() -> str:
