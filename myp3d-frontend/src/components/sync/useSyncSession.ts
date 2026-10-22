@@ -81,6 +81,8 @@ export function useSyncSession(port: number | null) {
     if (refreshedSessionRef.current === session.id) return;
     refreshedSessionRef.current = session.id;
     emitAppEvent('library-changed');
+    emitAppEvent('playlists-changed');
+    emitAppEvent('queue-changed');
   }, [session]);
 
   const pairedId = session?.status === 'paired' ? session.id : null;

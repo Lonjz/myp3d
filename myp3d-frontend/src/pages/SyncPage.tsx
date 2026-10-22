@@ -7,17 +7,20 @@ import {
   CircleAlert,
   CircleCheck,
   CircleX,
+  Download,
   Link as LinkIcon,
+  ListMusic,
   MonitorSmartphone,
   MonitorUp,
   Radio,
   Replace,
   ScanSearch,
+  Trash2,
   X,
 } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import { syncApi } from '../api/syncApi';
-import type { SyncDiff, SyncDiffTrack, SyncSession } from '../api/syncApi';
+import type { SyncDiff, SyncDiffRecord, SyncDiffTrack, SyncSession } from '../api/syncApi';
 import { Cover, DiffColumn, TrackText } from '../components/diff/DiffColumns';
 import { useSyncSession } from '../components/sync/useSyncSession';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -66,6 +69,39 @@ function DiffRow({
   );
 }
 
+function RecordRow({
+  record,
+  replacesLabel,
+  deletesLabel,
+}: {
+  record: SyncDiffRecord;
+  replacesLabel?: string;
+  deletesLabel?: string;
+}) {
+  const badge = record.deleted
+    ? deletesLabel && { icon: Trash2, label: deletesLabel, danger: true }
+    : record.replaces && replacesLabel && { icon: Replace, label: replacesLabel, danger: false };
+  return (
+    <li className="music-row">
+      <Cover icon={record.kind === 'playlist' ? ListMusic : Download} />
+      <TrackText title={record.name} sub="" />
+      {badge && (
+        <span className="music-changes">
+          <span
+            className={`music-change ${badge.danger ? 'music-change--danger' : ''}`.trim()}
+            title={badge.label}
+            aria-label={badge.label}
+          >
+            <badge.icon aria-hidden="true" />
+          </span>
+        </span>
+      )}
+    </li>
+  );
+}
+
+const recordKey = (record: SyncDiffRecord) => `${record.kind}:${record.key}`;
+
 function PairedColumns({ diff, loading, peerName }: { diff: SyncDiff | null; loading: boolean; peerName: string }) {
   if (!diff) {
     return (
@@ -77,23 +113,46 @@ function PairedColumns({ diff, loading, peerName }: { diff: SyncDiff | null; loa
 
   return (
     <div className={`music-columns ${loading ? 'is-scanning' : ''}`.trim()} aria-busy={loading}>
-      <DiffColumn icon={ArrowDown} label={`From ${peerName}`} count={diff.incoming.length}>
+      <DiffColumn
+        icon={ArrowDown}
+        label={`From ${peerName}`}
+        count={diff.incoming.length + diff.incoming_records.length}
+      >
         {diff.incoming.map((track) => (
           <DiffRow key={track.filename} track={track} coverUrl={peerCover} replacesLabel="Replaces your copy" />
         ))}
+        {diff.incoming_records.map((record) => (
+          <RecordRow
+            key={recordKey(record)}
+            record={record}
+            replacesLabel="Replaces your copy"
+            deletesLabel="Deletes your copy"
+          />
+        ))}
       </DiffColumn>
-      <DiffColumn icon={Check} label="On both" count={diff.both.length}>
+      <DiffColumn icon={Check} label="On both" count={diff.both.length + diff.both_records.length}>
         {diff.both.map((track) => (
           <DiffRow key={track.filename} track={track} coverUrl={localCover} />
         ))}
+        {diff.both_records.map((record) => (
+          <RecordRow key={recordKey(record)} record={record} />
+        ))}
       </DiffColumn>
-      <DiffColumn icon={ArrowUp} label={`To ${peerName}`} count={diff.outgoing.length}>
+      <DiffColumn icon={ArrowUp} label={`To ${peerName}`} count={diff.outgoing.length + diff.outgoing_records.length}>
         {diff.outgoing.map((track) => (
           <DiffRow
             key={track.filename}
             track={track}
             coverUrl={localCover}
             replacesLabel={`Replaces the copy on ${peerName}`}
+          />
+        ))}
+        {diff.outgoing_records.map((record) => (
+          <RecordRow
+            key={recordKey(record)}
+            record={record}
+            replacesLabel={`Replaces the copy on ${peerName}`}
+            deletesLabel={`Deletes it on ${peerName}`}
           />
         ))}
       </DiffColumn>
@@ -197,7 +256,9 @@ export function SyncPage() {
   const listening = status?.port != null && status.port === port && !startError;
   const paired = session?.status === 'paired' ? session : null;
   const showSession = session !== null && session.status !== 'incoming' && !paired;
-  const pending = diff ? diff.incoming.length + diff.outgoing.length : 0;
+  const pending = diff
+    ? diff.incoming.length + diff.outgoing.length + diff.incoming_records.length + diff.outgoing_records.length
+    : 0;
 
   return (
     <div className={`page sync-page ${paired ? 'page--fill sync-page--paired' : ''}`.trim()}>

@@ -45,10 +45,21 @@ export interface SyncDiffTrack {
   replaces: boolean;
 }
 
+export interface SyncDiffRecord {
+  kind: 'playlist' | 'download';
+  key: string;
+  name: string;
+  deleted: boolean;
+  replaces: boolean;
+}
+
 export interface SyncDiff {
   incoming: SyncDiffTrack[];
   both: SyncDiffTrack[];
   outgoing: SyncDiffTrack[];
+  incoming_records: SyncDiffRecord[];
+  both_records: SyncDiffRecord[];
+  outgoing_records: SyncDiffRecord[];
 }
 
 const post = <T>(path: string, body: unknown, fallbackError: string) =>
