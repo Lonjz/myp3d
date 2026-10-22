@@ -325,10 +325,6 @@ class MusicDiff(BaseModel):
     only_in_library: list[MP3Info]
 
 
-class MusicSyncRequest(BulkTracksRequest):
-    folder: str = Field(min_length=1)
-
-
 class MusicSyncInfo(BaseModel):
     status: Literal["syncing", "done", "failed"]
     total: int = 0
@@ -419,3 +415,32 @@ class PlaylistUpdate(BaseModel):
 
 class PlaylistTracksRequest(BaseModel):
     filenames: list[str] = Field(min_length=1)
+
+
+class MusicPlaylistEntry(BaseModel):
+    key: str
+    name: str
+    action: Literal["import", "export", "pull", "push", "merge", "link", "delete_local", "delete_music", "in_sync"]
+    track_count: int = 0
+    left_out: int = 0
+    playlist_id: Optional[str] = None
+    has_cover: bool = False
+    updated_at: Optional[str] = None
+
+
+class MusicPlaylistDiff(BaseModel):
+    songs_pending: int = 0
+    only_in_music: list[MusicPlaylistEntry]
+    in_sync: list[MusicPlaylistEntry]
+    to_sync: list[MusicPlaylistEntry]
+
+
+class MusicPlaylistSyncInfo(BaseModel):
+    status: Literal["syncing", "done", "failed"]
+    total: int = 0
+    created: int = 0
+    updated: int = 0
+    deleted: int = 0
+    failed: list[BulkFailure] = Field(default_factory=list)
+    without_art: list[BulkFailure] = Field(default_factory=list)
+    error: Optional[str] = None

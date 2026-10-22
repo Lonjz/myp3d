@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from routers import albums, cache, download, export, mp3s, music, peer, playlists, queue, search, spotify, stats, sync, youtube
-from services import playlist_service, queue_service
+from services import music_playlist_service, playlist_service, queue_service
 from services.config import API_PORT
 from services.discovery_service import discovery
 
@@ -28,6 +28,7 @@ def _is_loopback(host: Optional[str]) -> bool:
 async def lifespan(_: FastAPI):
     queue_service.init()
     playlist_service.init()
+    music_playlist_service.init()
     yield
     discovery.stop()
 

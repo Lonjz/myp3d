@@ -2,8 +2,15 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
-from models.schemas import MusicDiff, MusicFolderRequest, MusicStatus, MusicSyncInfo, MusicSyncRequest
-from services import music_service
+from models.schemas import (
+    MusicDiff,
+    MusicFolderRequest,
+    MusicPlaylistDiff,
+    MusicPlaylistSyncInfo,
+    MusicStatus,
+    MusicSyncInfo,
+)
+from services import music_playlist_service, music_service
 from services.music_service import MusicError
 
 router = APIRouter(prefix="/music", tags=["Music"])
@@ -11,6 +18,10 @@ router = APIRouter(prefix="/music", tags=["Music"])
 
 def _raise(exc: MusicError) -> None:
     raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+def _is_syncing(info: Optional[MusicSyncInfo | MusicPlaylistSyncInfo]) -> bool:
+    return info is not None and info.status == "syncing"
 
 
 @router.get("/status", response_model=MusicStatus)
@@ -35,9 +46,11 @@ def get_music_diff(payload: MusicFolderRequest):
 
 
 @router.post("/sync", response_model=MusicSyncInfo)
-def start_music_sync(payload: MusicSyncRequest):
+def start_music_sync(payload: MusicFolderRequest):
+    if _is_syncing(music_playlist_service.get_sync()):
+        raise HTTPException(status_code=409, detail="Wait for the playlist sync to finish")
     try:
-        return music_service.start_sync(payload.filenames, payload.folder)
+        return music_service.start_sync(payload.folder)
     except MusicError as exc:
         _raise(exc)
 
@@ -51,6 +64,38 @@ def get_music_sync():
 def dismiss_music_sync():
     try:
         music_service.dismiss_sync()
+    except MusicError as exc:
+        _raise(exc)
+    return {"success": True}
+
+
+@router.post("/playlists/diff", response_model=MusicPlaylistDiff)
+def get_music_playlist_diff(payload: MusicFolderRequest):
+    try:
+        return music_playlist_service.diff(payload.folder)
+    except MusicError as exc:
+        _raise(exc)
+
+
+@router.post("/playlists/sync", response_model=MusicPlaylistSyncInfo)
+def start_music_playlist_sync(payload: MusicFolderRequest):
+    if _is_syncing(music_service.get_sync()):
+        raise HTTPException(status_code=409, detail="Wait for the song sync to finish")
+    try:
+        return music_playlist_service.start_sync(payload.folder)
+    except MusicError as exc:
+        _raise(exc)
+
+
+@router.get("/playlists/sync", response_model=Optional[MusicPlaylistSyncInfo])
+def get_music_playlist_sync():
+    return music_playlist_service.get_sync()
+
+
+@router.post("/playlists/sync/dismiss")
+def dismiss_music_playlist_sync():
+    try:
+        music_playlist_service.dismiss_sync()
     except MusicError as exc:
         _raise(exc)
     return {"success": True}

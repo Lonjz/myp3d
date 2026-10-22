@@ -86,7 +86,7 @@ def is_available() -> bool:
     return sys.platform == "darwin"
 
 
-def _run_script(name: str, *args: str, timeout: float = EXPORT_TIMEOUT_S) -> str:
+def run_script(name: str, *args: str, timeout: float = EXPORT_TIMEOUT_S) -> str:
     if not is_available():
         raise MusicError(501, "Apple Music sync needs macOS")
     try:
@@ -129,7 +129,7 @@ def _path_key(path: str) -> str:
 
 
 def _read_library() -> list[_LibraryTrack]:
-    tracks_text, _, locations_text = _run_script("export_library").partition(GROUP_SEP)
+    tracks_text, _, locations_text = run_script("export_library").partition(GROUP_SEP)
     locations: dict[str, str] = {}
     for record in locations_text.split(RECORD_SEP) if locations_text else []:
         persistent_id, _, location = record.partition(FIELD_SEP)
@@ -165,7 +165,7 @@ def _is_within(path: Path, ancestor: Path) -> bool:
     return any(os.path.samefile(candidate, ancestor) for candidate in (path, *path.parents))
 
 
-def _require_folder(folder: str) -> Path:
+def require_folder(folder: str) -> Path:
     path = Path(folder.strip()).expanduser()
     if not path.is_absolute() or not path.is_dir():
         raise MusicError(400, "That folder doesn't exist")
@@ -282,12 +282,21 @@ def _match(root: Path, library: list[_LibraryTrack], local_tracks: list[MP3Info]
     )
 
 
+def song_links(root: Path) -> tuple[dict[str, str], int]:
+    matched = _match(root, _read_library(), list_mp3_infos())
+    filenames: dict[str, str] = {}
+    for pair in matched.pairs:
+        filenames.setdefault(pair.music.info.persistent_id, pair.track.filename)
+    pending = sum(1 for pair in matched.pairs if pair.changes) + len(matched.unpaired)
+    return filenames, pending
+
+
 def _track_sort_key(track: MP3Info) -> tuple[str, str]:
     return _normalize(track.artist), _normalize(track.title or track.filename)
 
 
 def diff(folder: str) -> MusicDiff:
-    root = _require_folder(folder)
+    root = require_folder(folder)
     matched = _match(root, _read_library(), list_mp3_infos())
     return MusicDiff(
         only_in_music=sorted(
@@ -336,7 +345,7 @@ def _write_cover(source: Path) -> Optional[str]:
     return art_path
 
 
-def _art_problem(state: str) -> Optional[str]:
+def parse_art_state(state: str) -> Optional[str]:
     if state == "art":
         return None
     _, _, reason = state.partition(":")
@@ -349,12 +358,12 @@ def _add_one(root: Path, source: Path, track: MP3Info, existing: Optional[Path])
         target = existing if existing is not None else _copy_into(root, source, track)
         args = [str(target)] + ([art_path] if art_path else [])
         try:
-            result = _run_script("add_track", *args, timeout=TRACK_TIMEOUT_S)
+            result = run_script("add_track", *args, timeout=TRACK_TIMEOUT_S)
         except MusicError as exc:
             if existing is None and exc.status_code != 504:
                 target.unlink(missing_ok=True)
             raise
-        return None if art_path is None else _art_problem(result.partition(FIELD_SEP)[2])
+        return None if art_path is None else parse_art_state(result.partition(FIELD_SEP)[2])
     finally:
         if art_path:
             Path(art_path).unlink(missing_ok=True)
@@ -369,10 +378,10 @@ def _update_one(source: Path, pair: _Pair) -> Optional[str]:
             (pair.track.artist or "").strip() if "artist" in pair.changes else "",
             (pair.track.album or "").strip() if "album" in pair.changes else "",
         ] + ([art_path] if art_path else [])
-        result = _run_script("update_track", *args, timeout=TRACK_TIMEOUT_S)
+        result = run_script("update_track", *args, timeout=TRACK_TIMEOUT_S)
         if "art" not in pair.changes:
             return None
-        return _art_problem(result) if art_path else "Couldn't read the cover art in myp3d"
+        return parse_art_state(result) if art_path else "Couldn't read the cover art in myp3d"
     finally:
         if art_path:
             Path(art_path).unlink(missing_ok=True)
@@ -390,20 +399,17 @@ def _record_failure(job: _SyncJob, filename: str, exc: Exception) -> None:
         job.failed.append(BulkFailure(filename=filename, detail=detail))
 
 
-def _run_sync(job: _SyncJob, root: Path, filenames: list[str]) -> None:
+def _run_sync(job: _SyncJob, root: Path) -> None:
     try:
         matched = _match(root, _read_library(), list_mp3_infos())
     except Exception as exc:
         _finish(job, "failed", exc.detail if isinstance(exc, MusicError) else "Couldn't read the Apple Music library")
         return
 
-    selected = set(filenames)
-    updates = [pair for pair in matched.pairs if pair.track.filename in selected and pair.changes]
+    updates = [pair for pair in matched.pairs if pair.changes]
     adds: list[MP3Info] = []
     seen: set[object] = set()
     for track in matched.unpaired:
-        if track.filename not in selected:
-            continue
         fingerprint = audio_fingerprint(OUTPUT_DIR / track.filename)
         keys = {_local_key(track)} | ({fingerprint} if fingerprint else set())
         if keys & seen:
@@ -412,7 +418,7 @@ def _run_sync(job: _SyncJob, root: Path, filenames: list[str]) -> None:
         adds.append(track)
 
     with _sync_lock:
-        job.total = len(updates) + len(adds) + len(job.failed)
+        job.total = len(updates) + len(adds)
 
     for pair in updates:
         source = OUTPUT_DIR / pair.track.filename
@@ -441,29 +447,19 @@ def _run_sync(job: _SyncJob, root: Path, filenames: list[str]) -> None:
     _finish(job, "done")
 
 
-def start_sync(filenames: list[str], folder: str) -> MusicSyncInfo:
+def start_sync(folder: str) -> MusicSyncInfo:
     global _sync
     if not is_available():
         raise MusicError(501, "Apple Music sync needs macOS")
-    root = _require_folder(folder)
-
-    present: list[str] = []
-    missing: list[BulkFailure] = []
-    for filename in dict.fromkeys(filenames):
-        if Path(filename).name != filename or not filename.lower().endswith(".mp3"):
-            raise MusicError(400, "Invalid filename")
-        if (OUTPUT_DIR / filename).is_file():
-            present.append(filename)
-        else:
-            missing.append(BulkFailure(filename=filename, detail="MP3 file not found"))
+    root = require_folder(folder)
 
     with _sync_lock:
         if _sync is not None and _sync.status == "syncing":
             raise MusicError(409, "A sync with Apple Music is already running")
-        job = _SyncJob(status="syncing", total=len(present) + len(missing), failed=missing)
+        job = _SyncJob(status="syncing", total=0)
         _sync = job
 
-    threading.Thread(target=_run_sync, args=(job, root, present), daemon=True).start()
+    threading.Thread(target=_run_sync, args=(job, root), daemon=True).start()
     return job.info()
 
 
