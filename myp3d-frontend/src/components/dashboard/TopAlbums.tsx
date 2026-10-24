@@ -6,6 +6,7 @@ import type { LibraryStats } from '../../api/mp3Api';
 import { formatBytes } from '../../utils/formatters';
 import { usePlayer } from '../player/playerContext';
 import { IconButton } from '../ui/IconButton';
+import { EmptyState } from '../ui/EmptyState';
 import { ChartCard } from './ChartCard';
 
 interface TopAlbumsProps {
@@ -17,9 +18,9 @@ export function TopAlbums({ albums }: TopAlbumsProps) {
   const currentAlbumName = (player.currentTrack?.album || '').trim().toLowerCase();
 
   return (
-    <ChartCard title="Top albums" icon={DiscAlbum} className="chart-card--full">
+    <ChartCard title="Top albums" icon={DiscAlbum} className="chart-card--span-2 chart-card--albums">
       {albums.length === 0 ? (
-        <p className="chart-card__empty">No albums yet.</p>
+        <EmptyState icon={DiscAlbum} label="No albums yet" compact />
       ) : (
         <div className="album-tile-grid">
           {albums.map((album, index) => {
@@ -40,8 +41,9 @@ export function TopAlbums({ albums }: TopAlbumsProps) {
                     )}
                   </div>
                   <span className="album-tile__name" title={album.album_name}>{album.album_name}</span>
-                  <span className="album-tile__meta">
-                    {album.track_count} tracks · {formatBytes(album.total_size)}
+                  <span className="album-tile__meta" title={`${album.track_count} tracks · ${formatBytes(album.total_size)}`}>
+                    <Music aria-hidden="true" />
+                    {album.track_count}
                   </span>
                 </Link>
                 <div className="album-tile__play-zone">

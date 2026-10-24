@@ -5,6 +5,7 @@ export const CHART_COLORS = {
   axis: 'var(--chart-axis)',
   label: 'var(--color-text-secondary)',
   cursor: 'var(--color-surface-hover)',
+  marker: 'var(--color-text-muted)',
 } as const;
 
 export const AXIS_TICK = { fill: CHART_COLORS.axis, fontSize: 12 } as const;

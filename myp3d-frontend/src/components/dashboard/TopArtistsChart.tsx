@@ -1,7 +1,9 @@
 import { MicVocal } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Bar, BarChart, Rectangle, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { BarShapeProps } from 'recharts';
 import type { LibraryStats } from '../../api/mp3Api';
+import { EmptyState } from '../ui/EmptyState';
 import { ChartCard } from './ChartCard';
 import { ChartTooltip } from './ChartTooltip';
 import { ANIMATE_CHARTS, AXIS_TICK, CHART_COLORS, MAX_BAR_SIZE, ROW_RADIUS } from './chartTheme';
@@ -40,17 +42,13 @@ function LabeledBar(props: BarShapeProps) {
 }
 
 export function TopArtistsChart({ artists }: TopArtistsChartProps) {
+  const navigate = useNavigate();
+  const openArtist = (name: string) => navigate(`/library?filter=artist&q=${encodeURIComponent(name)}`);
+
   return (
-    <ChartCard
-      title="Top artists"
-      icon={MicVocal}
-      table={{
-        columns: ['Artist', 'Tracks'],
-        rows: artists.map((artist) => [artist.name, artist.track_count]),
-      }}
-    >
+    <ChartCard title="Top artists" icon={MicVocal}>
       {artists.length === 0 ? (
-        <p className="chart-card__empty">No tagged artists yet.</p>
+        <EmptyState icon={MicVocal} label="No tagged artists" compact />
       ) : (
         <ResponsiveContainer width="100%" height={artists.length * ROW_HEIGHT + 8}>
           <BarChart data={artists} layout="vertical" margin={{ top: 0, right: 32, bottom: 0, left: 0 }}>
@@ -76,6 +74,8 @@ export function TopArtistsChart({ artists }: TopArtistsChartProps) {
               radius={ROW_RADIUS}
               maxBarSize={MAX_BAR_SIZE}
               isAnimationActive={ANIMATE_CHARTS}
+              cursor="pointer"
+              onClick={(_, index) => openArtist(artists[index].name)}
             />
           </BarChart>
         </ResponsiveContainer>
