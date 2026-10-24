@@ -46,7 +46,7 @@ export interface SyncDiffTrack {
 }
 
 export interface SyncDiffRecord {
-  kind: 'playlist' | 'download';
+  kind: 'playlist' | 'download' | 'favorite';
   key: string;
   name: string;
   deleted: boolean;

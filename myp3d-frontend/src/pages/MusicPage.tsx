@@ -13,6 +13,8 @@ import {
   Plus,
   RefreshCw,
   ScanSearch,
+  Star,
+  StarOff,
   Trash2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -37,6 +39,8 @@ const CHANGE_ICONS: Record<MusicChange, LucideIcon> = {
   artist: MicVocal,
   album: DiscAlbum,
   art: ImageIcon,
+  favorite: Star,
+  unfavorite: StarOff,
 };
 
 const hasChanges = (pair: MusicPair) => pair.changes.length > 0;
@@ -47,6 +51,8 @@ const changeTitle = (change: MusicChange, { track, music }: MusicPair) => {
   if (change === 'title') return `${music.name || '-'} → ${track.title}`;
   if (change === 'artist') return `${music.artist || '-'} → ${track.artist}`;
   if (change === 'album') return `${music.album || '-'} → ${track.album}`;
+  if (change === 'favorite') return 'Favourite in myp3d';
+  if (change === 'unfavorite') return 'Unfavourite in myp3d';
   return 'Cover art';
 };
 

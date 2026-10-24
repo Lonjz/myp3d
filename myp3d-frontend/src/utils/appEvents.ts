@@ -7,6 +7,7 @@ export type PlayRequest =
 export interface AppEventMap {
   'library-changed': undefined;
   'playlists-changed': undefined;
+  'favorites-changed': undefined;
   'queue-changed': undefined;
   'player-play': undefined;
   'preview-play': undefined;

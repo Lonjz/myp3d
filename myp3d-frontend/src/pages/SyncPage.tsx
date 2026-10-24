@@ -15,9 +15,12 @@ import {
   Radio,
   Replace,
   ScanSearch,
+  Star,
+  StarOff,
   Trash2,
   X,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import { syncApi } from '../api/syncApi';
 import type { SyncDiff, SyncDiffRecord, SyncDiffTrack, SyncSession } from '../api/syncApi';
@@ -43,6 +46,12 @@ const parsePort = (value: string) => {
 
 const localCover = (filename: string) => mp3Api.getCoverUrl(filename, 'thumb');
 const peerCover = (filename: string) => syncApi.peerCoverUrl(filename, 'thumb');
+
+const RECORD_ICONS: Record<SyncDiffRecord['kind'], LucideIcon> = {
+  playlist: ListMusic,
+  download: Download,
+  favorite: Star,
+};
 
 function DiffRow({
   track,
@@ -78,12 +87,15 @@ function RecordRow({
   replacesLabel?: string;
   deletesLabel?: string;
 }) {
-  const badge = record.deleted
-    ? deletesLabel && { icon: Trash2, label: deletesLabel, danger: true }
-    : record.replaces && replacesLabel && { icon: Replace, label: replacesLabel, danger: false };
+  const badge =
+    record.kind === 'favorite'
+      ? record.deleted && { icon: StarOff, label: 'Unfavourite', danger: false }
+      : record.deleted
+        ? deletesLabel && { icon: Trash2, label: deletesLabel, danger: true }
+        : record.replaces && replacesLabel && { icon: Replace, label: replacesLabel, danger: false };
   return (
     <li className="music-row">
-      <Cover icon={record.kind === 'playlist' ? ListMusic : Download} />
+      <Cover icon={RECORD_ICONS[record.kind]} />
       <TrackText title={record.name} sub="" />
       {badge && (
         <span className="music-changes">

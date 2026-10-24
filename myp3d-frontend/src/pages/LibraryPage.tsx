@@ -12,6 +12,7 @@ import {
   Search,
   Shuffle,
   Square,
+  Star,
   Timer,
   Trash2,
   TriangleAlert,
@@ -32,6 +33,7 @@ import { emitAppEvent } from '../utils/appEvents';
 import { DataTable } from '../components/table/DataTable';
 import type { DataTableColumn } from '../components/table/DataTable';
 import { SortableHeaderButton } from '../components/table/SortableHeaderButton';
+import { useFavorites } from '../components/favorites/useFavorites';
 import { BulkEditDialog } from '../components/library/BulkEditDialog';
 import { useLibrarySelectionCommands } from '../components/library/useLibrarySelectionCommands';
 import { AddToPlaylistDialog } from '../components/playlists/AddToPlaylistDialog';
@@ -112,6 +114,7 @@ export function LibraryPage() {
   });
 
   const player = usePlayer();
+  const { favorites, toggle: toggleFavorite } = useFavorites();
   const { showSuccess, showError } = useToast();
   const selection = useTrackSelection();
   const downloads = useSequentialDownload();
@@ -329,9 +332,17 @@ export function LibraryPage() {
     {
       key: 'actions',
       header: <span className="sr-only">Actions</span>,
-      width: '108px',
+      width: '148px',
       render: (mp3) => (
         <div className="table-actions">
+          <IconButton
+            icon={Star}
+            label={favorites.has(mp3.filename) ? 'Unfavourite' : 'Favourite'}
+            size="sm"
+            className={`favorite-toggle ${favorites.has(mp3.filename) ? 'is-favorite' : ''}`.trim()}
+            aria-pressed={favorites.has(mp3.filename)}
+            onClick={() => void toggleFavorite(mp3.filename)}
+          />
           <a
             href={mp3Api.getFileUrl(mp3.filename)}
             download

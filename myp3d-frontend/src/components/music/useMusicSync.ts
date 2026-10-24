@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { musicApi } from '../../api/musicApi';
 import type { MusicDiff, MusicSync } from '../../api/musicApi';
 import { usePersistentState } from '../../hooks/usePersistentState';
+import { emitAppEvent } from '../../utils/appEvents';
 import { useToast } from '../messages/toastContext';
 
 const SYNC_POLL_MS = 1000;
@@ -68,7 +69,9 @@ export function useMusicSync() {
     const poll = async () => {
       try {
         const next = await musicApi.syncStatus();
-        if (!cancelled) setJob(next);
+        if (cancelled) return;
+        setJob(next);
+        if (next?.status !== 'syncing') emitAppEvent('favorites-changed');
       } catch {
         return;
       }
