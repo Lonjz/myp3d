@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useReducer, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DiscAlbum, HardDrive, ImagePlus, MicVocal, Music, Play, Save, Shuffle, Trash2, TriangleAlert, Undo2 } from 'lucide-react';
+import { DiscAlbum, FileAudio, HardDrive, ImagePlus, MicVocal, Music, Play, Save, Shuffle, Trash2, TriangleAlert, Undo2 } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { AlbumDetail, AlbumInfo } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
@@ -10,10 +10,12 @@ import { InfiniteSidebarList } from '../components/sidebar/InfiniteSidebarList';
 import { usePlayer } from '../components/player/playerContext';
 import { TrackIndexButton } from '../components/player/TrackIndexButton';
 import { DataTable } from '../components/table/DataTable';
+import { HeaderIcon } from '../components/table/HeaderIcon';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { Spinner } from '../components/ui/Spinner';
+import { EmptyState } from '../components/ui/EmptyState';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { emitAppEvent, subscribeAppEvent } from '../utils/appEvents';
 import { getCachedAlbumDetail, setCachedAlbumDetail } from '../utils/detailCache';
@@ -157,7 +159,7 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
   };
 
   if (loading && !albumDetail) return <div className="page"><Spinner /></div>;
-  if (!albumDetail) return <div className="page"><p className="page-empty">Album not found</p></div>;
+  if (!albumDetail) return <div className="page"><EmptyState icon={DiscAlbum} label="Album not found" /></div>;
 
   const existingCoverPreview = albumDetail.album.has_cover ? mp3Api.getAlbumCoverUrl(albumDetail.album.album_key, 'full') : null;
   const effectiveCoverPreview = coverPreview || existingCoverPreview;
@@ -309,7 +311,7 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
               },
               {
                 key: 'title',
-                header: 'Title',
+                header: <HeaderIcon label="Title" icon={Music} />,
                 render: (track) => (
                   <>
                     <span className="table-cell-ellipsis" title={track.title || '-'}>{track.title || '-'}</span>
@@ -319,19 +321,19 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
               },
               {
                 key: 'artist',
-                header: 'Artist',
+                header: <HeaderIcon label="Artist" icon={MicVocal} />,
                 hideBelow: 'sm',
                 render: (track) => <span className="table-cell-ellipsis" title={track.artist || '-'}>{track.artist || '-'}</span>,
               },
               {
                 key: 'filename',
-                header: 'File name',
+                header: <HeaderIcon label="File name" icon={FileAudio} />,
                 hideBelow: 'md',
                 render: (track) => <span className="library-filename" title={track.filename}>{track.filename}</span>,
               },
               {
                 key: 'size',
-                header: 'Size',
+                header: <HeaderIcon label="Size" icon={HardDrive} />,
                 width: '96px',
                 hideBelow: 'sm',
                 render: (track) => formatBytes(track.file_size),

@@ -41,12 +41,6 @@
   white-space: nowrap;
 }
 
-.page-empty {
-  padding: var(--space-8) 0;
-  color: var(--color-text-muted);
-  text-align: center;
-}
-
 .library-table-wrap {
   overflow: clip;
   border-radius: var(--radius-lg);
@@ -136,6 +130,16 @@
 .library-sort-button:hover,
 .library-sort-button.active {
   color: var(--color-text);
+}
+
+.table-header {
+  display: inline-flex;
+  align-items: center;
+}
+
+.table-header-icon {
+  width: 16px;
+  height: 16px;
 }
 
 .library-sort-indicator {
@@ -281,11 +285,6 @@
 
 .favorite-toggle.is-favorite svg {
   fill: currentColor;
-}
-
-.favorite-filter.is-active {
-  background: var(--selected-bg);
-  box-shadow: var(--selected-shadow);
 }
 
 .library-empty-row {

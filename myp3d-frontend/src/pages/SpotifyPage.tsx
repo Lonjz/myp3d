@@ -17,6 +17,7 @@ import { useSearchParams } from 'react-router-dom';
 import { ExplicitBadge, MatchDot } from '../components/spotify/matchBadges';
 import { MatchPicker } from '../components/spotify/MatchPicker';
 import { isReadyRow, useSpotifyImport } from '../components/spotify/useSpotifyImport';
+import { EmptyState } from '../components/ui/EmptyState';
 import type { SpotifyRow } from '../components/spotify/useSpotifyImport';
 import { SpotifyIcon } from '../components/ui/BrandIcons';
 import { Checkbox } from '../components/ui/Checkbox';
@@ -267,15 +268,7 @@ export function SpotifyPage() {
       </form>
 
       {rows.length === 0 ? (
-        <div className="sync-empty glass">
-          {resolving ? (
-            <Spinner />
-          ) : (
-            <span className="sync-radar" aria-hidden="true">
-              <SpotifyIcon />
-            </span>
-          )}
-        </div>
+        <EmptyState icon={SpotifyIcon} loading={resolving} />
       ) : (
         <section className="spotify-list glass" aria-label="Spotify songs" aria-busy={resolving}>
           <header className="spotify-list__header">

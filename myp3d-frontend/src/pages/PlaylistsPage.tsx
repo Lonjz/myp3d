@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, RefreshCw, Search, Star } from 'lucide-react';
+import { CalendarClock, ListMusic, Music, Plus, RefreshCw, Search, Star } from 'lucide-react';
 import { NEW_PLAYLIST_NAME, playlistApi } from '../api/playlistApi';
 import type { PlaylistInfo } from '../api/playlistApi';
 import { useToast } from '../components/messages/toastContext';
@@ -9,6 +9,7 @@ import { usePlayer } from '../components/player/playerContext';
 import { usePlaylists } from '../components/playlists/usePlaylists';
 import { DataTable } from '../components/table/DataTable';
 import type { DataTableColumn } from '../components/table/DataTable';
+import { HeaderIcon } from '../components/table/HeaderIcon';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { usePersistentState } from '../hooks/usePersistentState';
@@ -74,7 +75,7 @@ export function PlaylistsPage() {
     },
     {
       key: 'name',
-      header: 'Playlist',
+      header: <HeaderIcon label="Playlist" icon={ListMusic} />,
       render: (playlist) => (
         <span className="playlist-name">
           <span className="table-cell-ellipsis" title={playlist.name}>{playlist.name}</span>
@@ -88,14 +89,14 @@ export function PlaylistsPage() {
     },
     {
       key: 'tracks',
-      header: 'Tracks',
+      header: <HeaderIcon label="Tracks" icon={Music} />,
       width: '90px',
       hideBelow: 'sm',
       render: (playlist) => playlist.track_count,
     },
     {
       key: 'updated_at',
-      header: 'Updated',
+      header: <HeaderIcon label="Updated" icon={CalendarClock} />,
       width: '128px',
       hideBelow: 'sm',
       render: (playlist) => (

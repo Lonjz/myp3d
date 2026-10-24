@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlignLeft, GripVertical, ImagePlus, ListMusic, Music, Play, Save, Shuffle, Trash2, TriangleAlert, Undo2, X } from 'lucide-react';
+import { AlignLeft, Clock, DiscAlbum, GripVertical, ImagePlus, ListMusic, Music, Play, Save, Shuffle, Trash2, TriangleAlert, Undo2, X } from 'lucide-react';
 import type { MP3Info } from '../api/mp3Api';
 import { NEW_PLAYLIST_NAME, playlistApi } from '../api/playlistApi';
 import type { PlaylistDetail, PlaylistInfo } from '../api/playlistApi';
@@ -12,10 +12,12 @@ import { usePlayer } from '../components/player/playerContext';
 import { TrackIndexButton } from '../components/player/TrackIndexButton';
 import { InfiniteSidebarList } from '../components/sidebar/InfiniteSidebarList';
 import { DataTable } from '../components/table/DataTable';
+import { HeaderIcon } from '../components/table/HeaderIcon';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { Spinner } from '../components/ui/Spinner';
+import { EmptyState } from '../components/ui/EmptyState';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { emitAppEvent } from '../utils/appEvents';
 import { formatDuration } from '../utils/formatters';
@@ -177,7 +179,7 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
   };
 
   if (loading && !detail) return <div className="page"><Spinner /></div>;
-  if (!detail) return <div className="page"><p className="page-empty">Playlist not found</p></div>;
+  if (!detail) return <div className="page"><EmptyState icon={ListMusic} label="Playlist not found" /></div>;
 
   const effectiveCoverPreview = coverPreview || (detail.has_cover ? playlistApi.coverUrl(detail, 'full') : null);
 
@@ -367,7 +369,7 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
               },
               {
                 key: 'title',
-                header: 'Title',
+                header: <HeaderIcon label="Title" icon={Music} />,
                 render: ({ track }) => (
                   <>
                     <span className="table-cell-ellipsis" title={track.title || track.filename}>
@@ -379,13 +381,13 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
               },
               {
                 key: 'album',
-                header: 'Album',
+                header: <HeaderIcon label="Album" icon={DiscAlbum} />,
                 hideBelow: 'sm',
                 render: ({ track }) => <span className="table-cell-ellipsis" title={track.album || '-'}>{track.album || '-'}</span>,
               },
               {
                 key: 'duration',
-                header: 'Time',
+                header: <HeaderIcon label="Duration" icon={Clock} />,
                 width: '80px',
                 hideBelow: 'md',
                 render: ({ track }) => formatDuration(track.duration),

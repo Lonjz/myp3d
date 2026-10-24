@@ -2,9 +2,12 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  CalendarPlus,
+  Clock,
   DiscAlbum,
   Download,
   FileAudio,
+  HardDrive,
   ListChecks,
   ListFilter,
   ListPlus,
@@ -17,12 +20,12 @@ import {
   Shuffle,
   Square,
   Star,
-  Timer,
   Trash2,
   TriangleAlert,
   Undo2,
   X,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { MP3DurationRange, MP3FilterBy, MP3Info, MP3SortBy } from '../api/mp3Api';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
@@ -52,14 +55,14 @@ import { IconSelect } from '../components/ui/IconSelect';
 import type { IconSelectOption } from '../components/ui/IconSelect';
 
 const PAGE_SIZE = 50;
-const SORT_COLUMN_LABELS: Record<MP3SortBy, string> = {
-  title: 'Title',
-  artist: 'Artist',
-  album: 'Album',
-  filename: 'File Name',
-  size: 'Size',
-  duration: 'Duration',
-  date_added: 'Date Added',
+const SORT_COLUMNS: Record<MP3SortBy, { label: string; icon: LucideIcon }> = {
+  title: { label: 'Title', icon: Music },
+  artist: { label: 'Artist', icon: MicVocal },
+  album: { label: 'Album', icon: DiscAlbum },
+  filename: { label: 'File name', icon: FileAudio },
+  size: { label: 'Size', icon: HardDrive },
+  duration: { label: 'Duration', icon: Clock },
+  date_added: { label: 'Date added', icon: CalendarPlus },
 };
 
 const DURATION_OPTIONS: Array<[MP3DurationRange, string]> = [
@@ -243,7 +246,8 @@ export function LibraryPage() {
   const renderSortHeader = (column: MP3SortBy) => {
     return (
       <SortableHeaderButton
-        label={SORT_COLUMN_LABELS[column]}
+        label={SORT_COLUMNS[column].label}
+        icon={SORT_COLUMNS[column].icon}
         isActive={sortBy === column}
         sortDirection={sortDirection}
         onClick={() => handleSortClick(column)}
@@ -439,10 +443,10 @@ export function LibraryPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
             <IconSelect label="Search in" value={filterBy} options={SCOPE_OPTIONS} onChange={setFilterBy} />
-            <label className="icon-field library-duration" title="Length in minutes">
-              <Timer className="icon-field__icon" aria-hidden="true" />
+            <label className="icon-field library-duration" title="Duration in minutes">
+              <Clock className="icon-field__icon" aria-hidden="true" />
               <select
-                aria-label="Length in minutes"
+                aria-label="Duration in minutes"
                 value={durationRange}
                 onChange={(e) => setDurationRange(e.target.value as MP3DurationRange)}
               >

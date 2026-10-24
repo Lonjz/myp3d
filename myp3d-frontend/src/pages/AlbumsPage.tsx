@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { RefreshCw, Search } from 'lucide-react';
+import { CalendarPlus, DiscAlbum, HardDrive, MicVocal, Music, RefreshCw, Search } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { AlbumInfo, AlbumSortBy } from '../api/mp3Api';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
@@ -10,6 +11,7 @@ import { useSortState } from '../hooks/useSortState';
 import { formatBytes, formatDate, formatDateTime } from '../utils/formatters';
 import { DataTable } from '../components/table/DataTable';
 import type { DataTableColumn } from '../components/table/DataTable';
+import { HeaderIcon } from '../components/table/HeaderIcon';
 import { SortableHeaderButton } from '../components/table/SortableHeaderButton';
 import { CoverPlayButton } from '../components/player/CoverPlayButton';
 import { usePlayer } from '../components/player/playerContext';
@@ -61,10 +63,11 @@ export function AlbumsPage() {
   const player = usePlayer();
   const currentAlbumName = (player.currentTrack?.album || '').trim().toLowerCase();
 
-  const renderSortHeader = (column: AlbumSortBy, label: string) => {
+  const renderSortHeader = (column: AlbumSortBy, label: string, icon: LucideIcon) => {
     return (
       <SortableHeaderButton
         label={label}
+        icon={icon}
         isActive={sortBy === column}
         sortDirection={sortDirection}
         onClick={() => handleSortClick(column)}
@@ -94,7 +97,7 @@ export function AlbumsPage() {
     },
     {
       key: 'album',
-      header: renderSortHeader('album_name', 'Album'),
+      header: renderSortHeader('album_name', 'Album', DiscAlbum),
       render: (album) => (
         <>
           <span className="table-cell-ellipsis" title={album.album_name || '(No Album)'}>{album.album_name || '(No Album)'}</span>
@@ -106,27 +109,27 @@ export function AlbumsPage() {
     },
     {
       key: 'artists',
-      header: 'Artists',
+      header: <HeaderIcon label="Artists" icon={MicVocal} />,
       hideBelow: 'sm',
       render: (album) => <span className="table-cell-ellipsis" title={formatArtists(album)}>{formatArtists(album)}</span>,
     },
     {
       key: 'tracks',
-      header: renderSortHeader('track_count', 'Tracks'),
+      header: renderSortHeader('track_count', 'Tracks', Music),
       width: '90px',
       hideBelow: 'sm',
       render: (album) => <span className="table-cell-ellipsis" title={String(album.track_count)}>{album.track_count}</span>,
     },
     {
       key: 'size',
-      header: renderSortHeader('total_size', 'Size'),
+      header: renderSortHeader('total_size', 'Size', HardDrive),
       width: '110px',
       hideBelow: 'md',
       render: (album) => <span className="table-cell-ellipsis" title={formatBytes(album.total_size)}>{formatBytes(album.total_size)}</span>,
     },
     {
       key: 'date_added',
-      header: renderSortHeader('date_added', 'Date Added'),
+      header: renderSortHeader('date_added', 'Date added', CalendarPlus),
       width: '128px',
       hideBelow: 'sm',
       render: (album) => <span className="library-date" title={formatDateTime(album.date_added)}>{formatDate(album.date_added)}</span>,

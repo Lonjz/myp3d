@@ -24,7 +24,7 @@ function trackItem(track: MP3Info): SpotlightItem {
       meta: compactMeta([
         { icon: MicVocal, label: 'Artist', value: track.artist || '' },
         { icon: DiscAlbum, label: 'Album', value: track.album || '' },
-        track.duration ? { icon: Clock, label: 'Length', value: formatDuration(Math.round(track.duration)) } : null,
+        track.duration ? { icon: Clock, label: 'Duration', value: formatDuration(Math.round(track.duration)) } : null,
         { icon: HardDrive, label: 'Size', value: formatBytes(track.file_size) },
         track.date_added ? { icon: CalendarPlus, label: 'Added', value: formatDate(track.date_added) } : null,
       ]),

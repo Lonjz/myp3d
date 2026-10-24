@@ -17,6 +17,7 @@ import { queueApi } from '../api/queueApi';
 import type { QueueItem } from '../api/queueApi';
 import { QueueItemDialog } from '../components/downloads/QueueItemDialog';
 import { useDownloadQueue } from '../components/downloads/downloadQueueContext';
+import { EmptyState } from '../components/ui/EmptyState';
 import { IconButton } from '../components/ui/IconButton';
 import { Spinner } from '../components/ui/Spinner';
 import { usePresence } from '../hooks/usePresence';
@@ -186,15 +187,7 @@ export function DownloadsPage() {
       </div>
 
       {items === null || items.length === 0 ? (
-        <div className="sync-empty glass">
-          {items === null ? (
-            <Spinner />
-          ) : (
-            <span className="sync-radar" aria-hidden="true">
-              <Download />
-            </span>
-          )}
-        </div>
+        <EmptyState icon={Download} loading={items === null} />
       ) : (
         <section className="downloads-list glass" aria-label="Downloads">
           <ul className="music-rows">

@@ -73,10 +73,17 @@
   height: 18px;
 }
 
-.icon-btn:hover:not(:disabled),
-.icon-btn.is-active {
+.icon-btn:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.2);
   border-color: var(--color-border-hover);
+}
+
+.icon-btn.is-active,
+.icon-btn.is-active:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--selected-bg);
+  box-shadow: var(--selected-shadow);
+  color: var(--color-text);
 }
 
 .icon-btn--sm {
@@ -127,10 +134,16 @@
   color: var(--color-text-secondary);
 }
 
-.icon-btn--ghost:hover:not(:disabled),
-.icon-btn--ghost.is-active {
+.icon-btn--ghost:hover:not(:disabled) {
   background: var(--color-surface-hover);
   border-color: transparent;
+  color: var(--color-text);
+}
+
+.icon-btn--ghost.is-active,
+.icon-btn--ghost.is-active:hover:not(:disabled) {
+  background: var(--selected-bg);
+  box-shadow: var(--selected-shadow);
   color: var(--color-text);
 }
 
@@ -178,6 +191,20 @@
   background: var(--selected-bg);
   box-shadow: var(--selected-shadow);
   color: var(--color-text);
+}
+
+.segmented--sm {
+  padding: 2px;
+}
+
+.segmented--sm .segmented__option {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.segmented--sm .segmented__option svg {
+  width: 16px;
+  height: 16px;
 }
 
 .segmented__option:disabled {

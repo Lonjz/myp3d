@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useReducer, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DiscAlbum, FileAudio, ImagePlus, MicVocal, Pause, Play, Save, Trash2, TriangleAlert, Type, Undo2 } from 'lucide-react';
+import { DiscAlbum, FileAudio, ImagePlus, MicVocal, Music, Pause, Play, Save, Trash2, TriangleAlert, Type, Undo2 } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { MP3Info } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
@@ -12,6 +12,7 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { Spinner } from '../components/ui/Spinner';
+import { EmptyState } from '../components/ui/EmptyState';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { emitAppEvent, subscribeAppEvent } from '../utils/appEvents';
 import { getCachedMp3Info, setCachedMp3Info } from '../utils/detailCache';
@@ -163,7 +164,7 @@ export function EditPage({ filename, onBack }: EditPageProps) {
   };
 
   if (loading && !mp3) return <div className="page"><Spinner /></div>;
-  if (!mp3) return <div className="page"><p className="page-empty">Track not found</p></div>;
+  if (!mp3) return <div className="page"><EmptyState icon={Music} label="Track not found" /></div>;
 
   const existingCoverPreview = mp3.has_cover ? mp3Api.getCoverUrl(mp3.filename, 'full') : null;
   const effectiveCoverPreview = coverPreview || existingCoverPreview;

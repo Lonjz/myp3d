@@ -26,10 +26,10 @@ import { MusicJobPanel } from '../components/music/MusicJobPanel';
 import { PlaylistColumns } from '../components/music/PlaylistColumns';
 import { useMusicSync } from '../components/music/useMusicSync';
 import { usePlaylistMusicSync } from '../components/music/usePlaylistMusicSync';
+import { EmptyState } from '../components/ui/EmptyState';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { AppleMusicIcon } from '../components/ui/BrandIcons';
-import { Spinner } from '../components/ui/Spinner';
 import { formatTrackSubtitle } from '../utils/formatters';
 
 type MusicStep = 'songs' | 'playlists';
@@ -131,15 +131,7 @@ function FailureChips({ failed, withoutArt }: { failed: BulkResult['failed']; wi
 
 function MusicEmpty({ scanning }: { scanning: boolean }) {
   return (
-    <div className="sync-empty glass">
-      {scanning ? (
-        <Spinner />
-      ) : (
-        <span className="sync-radar" aria-hidden="true">
-          <AppleMusicIcon />
-        </span>
-      )}
-    </div>
+    <EmptyState icon={AppleMusicIcon} loading={scanning} />
   );
 }
 
@@ -152,9 +144,7 @@ export function MusicPage() {
   if (available === null) {
     return (
       <div className="page sync-page music-page">
-        <div className="sync-empty glass">
-          <Spinner />
-        </div>
+        <EmptyState loading />
       </div>
     );
   }
@@ -162,12 +152,7 @@ export function MusicPage() {
   if (!available) {
     return (
       <div className="page sync-page music-page">
-        <div className="sync-empty glass">
-          <span className="sync-radar" aria-hidden="true">
-            <AppleMusicIcon />
-          </span>
-          <p className="sync-empty__text">macOS only</p>
-        </div>
+        <EmptyState icon={AppleMusicIcon} text="macOS only" />
       </div>
     );
   }

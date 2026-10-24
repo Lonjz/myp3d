@@ -26,6 +26,7 @@ import { syncApi } from '../api/syncApi';
 import type { SyncDiff, SyncDiffRecord, SyncDiffTrack, SyncSession } from '../api/syncApi';
 import { Cover, DiffColumn, TrackText } from '../components/diff/DiffColumns';
 import { useSyncSession } from '../components/sync/useSyncSession';
+import { EmptyState } from '../components/ui/EmptyState';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
@@ -117,9 +118,7 @@ const recordKey = (record: SyncDiffRecord) => `${record.kind}:${record.key}`;
 function PairedColumns({ diff, loading, peerName }: { diff: SyncDiff | null; loading: boolean; peerName: string }) {
   if (!diff) {
     return (
-      <div className="sync-empty glass">
-        <Spinner />
-      </div>
+      <EmptyState loading />
     );
   }
 
@@ -356,14 +355,11 @@ export function SyncPage() {
           ))}
         </ul>
       ) : (
-        <div className="sync-empty glass">
-          <span className={`sync-radar ${listening ? 'is-on' : ''}`.trim()} aria-hidden="true">
-            <MonitorUp />
-          </span>
-          <p className="sync-empty__text">
-            {startError ?? (portInvalid ? `Port ${MIN_PORT}–${MAX_PORT}` : `Looking for devices on port ${port ?? portInput}`)}
-          </p>
-        </div>
+        <EmptyState
+          icon={MonitorUp}
+          pulse={listening}
+          text={startError ?? (portInvalid ? `Port ${MIN_PORT}–${MAX_PORT}` : `Looking for devices on port ${port ?? portInput}`)}
+        />
       )}
 
       <ConfirmDialog

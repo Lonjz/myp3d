@@ -391,7 +391,7 @@
   height: 18px;
   margin-top: -6px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--color-text);
   border: 0;
   box-shadow: 0 2px 8px rgba(8, 4, 24, 0.4);
   cursor: pointer;
@@ -402,7 +402,7 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--color-text);
   border: 0;
   box-shadow: 0 2px 8px rgba(8, 4, 24, 0.4);
   cursor: pointer;
@@ -417,7 +417,7 @@
   margin-top: -4px;
   border-radius: 50%;
   background: var(--color-rose);
-  border: 2px solid #fff;
+  border: 2px solid var(--color-text);
   cursor: pointer;
 }
 
@@ -426,7 +426,7 @@
   height: 14px;
   border-radius: 50%;
   background: var(--color-rose);
-  border: 2px solid #fff;
+  border: 2px solid var(--color-text);
   cursor: pointer;
 }
 
@@ -601,6 +601,11 @@
 .icon-select:hover,
 .icon-select.is-open {
   background: rgba(255, 255, 255, 0.1);
+}
+
+.icon-select.is-active {
+  background: var(--selected-bg);
+  box-shadow: var(--selected-shadow);
 }
 
 .icon-select:focus-visible {

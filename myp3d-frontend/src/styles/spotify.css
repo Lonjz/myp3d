@@ -29,7 +29,7 @@
 }
 
 .spotify-page .spotify-list,
-.spotify-page .sync-empty {
+.spotify-page .empty-state {
   outline: 2px dashed transparent;
   outline-offset: -6px;
   transition:
@@ -38,7 +38,7 @@
 }
 
 .spotify-page.is-dropping .spotify-list,
-.spotify-page.is-dropping .sync-empty {
+.spotify-page.is-dropping .empty-state {
   outline-color: color-mix(in srgb, var(--color-lavender) 70%, transparent);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-lavender) 18%, transparent);
 }

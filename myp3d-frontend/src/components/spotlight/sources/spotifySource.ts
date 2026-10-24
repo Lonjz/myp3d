@@ -1,4 +1,4 @@
-import { Link2 } from 'lucide-react';
+import { Link } from 'lucide-react';
 import { hasSpotifyLink } from '../../../utils/spotify';
 import { SpotifyIcon } from '../../ui/BrandIcons';
 import type { InstantSpotlightSource } from '../spotlightTypes';
@@ -17,7 +17,7 @@ export const spotifySource: InstantSpotlightSource = {
         subtitle: value,
         icon: SpotifyIcon,
         preview: {
-          meta: [{ icon: Link2, label: 'URL', value }],
+          meta: [{ icon: Link, label: 'URL', value }],
         },
         run: ({ navigate }) => navigate(`/spotify?url=${encodeURIComponent(value)}`),
       },
