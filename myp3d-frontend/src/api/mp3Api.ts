@@ -100,6 +100,7 @@ export interface LibraryStats {
   total_artists: number;
   total_size: number;
   total_duration: number;
+  total_favorites: number;
   average_size: number;
   average_duration: number;
   tracks_with_cover: number;
@@ -108,6 +109,8 @@ export interface LibraryStats {
     missing_artist: number;
     missing_album: number;
     missing_cover: number;
+    duplicates: number;
+    unlisted: number;
   };
   top_artists: Array<{ name: string; track_count: number }>;
   top_albums: Array<{
@@ -118,8 +121,10 @@ export interface LibraryStats {
     has_cover: boolean;
   }>;
   additions_by_month: Array<{ month: string; track_count: number; total_size: number }>;
-  duration_histogram: Array<{ label: string; track_count: number }>;
+  additions_by_day: Array<{ date: string; track_count: number }>;
+  duration_histogram: Array<{ key: MP3DurationRange; label: string; track_count: number }>;
   recent_tracks: MP3Info[];
+  favorite_tracks: MP3Info[];
 }
 
 export interface SearchResults {
@@ -172,6 +177,7 @@ interface PaginatedAlbumResponse {
 export type MP3FilterBy = 'all' | 'title' | 'artist' | 'filename' | 'album';
 export type MP3SortBy = 'date_added' | 'filename' | 'size' | 'artist' | 'title' | 'album' | 'duration';
 export type MP3DurationRange = 'any' | 'under-2' | '2-3' | '3-4' | '4-5' | '5-7' | 'over-7';
+export type MP3Issue = 'any' | 'title' | 'artist' | 'album' | 'cover' | 'duplicate' | 'playlist';
 export type AlbumSortBy = 'album_name' | 'track_count' | 'total_size' | 'date_added';
 export type SortDirection = 'asc' | 'desc';
 
@@ -184,6 +190,7 @@ interface MP3ListPagedParams {
   durationRange?: MP3DurationRange;
   sortDirection?: SortDirection;
   favoritesOnly?: boolean;
+  issue?: MP3Issue;
 }
 
 interface AlbumListPagedParams {
@@ -237,6 +244,7 @@ export const mp3Api = {
     query.set('filter_by', params.filterBy || 'all');
     query.set('duration', params.durationRange || 'any');
     query.set('favorites', String(Boolean(params.favoritesOnly)));
+    query.set('issue', params.issue || 'any');
     return apiFetch(`/mp3s/paged?${query.toString()}`, undefined, 'Failed to fetch paged MP3 list');
   },
 
@@ -248,6 +256,7 @@ export const mp3Api = {
       sort_direction: params.sortDirection || 'desc',
       duration: params.durationRange || 'any',
       favorites: String(Boolean(params.favoritesOnly)),
+      issue: params.issue || 'any',
     });
     return apiFetch(`/mp3s/all?${query.toString()}`, undefined, 'Failed to fetch MP3 list');
   },

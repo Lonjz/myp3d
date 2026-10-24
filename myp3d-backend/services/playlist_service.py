@@ -155,6 +155,15 @@ def list_playlists() -> list[PlaylistInfo]:
     return [_to_info(row, tracks.get(row["id"], []), names) for row in rows]
 
 
+def listed_filenames() -> set[str]:
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT t.filename FROM playlist_tracks t JOIN playlists p ON p.id = t.playlist_id "
+            "WHERE p.deleted_at IS NULL AND p.is_favorites = 0"
+        ).fetchall()
+    return {row["filename"] for row in rows}
+
+
 def list_states() -> list[PlaylistState]:
     with _connect() as conn:
         rows = conn.execute(

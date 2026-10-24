@@ -4,27 +4,36 @@ from datetime import datetime, timezone
 from models.schemas import (
     AlbumStat,
     ArtistStat,
+    DayBucket,
     DurationBucket,
     LibraryHealth,
     LibraryStats,
     MonthBucket,
 )
-from services.mp3_service import NO_ALBUM_LABEL, build_album_groups, list_mp3_infos
+from services import favorite_service, playlist_service
+from services.mp3_service import (
+    DURATION_RANGES,
+    NO_ALBUM_LABEL,
+    build_album_groups,
+    duplicate_filenames,
+    list_mp3_infos,
+)
 
 
 TOP_ARTIST_LIMIT = 8
-TOP_ALBUM_LIMIT = 6
-RECENT_TRACK_LIMIT = 6
+TOP_ALBUM_LIMIT = 10
+RECENT_TRACK_LIMIT = 7
+FAVORITE_TRACK_LIMIT = 7
 MONTHS_OF_HISTORY = 12
 
-DURATION_BUCKETS: list[tuple[str, float]] = [
-    ("< 2m", 120),
-    ("2–3m", 180),
-    ("3–4m", 240),
-    ("4–5m", 300),
-    ("5–7m", 420),
-    ("7m+", float("inf")),
-]
+DURATION_LABELS: dict[str, str] = {
+    "under-2": "< 2m",
+    "2-3": "2–3m",
+    "3-4": "3–4m",
+    "4-5": "4–5m",
+    "5-7": "5–7m",
+    "over-7": "7m+",
+}
 
 
 def _is_blank(value: str | None) -> bool:
@@ -74,15 +83,23 @@ def compute_library_stats() -> LibraryStats:
             month_counts[key][0] += 1
             month_counts[key][1] += track.file_size
 
+    day_counts: Counter[str] = Counter(
+        track.date_added.astimezone().date().isoformat() for track in tracks if track.date_added is not None
+    )
+
     while len(month_keys) > 1 and month_counts[month_keys[0]][0] == 0:
         del month_counts[month_keys.pop(0)]
 
-    bucket_counts = [0] * len(DURATION_BUCKETS)
+    duration_counts = {key: 0 for key in DURATION_RANGES}
     for duration in durations:
-        for index, (_, upper) in enumerate(DURATION_BUCKETS):
-            if duration < upper:
-                bucket_counts[index] += 1
+        for key, (lower, upper) in DURATION_RANGES.items():
+            if lower <= duration < upper:
+                duration_counts[key] += 1
                 break
+
+    listed = playlist_service.listed_filenames()
+    tracks_by_name = {track.filename: track for track in tracks}
+    favorite_names = [name for name in favorite_service.list_ordered() if name in tracks_by_name]
 
     oldest = datetime.min.replace(tzinfo=timezone.utc)
     recent_tracks = sorted(tracks, key=lambda track: track.date_added or oldest, reverse=True)
@@ -93,6 +110,7 @@ def compute_library_stats() -> LibraryStats:
         total_artists=len(artist_counts),
         total_size=total_size,
         total_duration=total_duration,
+        total_favorites=len(favorite_names),
         average_size=total_size / total_tracks if total_tracks else 0.0,
         average_duration=total_duration / len(durations) if durations else 0.0,
         tracks_with_cover=sum(1 for track in tracks if track.has_cover),
@@ -101,6 +119,8 @@ def compute_library_stats() -> LibraryStats:
             missing_artist=sum(1 for track in tracks if _is_blank(track.artist)),
             missing_album=sum(1 for track in tracks if _is_blank(track.album)),
             missing_cover=sum(1 for track in tracks if not track.has_cover),
+            duplicates=len(duplicate_filenames(tracks)),
+            unlisted=sum(1 for track in tracks if track.filename not in listed),
         ),
         top_artists=[
             ArtistStat(name=artist_display[key], track_count=count)
@@ -120,9 +140,11 @@ def compute_library_stats() -> LibraryStats:
             MonthBucket(month=key, track_count=count, total_size=size)
             for key, (count, size) in month_counts.items()
         ],
+        additions_by_day=[DayBucket(date=day, track_count=count) for day, count in sorted(day_counts.items())],
         duration_histogram=[
-            DurationBucket(label=label, track_count=count)
-            for (label, _), count in zip(DURATION_BUCKETS, bucket_counts)
+            DurationBucket(key=key, label=DURATION_LABELS[key], track_count=count)
+            for key, count in duration_counts.items()
         ],
         recent_tracks=recent_tracks[:RECENT_TRACK_LIMIT],
+        favorite_tracks=[tracks_by_name[name] for name in reversed(favorite_names[-FAVORITE_TRACK_LIMIT:])],
     )

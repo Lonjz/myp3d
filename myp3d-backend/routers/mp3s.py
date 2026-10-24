@@ -22,6 +22,7 @@ from services.config import OUTPUT_DIR
 from services.cover_service import CoverSize, get_cover_variant
 from services.mp3_service import (
     MP3DurationRange,
+    MP3Issue,
     MP3SortBy,
     filter_sort_mp3_infos,
     get_mp3_info,
@@ -62,6 +63,7 @@ def list_mp3s_paged(
     sort_direction: Literal["asc", "desc"] = Query("desc"),
     duration: MP3DurationRange = Query("any"),
     favorites: bool = Query(False),
+    issue: MP3Issue = Query("any"),
 ):
     """List MP3 files using server-side pagination, filtering, and sorting."""
     items, total = query_mp3_infos(
@@ -73,6 +75,8 @@ def list_mp3s_paged(
         sort_direction=sort_direction,
         duration_range=duration,
         only=favorite_service.list_filenames() if favorites else None,
+        issue=issue,
+        listed=playlist_service.listed_filenames() if issue == "playlist" else None,
     )
     total_pages = max(1, (total + limit - 1) // limit)
     return PaginatedMP3Response(
@@ -95,9 +99,11 @@ def list_all_mp3s(
     sort_direction: Literal["asc", "desc"] = Query("desc"),
     duration: MP3DurationRange = Query("any"),
     favorites: bool = Query(False),
+    issue: MP3Issue = Query("any"),
 ):
     only = favorite_service.list_filenames() if favorites else None
-    return filter_sort_mp3_infos(search, filter_by, sort_by, sort_direction, duration, only)
+    listed = playlist_service.listed_filenames() if issue == "playlist" else None
+    return filter_sort_mp3_infos(search, filter_by, sort_by, sort_direction, duration, only, issue, listed)
 
 
 def _resolve_bulk_paths(filenames: list[str]) -> tuple[list[Path], list[BulkFailure]]:

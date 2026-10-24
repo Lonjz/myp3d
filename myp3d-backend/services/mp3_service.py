@@ -201,6 +201,7 @@ def list_albums() -> list[AlbumInfo]:
 MP3FilterBy = Literal["all", "title", "artist", "filename", "album"]
 MP3SortBy = Literal["date_added", "filename", "size", "artist", "title", "album", "duration"]
 MP3DurationRange = Literal["any", "under-2", "2-3", "3-4", "4-5", "5-7", "over-7"]
+MP3Issue = Literal["any", "title", "artist", "album", "cover", "duplicate", "playlist"]
 SortDirection = Literal["asc", "desc"]
 
 DURATION_RANGES: dict[str, tuple[float, float]] = {
@@ -213,6 +214,36 @@ DURATION_RANGES: dict[str, tuple[float, float]] = {
 }
 
 
+def _is_blank(value: Optional[str]) -> bool:
+    return not (value or "").strip()
+
+
+def duplicate_filenames(tracks: list[MP3Info]) -> set[str]:
+    groups: dict[tuple[str, str], list[str]] = {}
+    for track in tracks:
+        if _is_blank(track.title) or _is_blank(track.artist):
+            continue
+        key = (track.title.strip().casefold(), track.artist.strip().casefold())
+        groups.setdefault(key, []).append(track.filename)
+    return {filename for filenames in groups.values() if len(filenames) > 1 for filename in filenames}
+
+
+def _has_issue(track: MP3Info, issue: MP3Issue, duplicates: set[str], listed: set[str]) -> bool:
+    if issue == "title":
+        return _is_blank(track.title)
+    if issue == "artist":
+        return _is_blank(track.artist)
+    if issue == "album":
+        return _is_blank(track.album)
+    if issue == "cover":
+        return not track.has_cover
+    if issue == "duplicate":
+        return track.filename in duplicates
+    if issue == "playlist":
+        return track.filename not in listed
+    return True
+
+
 def filter_sort_mp3_infos(
     search: str,
     filter_by: MP3FilterBy,
@@ -220,10 +251,15 @@ def filter_sort_mp3_infos(
     sort_direction: SortDirection,
     duration_range: MP3DurationRange = "any",
     only: Optional[set[str]] = None,
+    issue: MP3Issue = "any",
+    listed: Optional[set[str]] = None,
 ) -> list[MP3Info]:
     mp3s = list_mp3_infos()
+    duplicates = duplicate_filenames(mp3s) if issue == "duplicate" else set()
     if only is not None:
         mp3s = [track for track in mp3s if track.filename in only]
+    if issue != "any":
+        mp3s = [track for track in mp3s if _has_issue(track, issue, duplicates, listed or set())]
     search_query = search.strip().casefold()
 
     if duration_range in DURATION_RANGES:
@@ -289,8 +325,10 @@ def query_mp3_infos(
     sort_direction: SortDirection,
     duration_range: MP3DurationRange = "any",
     only: Optional[set[str]] = None,
+    issue: MP3Issue = "any",
+    listed: Optional[set[str]] = None,
 ) -> tuple[list[MP3Info], int]:
-    mp3s = filter_sort_mp3_infos(search, filter_by, sort_by, sort_direction, duration_range, only)
+    mp3s = filter_sort_mp3_infos(search, filter_by, sort_by, sort_direction, duration_range, only, issue, listed)
     total = len(mp3s)
     start = (page - 1) * limit
     end = start + limit

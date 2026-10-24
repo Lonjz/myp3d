@@ -18,9 +18,10 @@ interface IconSelectProps<T extends string> {
   value: T;
   options: IconSelectOption<T>[];
   onChange: (value: T) => void;
+  active?: boolean;
 }
 
-export function IconSelect<T extends string>({ label, value, options, onChange }: IconSelectProps<T>) {
+export function IconSelect<T extends string>({ label, value, options, onChange, active = false }: IconSelectProps<T>) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -93,7 +94,7 @@ export function IconSelect<T extends string>({ label, value, options, onChange }
       <button
         ref={triggerRef}
         type="button"
-        className={`icon-select ${open ? 'is-open' : ''}`.trim()}
+        className={['icon-select', open ? 'is-open' : '', active ? 'is-active' : ''].filter(Boolean).join(' ')}
         aria-label={title}
         title={title}
         aria-haspopup="true"

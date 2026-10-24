@@ -1,15 +1,19 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useEffectEvent, useMemo, useState } from 'react';
 import type { ChangeEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   CalendarPlus,
   Clock,
+  CopyX,
   DiscAlbum,
   Download,
   FileAudio,
   HardDrive,
+  HeartPulse,
+  Image,
   ListChecks,
   ListFilter,
+  ListMusic,
   ListPlus,
   MicVocal,
   Music,
@@ -22,12 +26,13 @@ import {
   Star,
   Trash2,
   TriangleAlert,
+  Type,
   Undo2,
   X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
-import type { MP3DurationRange, MP3FilterBy, MP3Info, MP3SortBy } from '../api/mp3Api';
+import type { MP3DurationRange, MP3FilterBy, MP3Info, MP3Issue, MP3SortBy } from '../api/mp3Api';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useInfiniteList } from '../hooks/useInfiniteList';
 import { usePersistentState } from '../hooks/usePersistentState';
@@ -83,6 +88,22 @@ const SCOPE_OPTIONS: IconSelectOption<MP3FilterBy>[] = [
   { value: 'filename', label: 'File name', icon: FileAudio },
 ];
 
+const ISSUE_OPTIONS: IconSelectOption<MP3Issue>[] = [
+  { value: 'any', label: 'Any', icon: HeartPulse },
+  { value: 'title', label: 'Missing title', icon: Type },
+  { value: 'artist', label: 'Missing artist', icon: MicVocal },
+  { value: 'album', label: 'Missing album', icon: DiscAlbum },
+  { value: 'cover', label: 'Missing cover art', icon: Image },
+  { value: 'duplicate', label: 'Duplicates', icon: CopyX },
+  { value: 'playlist', label: 'Not in a playlist', icon: ListMusic },
+];
+
+const LINK_PARAMS = ['q', 'filter', 'duration', 'favorites', 'issue'];
+
+function pickOption<T extends string>(value: string | null, options: readonly T[], fallback: T): T {
+  return options.find((option) => option === value) ?? fallback;
+}
+
 const getTrackKey = (mp3: MP3Info) => mp3.filename;
 const trackCount = (count: number) => `${count} track${count === 1 ? '' : 's'}`;
 const isShiftClick = (event: ChangeEvent<HTMLInputElement>) =>
@@ -94,6 +115,7 @@ export function LibraryPage() {
   const [filterBy, setFilterBy] = usePersistentState<MP3FilterBy>('library:filter', 'all');
   const [durationRange, setDurationRange] = usePersistentState<MP3DurationRange>('library:duration', 'any');
   const [favoritesOnly, setFavoritesOnly] = usePersistentState('library:favorites', false);
+  const [issue, setIssue] = usePersistentState<MP3Issue>('library:issue', 'any');
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
 
   const { sortBy, sortDirection, handleSortClick } = useSortState<MP3SortBy>({
@@ -111,9 +133,26 @@ export function LibraryPage() {
       sortDirection,
       durationRange,
       favoritesOnly,
+      issue,
     }),
-    [debouncedSearchQuery, filterBy, sortBy, sortDirection, durationRange, favoritesOnly],
+    [debouncedSearchQuery, filterBy, sortBy, sortDirection, durationRange, favoritesOnly, issue],
   );
+
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const applySearchParams = useEffectEvent((params: URLSearchParams) => {
+    if (!LINK_PARAMS.some((key) => params.has(key))) return;
+    setSearchQuery(params.get('q') ?? '');
+    setFilterBy(pickOption(params.get('filter'), SCOPE_OPTIONS.map((option) => option.value), 'all'));
+    setDurationRange(pickOption(params.get('duration'), DURATION_OPTIONS.map(([value]) => value), 'any'));
+    setFavoritesOnly(params.get('favorites') === '1');
+    setIssue(pickOption(params.get('issue'), ISSUE_OPTIONS.map((option) => option.value), 'any'));
+    setSearchParams({}, { replace: true });
+  });
+
+  useEffect(() => {
+    applySearchParams(searchParams);
+  }, [searchParams]);
 
   const {
     items: mp3s,
@@ -414,7 +453,11 @@ export function LibraryPage() {
         onRowOpen={(mp3) => navigate(`/details/${encodeURIComponent(mp3.filename)}`)}
         getRowClassName={(mp3) => (selection.isSelected(mp3.filename) ? 'is-selected' : undefined)}
         className="library-table--selectable"
-        emptyMessage={debouncedSearchQuery.trim() || favoritesOnly ? 'No matches' : 'No tracks yet'}
+        emptyMessage={
+          debouncedSearchQuery.trim() || favoritesOnly || issue !== 'any' || durationRange !== 'any'
+            ? 'No matches'
+            : 'No tracks yet'
+        }
         loading={loading}
         loadingMore={loadingMore}
         hasMore={hasMore}
@@ -455,6 +498,13 @@ export function LibraryPage() {
                 ))}
               </select>
             </label>
+            <IconSelect
+              label="Issues"
+              value={issue}
+              options={ISSUE_OPTIONS}
+              onChange={setIssue}
+              active={issue !== 'any'}
+            />
             <IconButton
               icon={Star}
               label="Favourites only"

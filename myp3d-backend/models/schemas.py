@@ -198,7 +198,13 @@ class MonthBucket(BaseModel):
     total_size: int
 
 
+class DayBucket(BaseModel):
+    date: str
+    track_count: int
+
+
 class DurationBucket(BaseModel):
+    key: str
     label: str
     track_count: int
 
@@ -208,6 +214,8 @@ class LibraryHealth(BaseModel):
     missing_artist: int
     missing_album: int
     missing_cover: int
+    duplicates: int
+    unlisted: int
 
 
 class LibraryStats(BaseModel):
@@ -216,6 +224,7 @@ class LibraryStats(BaseModel):
     total_artists: int
     total_size: int
     total_duration: float
+    total_favorites: int
     average_size: float
     average_duration: float
     tracks_with_cover: int
@@ -223,8 +232,10 @@ class LibraryStats(BaseModel):
     top_artists: list[ArtistStat]
     top_albums: list[AlbumStat]
     additions_by_month: list[MonthBucket]
+    additions_by_day: list[DayBucket]
     duration_histogram: list[DurationBucket]
     recent_tracks: list[MP3Info]
+    favorite_tracks: list[MP3Info]
 
 
 class SyncDevice(BaseModel):
