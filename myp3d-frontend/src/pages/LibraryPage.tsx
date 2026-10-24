@@ -2,10 +2,14 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  DiscAlbum,
   Download,
+  FileAudio,
   ListChecks,
   ListFilter,
   ListPlus,
+  MicVocal,
+  Music,
   Pencil,
   Play,
   RefreshCw,
@@ -44,6 +48,8 @@ import { Checkbox } from '../components/ui/Checkbox';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
+import { IconSelect } from '../components/ui/IconSelect';
+import type { IconSelectOption } from '../components/ui/IconSelect';
 
 const PAGE_SIZE = 50;
 const SORT_COLUMN_LABELS: Record<MP3SortBy, string> = {
@@ -57,13 +63,21 @@ const SORT_COLUMN_LABELS: Record<MP3SortBy, string> = {
 };
 
 const DURATION_OPTIONS: Array<[MP3DurationRange, string]> = [
-  ['any', 'Any length'],
-  ['under-2', 'Under 2 min'],
-  ['2-3', '2–3 min'],
-  ['3-4', '3–4 min'],
-  ['4-5', '4–5 min'],
-  ['5-7', '5–7 min'],
-  ['over-7', 'Over 7 min'],
+  ['any', 'Any'],
+  ['under-2', '< 2'],
+  ['2-3', '2–3'],
+  ['3-4', '3–4'],
+  ['4-5', '4–5'],
+  ['5-7', '5–7'],
+  ['over-7', '7+'],
+];
+
+const SCOPE_OPTIONS: IconSelectOption<MP3FilterBy>[] = [
+  { value: 'all', label: 'All', icon: ListFilter },
+  { value: 'title', label: 'Title', icon: Music },
+  { value: 'artist', label: 'Artist', icon: MicVocal },
+  { value: 'album', label: 'Album', icon: DiscAlbum },
+  { value: 'filename', label: 'File name', icon: FileAudio },
 ];
 
 const getTrackKey = (mp3: MP3Info) => mp3.filename;
@@ -76,6 +90,7 @@ export function LibraryPage() {
   const [searchQuery, setSearchQuery] = usePersistentState('library:search', '');
   const [filterBy, setFilterBy] = usePersistentState<MP3FilterBy>('library:filter', 'all');
   const [durationRange, setDurationRange] = usePersistentState<MP3DurationRange>('library:duration', 'any');
+  const [favoritesOnly, setFavoritesOnly] = usePersistentState('library:favorites', false);
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
 
   const { sortBy, sortDirection, handleSortClick } = useSortState<MP3SortBy>({
@@ -92,8 +107,9 @@ export function LibraryPage() {
       sortBy,
       sortDirection,
       durationRange,
+      favoritesOnly,
     }),
-    [debouncedSearchQuery, filterBy, sortBy, sortDirection, durationRange],
+    [debouncedSearchQuery, filterBy, sortBy, sortDirection, durationRange, favoritesOnly],
   );
 
   const {
@@ -341,7 +357,10 @@ export function LibraryPage() {
             size="sm"
             className={`favorite-toggle ${favorites.has(mp3.filename) ? 'is-favorite' : ''}`.trim()}
             aria-pressed={favorites.has(mp3.filename)}
-            onClick={() => void toggleFavorite(mp3.filename)}
+            onClick={async () => {
+              await toggleFavorite(mp3.filename);
+              if (favoritesOnly) await refresh();
+            }}
           />
           <a
             href={mp3Api.getFileUrl(mp3.filename)}
@@ -391,7 +410,7 @@ export function LibraryPage() {
         onRowOpen={(mp3) => navigate(`/details/${encodeURIComponent(mp3.filename)}`)}
         getRowClassName={(mp3) => (selection.isSelected(mp3.filename) ? 'is-selected' : undefined)}
         className="library-table--selectable"
-        emptyMessage={debouncedSearchQuery.trim() ? 'No matches' : 'No tracks yet'}
+        emptyMessage={debouncedSearchQuery.trim() || favoritesOnly ? 'No matches' : 'No tracks yet'}
         loading={loading}
         loadingMore={loadingMore}
         hasMore={hasMore}
@@ -419,24 +438,11 @@ export function LibraryPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-            <label className="icon-field library-filter" title="Filter by">
-              <ListFilter className="icon-field__icon" aria-hidden="true" />
-              <select
-                aria-label="Filter by"
-                value={filterBy}
-                onChange={(e) => setFilterBy(e.target.value as MP3FilterBy)}
-              >
-                <option value="all">All</option>
-                <option value="title">Title</option>
-                <option value="artist">Artist</option>
-                <option value="album">Album</option>
-                <option value="filename">File name</option>
-              </select>
-            </label>
-            <label className="icon-field library-filter library-duration" title="Length">
+            <IconSelect label="Search in" value={filterBy} options={SCOPE_OPTIONS} onChange={setFilterBy} />
+            <label className="icon-field library-duration" title="Length in minutes">
               <Timer className="icon-field__icon" aria-hidden="true" />
               <select
-                aria-label="Length"
+                aria-label="Length in minutes"
                 value={durationRange}
                 onChange={(e) => setDurationRange(e.target.value as MP3DurationRange)}
               >
@@ -445,6 +451,14 @@ export function LibraryPage() {
                 ))}
               </select>
             </label>
+            <IconButton
+              icon={Star}
+              label="Favourites only"
+              active={favoritesOnly}
+              className={`favorite-filter favorite-toggle ${favoritesOnly ? 'is-favorite' : ''}`.trim()}
+              aria-pressed={favoritesOnly}
+              onClick={() => setFavoritesOnly(!favoritesOnly)}
+            />
             <IconButton icon={Play} label="Play all" onClick={() => void playAll(false)} disabled={totalItems === 0} />
             <IconButton icon={Shuffle} label="Shuffle all" onClick={() => void playAll(true)} disabled={totalItems === 0} />
             <IconButton icon={RefreshCw} label="Refresh" onClick={() => void refresh()} />

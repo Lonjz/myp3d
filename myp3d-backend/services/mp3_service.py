@@ -219,8 +219,11 @@ def filter_sort_mp3_infos(
     sort_by: MP3SortBy,
     sort_direction: SortDirection,
     duration_range: MP3DurationRange = "any",
+    only: Optional[set[str]] = None,
 ) -> list[MP3Info]:
     mp3s = list_mp3_infos()
+    if only is not None:
+        mp3s = [track for track in mp3s if track.filename in only]
     search_query = search.strip().casefold()
 
     if duration_range in DURATION_RANGES:
@@ -285,8 +288,9 @@ def query_mp3_infos(
     sort_by: MP3SortBy,
     sort_direction: SortDirection,
     duration_range: MP3DurationRange = "any",
+    only: Optional[set[str]] = None,
 ) -> tuple[list[MP3Info], int]:
-    mp3s = filter_sort_mp3_infos(search, filter_by, sort_by, sort_direction, duration_range)
+    mp3s = filter_sort_mp3_infos(search, filter_by, sort_by, sort_direction, duration_range, only)
     total = len(mp3s)
     start = (page - 1) * limit
     end = start + limit

@@ -183,6 +183,7 @@ interface MP3ListPagedParams {
   sortBy?: MP3SortBy;
   durationRange?: MP3DurationRange;
   sortDirection?: SortDirection;
+  favoritesOnly?: boolean;
 }
 
 interface AlbumListPagedParams {
@@ -235,6 +236,7 @@ export const mp3Api = {
     const query = pagedQuery(params, { sortBy: 'date_added', sortDirection: 'desc' });
     query.set('filter_by', params.filterBy || 'all');
     query.set('duration', params.durationRange || 'any');
+    query.set('favorites', String(Boolean(params.favoritesOnly)));
     return apiFetch(`/mp3s/paged?${query.toString()}`, undefined, 'Failed to fetch paged MP3 list');
   },
 
@@ -245,6 +247,7 @@ export const mp3Api = {
       sort_by: params.sortBy || 'date_added',
       sort_direction: params.sortDirection || 'desc',
       duration: params.durationRange || 'any',
+      favorites: String(Boolean(params.favoritesOnly)),
     });
     return apiFetch(`/mp3s/all?${query.toString()}`, undefined, 'Failed to fetch MP3 list');
   },

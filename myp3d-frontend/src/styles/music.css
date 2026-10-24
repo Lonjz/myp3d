@@ -22,68 +22,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.music-steps {
-  display: inline-flex;
-  flex-shrink: 0;
-  gap: var(--space-1);
-  padding: 3px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.music-step {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  transition:
-    background var(--duration-fast) var(--ease-standard),
-    box-shadow var(--duration-fast) var(--ease-standard),
-    color var(--duration-fast) var(--ease-standard);
-}
-
-.music-step svg {
-  width: 18px;
-  height: 18px;
-}
-
-.music-step:hover:not(:disabled),
-.music-step:focus-visible {
-  color: var(--color-text);
-  outline: none;
-}
-
-.music-step.is-active {
-  background: var(--selected-bg);
-  box-shadow: var(--selected-shadow);
-  color: var(--color-text);
-}
-
-.music-step:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.music-step__dot {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  width: 7px;
-  height: 7px;
-  border-radius: var(--radius-full);
-  background: var(--color-rose);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25);
-}
-
 .music-columns {
   display: grid;
   flex: 1;

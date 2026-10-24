@@ -578,3 +578,105 @@
     grid-column: auto;
   }
 }
+
+.icon-select {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-1);
+  height: 2.75rem;
+  padding: 0 var(--space-3) 0 var(--space-4);
+  border: 1px solid var(--color-border-emphasis);
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 1px 2px rgba(8, 4, 24, 0.25);
+  color: var(--color-text);
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard),
+    background var(--duration-fast) var(--ease-standard);
+}
+
+.icon-select:hover,
+.icon-select.is-open {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.icon-select:focus-visible {
+  border-color: color-mix(in srgb, var(--color-accent) 70%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-accent) 18%, transparent);
+  outline: none;
+}
+
+.icon-select svg {
+  width: 18px;
+  height: 18px;
+}
+
+.icon-select .icon-select__chevron {
+  width: 14px;
+  height: 14px;
+  color: var(--color-text-muted);
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+
+.icon-select.is-open .icon-select__chevron {
+  transform: rotate(180deg);
+}
+
+.icon-select__menu.glass {
+  position: fixed;
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--glass-sheen), var(--glass-tint-overlay);
+  -webkit-backdrop-filter: var(--glass-blur-heavy);
+  backdrop-filter: var(--glass-blur-heavy);
+  visibility: hidden;
+  animation: confirm-panel-in 200ms var(--ease-spring) both;
+}
+
+.icon-select__option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+.icon-select__option svg {
+  width: 18px;
+  height: 18px;
+}
+
+.icon-select__option:hover,
+.icon-select__option:focus-visible {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+  outline: none;
+}
+
+.icon-select__option.is-active {
+  background: var(--selected-bg);
+  box-shadow: var(--selected-shadow);
+  color: var(--color-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icon-select__menu.glass {
+    animation-name: confirm-fade-in;
+  }
+}

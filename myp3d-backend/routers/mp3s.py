@@ -61,6 +61,7 @@ def list_mp3s_paged(
     sort_by: MP3SortBy = Query("date_added"),
     sort_direction: Literal["asc", "desc"] = Query("desc"),
     duration: MP3DurationRange = Query("any"),
+    favorites: bool = Query(False),
 ):
     """List MP3 files using server-side pagination, filtering, and sorting."""
     items, total = query_mp3_infos(
@@ -71,6 +72,7 @@ def list_mp3s_paged(
         sort_by=sort_by,
         sort_direction=sort_direction,
         duration_range=duration,
+        only=favorite_service.list_filenames() if favorites else None,
     )
     total_pages = max(1, (total + limit - 1) // limit)
     return PaginatedMP3Response(
@@ -92,8 +94,10 @@ def list_all_mp3s(
     sort_by: MP3SortBy = Query("date_added"),
     sort_direction: Literal["asc", "desc"] = Query("desc"),
     duration: MP3DurationRange = Query("any"),
+    favorites: bool = Query(False),
 ):
-    return filter_sort_mp3_infos(search, filter_by, sort_by, sort_direction, duration)
+    only = favorite_service.list_filenames() if favorites else None
+    return filter_sort_mp3_infos(search, filter_by, sort_by, sort_direction, duration, only)
 
 
 def _resolve_bulk_paths(filenames: list[str]) -> tuple[list[Path], list[BulkFailure]]:

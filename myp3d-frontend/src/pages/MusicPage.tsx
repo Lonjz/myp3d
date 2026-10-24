@@ -287,10 +287,10 @@ export function MusicPage() {
   return (
     <div className="page page--fill sync-page music-page">
       <div className="sync-toolbar glass">
-        <div className="music-steps" role="group" aria-label="Sync step">
+        <div className="segmented" role="group" aria-label="Sync step">
           <button
             type="button"
-            className={`music-step ${step === 'songs' ? 'is-active' : ''}`.trim()}
+            className={`segmented__option ${step === 'songs' ? 'is-active' : ''}`.trim()}
             aria-pressed={step === 'songs'}
             aria-label="Songs"
             title="Songs"
@@ -301,7 +301,7 @@ export function MusicPage() {
           </button>
           <button
             type="button"
-            className={`music-step ${step === 'playlists' ? 'is-active' : ''}`.trim()}
+            className={`segmented__option ${step === 'playlists' ? 'is-active' : ''}`.trim()}
             aria-pressed={step === 'playlists'}
             aria-label={songsPending ? 'Playlists (songs still to sync)' : 'Playlists'}
             title={songsPending ? 'Playlists (songs still to sync)' : 'Playlists'}
@@ -309,7 +309,7 @@ export function MusicPage() {
             disabled={anySyncing}
           >
             <ListMusic aria-hidden="true" />
-            {songsPending && <span className="music-step__dot" aria-hidden="true" />}
+            {songsPending && <span className="segmented__dot" aria-hidden="true" />}
           </button>
         </div>
         <IconField

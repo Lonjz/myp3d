@@ -28,8 +28,8 @@
   max-width: 480px;
 }
 
-.library-filter {
-  width: 170px;
+.library-duration {
+  width: 116px;
 }
 
 .library-count {
@@ -283,6 +283,11 @@
   fill: currentColor;
 }
 
+.favorite-filter.is-active {
+  background: var(--selected-bg);
+  box-shadow: var(--selected-shadow);
+}
+
 .library-empty-row {
   padding: var(--space-6);
   color: var(--color-text-muted);
@@ -335,7 +340,7 @@
     max-width: none;
   }
 
-  .library-filter {
+  .library-duration {
     flex: 1;
   }
 
