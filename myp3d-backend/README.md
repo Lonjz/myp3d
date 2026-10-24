@@ -1,73 +1,18 @@
 # myp3d-backend
 
-FastAPI backend for YouTube-to-MP3 downloads, metadata edits, and album grouping.
-
-## Quick start
+FastAPI server for downloads, tagging, the library database and sync. Setup and config are in the [main README](../README.md).
 
 ```bash
-python -m venv venv
+venv\Scripts\activate          # macOS/Linux: source venv/bin/activate
+python main.py
 ```
 
-Windows PowerShell:
+Endpoints are documented at http://localhost:8000/docs while the server runs.
 
-```powershell
-.\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
+## Layout
 
-macOS/Linux:
-
-```bash
-source venv/bin/activate
-pip install -r requirements.txt
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
-
-## Config
-
-`.env`:
-
-```env
-USE_SYSTEM_FFMPEG=false
-```
-
-- `false`: use bundled `ffmpeg.exe` (Windows default)
-- `true`: use system ffmpeg from `PATH`
-
-## Key endpoints
-
-- `GET /` health
-- `POST /download` download + tag
-- `GET /youtube/search` search
-- `GET /mp3s/paged` list with pagination (`sort_by=duration`, `duration=under-2|2-3|3-4|4-5|5-7|over-7`)
-- `GET /mp3s/{filename}` stream/download
-- `GET /mp3s/{filename}/info` metadata
-- `PUT /mp3s/{filename}/metadata` update + optional rename
-- `POST /mp3s/{filename}/cover` update cover
-- `GET /mp3s/{filename}/cover` cover bytes
-- `DELETE /mp3s/{filename}` delete
-- `POST /mp3s/upload` upload MP3
-- `POST /mp3s/bulk/metadata` set artist/album on many tracks
-- `POST /mp3s/bulk/cover` set one cover on many tracks
-- `POST /mp3s/bulk/delete` delete many tracks
-- `GET /albums/paged` list albums
-- `GET /albums/{album_key}` album detail
-- `PUT /albums/{album_key}` rename album + optional artist for every track
-- `POST /albums/{album_key}/cover` update album cover
-- `GET /albums/{album_key}/cover` album cover bytes
-- `GET /sync/device` this device's LAN name and active discovery port
-- `POST /sync/start` / `POST /sync/stop` start or stop discovery on a chosen UDP port
-- `GET /sync/peers` devices found on the same port
-- `GET /sync/session` current sync session
-- `POST /sync/requests` ask a device to pair
-- `POST /sync/session/accept|decline|cancel|dismiss` answer or end a session
-- `GET /sync/session/diff` songs each paired device will receive, and the ones they share
-- `GET /sync/session/cover/{filename}` cover art from the paired device
-- `POST /sync/session/start` start the sync on both paired devices
-- `GET /sync/manifest`, `POST /sync/incoming`, `POST /sync/sessions/{id}/accepted|start|declined|cancelled|progress` device-to-device calls
-
-## Notes
-
-- Files are stored in `downloads/`.
-- Local filesystem only; no auth.
+- `routers/` HTTP routes, one file per area
+- `services/` the actual work: yt-dlp, eyed3, playlists, sync, Apple Music
+- `models/schemas.py` request and response models
+- `applescripts/` scripts the Apple Music sync runs through `osascript`
+- `myp3d.db` SQLite file for playlists, favourites and the download queue (created on first run)

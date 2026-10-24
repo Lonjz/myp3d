@@ -1,32 +1,18 @@
 # myp3d-frontend
 
-React + TypeScript + Vite UI for downloading, browsing, and editing local MP3 files.
-
-## Quick start
+React + TypeScript + Vite. Setup is in the [main README](../README.md).
 
 ```bash
-npm install
-npm run dev
+npm run dev       # http://localhost:5173
+npm run lint
+npm run build
 ```
 
-## Config
+`VITE_API_BASE_URL` in `.env` points at the backend (default `http://localhost:8000`).
 
-`.env`:
+## Layout
 
-```env
-VITE_API_BASE_URL=http://localhost:8000
-```
-
-## Pages
-
-- Download: URL + metadata + cover
-- Query: YouTube search + preview + autofill
-- Library: list/search/sort/paginate MP3s
-- Details: edit metadata + cover
-- Albums: list/search/sort albums
-- Album Edit: rename + cover for all tracks
-
-## Notes
-
-- Backend client lives in `src/api/mp3Api.ts`.
-- Shared UI primitives: cover crop flow + paginated table.
+- `src/pages/` one component per route
+- `src/components/` grouped by feature, with shared pieces in `ui/` (`IconButton`, `IconField`, `IconSelect`, `EmptyState`)
+- `src/api/` typed clients for the backend
+- `src/styles/tokens.css` colours, spacing, radii and glass effects everything else builds on
