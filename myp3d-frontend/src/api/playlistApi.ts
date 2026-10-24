@@ -7,6 +7,7 @@ export interface PlaylistInfo {
   description: string;
   track_count: number;
   has_cover: boolean;
+  is_favorites: boolean;
   updated_at: string;
 }
 

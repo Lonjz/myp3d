@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, RefreshCw, Search } from 'lucide-react';
+import { Plus, RefreshCw, Search, Star } from 'lucide-react';
 import { NEW_PLAYLIST_NAME, playlistApi } from '../api/playlistApi';
 import type { PlaylistInfo } from '../api/playlistApi';
 import { useToast } from '../components/messages/toastContext';
@@ -75,7 +75,16 @@ export function PlaylistsPage() {
     {
       key: 'name',
       header: 'Playlist',
-      render: (playlist) => <span className="table-cell-ellipsis" title={playlist.name}>{playlist.name}</span>,
+      render: (playlist) => (
+        <span className="playlist-name">
+          <span className="table-cell-ellipsis" title={playlist.name}>{playlist.name}</span>
+          {playlist.is_favorites && (
+            <span className="playlist-name__favorites" title="Favourites" aria-label="Favourites" role="img">
+              <Star aria-hidden="true" />
+            </span>
+          )}
+        </span>
+      ),
     },
     {
       key: 'tracks',

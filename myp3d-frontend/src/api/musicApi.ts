@@ -13,7 +13,15 @@ export interface MusicTrack {
   album: string | null;
 }
 
-export type MusicChange = 'title' | 'artist' | 'album' | 'art' | 'favorite' | 'unfavorite';
+export type MusicChange =
+  | 'title'
+  | 'artist'
+  | 'album'
+  | 'art'
+  | 'favorite'
+  | 'unfavorite'
+  | 'favorite_music'
+  | 'unfavorite_music';
 
 export interface MusicPair {
   track: MP3Info;

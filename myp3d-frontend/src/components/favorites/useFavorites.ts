@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { favoriteApi } from '../../api/favoriteApi';
-import { subscribeAppEvent } from '../../utils/appEvents';
+import { emitAppEvent, subscribeAppEvent } from '../../utils/appEvents';
 import { useToast } from '../messages/toastContext';
 
 const errorMessage = (err: unknown, fallback: string) => (err instanceof Error ? err.message : fallback);
@@ -28,9 +28,11 @@ export function useFavorites() {
     void load();
     const unsubscribeFavorites = subscribeAppEvent('favorites-changed', () => void load());
     const unsubscribeLibrary = subscribeAppEvent('library-changed', () => void load());
+    const unsubscribePlaylists = subscribeAppEvent('playlists-changed', () => void load());
     return () => {
       unsubscribeFavorites();
       unsubscribeLibrary();
+      unsubscribePlaylists();
     };
   }, [showError]);
 
@@ -40,6 +42,7 @@ export function useFavorites() {
       setFavorites((current) => withFilename(current, filename, on));
       try {
         await (on ? favoriteApi.add(filename) : favoriteApi.remove(filename));
+        emitAppEvent('playlists-changed');
       } catch (err) {
         setFavorites((current) => withFilename(current, filename, !on));
         showError(errorMessage(err, on ? 'Failed to favourite' : 'Failed to unfavourite'));

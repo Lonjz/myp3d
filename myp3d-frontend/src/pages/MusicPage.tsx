@@ -41,6 +41,8 @@ const CHANGE_ICONS: Record<MusicChange, LucideIcon> = {
   art: ImageIcon,
   favorite: Star,
   unfavorite: StarOff,
+  favorite_music: Star,
+  unfavorite_music: StarOff,
 };
 
 const hasChanges = (pair: MusicPair) => pair.changes.length > 0;
@@ -53,6 +55,8 @@ const changeTitle = (change: MusicChange, { track, music }: MusicPair) => {
   if (change === 'album') return `${music.album || '-'} → ${track.album}`;
   if (change === 'favorite') return 'Favourite in myp3d';
   if (change === 'unfavorite') return 'Unfavourite in myp3d';
+  if (change === 'favorite_music') return 'Favourite in Apple Music';
+  if (change === 'unfavorite_music') return 'Unfavourite in Apple Music';
   return 'Cover art';
 };
 
