@@ -280,10 +280,10 @@ def add_tracks(playlist_id: str, filenames: list[str]) -> PlaylistInfo:
         current = _filenames(conn, playlist_id)
         added = [filename for filename in cleaned if filename not in current]
         if added:
-            _write_tracks(conn, playlist_id, current + added)
+            _write_tracks(conn, playlist_id, added + current)
             _touch(conn, playlist_id)
             row = _require(conn, playlist_id)
-        return _to_info(row, current + added, names)
+        return _to_info(row, added + current, names)
 
 
 def set_cover(playlist_id: str, cover: bytes) -> PlaylistInfo:

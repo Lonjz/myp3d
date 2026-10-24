@@ -24,8 +24,8 @@ def reconcile() -> None:
     library = _library_names()
     current = playlist_service.stored_filenames(target)
     kept = [filename for filename in current if filename in starred_set or filename not in library]
-    added = [filename for filename in starred if filename not in current and filename in library]
-    playlist_service.replace_tracks(target, kept + added)
+    added = [filename for filename in reversed(starred) if filename not in current and filename in library]
+    playlist_service.replace_tracks(target, added + kept)
 
 
 def ensure() -> None:
@@ -45,7 +45,7 @@ def _follow_stars(add: Iterable[str], remove: Iterable[str]) -> None:
     current = [filename for filename in playlist_service.stored_filenames(target) if filename not in removed]
     library = _library_names()
     added = [filename for filename in dict.fromkeys(add) if filename not in current and filename in library]
-    playlist_service.replace_tracks(target, current + added)
+    playlist_service.replace_tracks(target, added + current)
 
 
 def set_many(add: Iterable[str], remove: Iterable[str]) -> None:
