@@ -19,6 +19,7 @@ import { DownloadQueueProvider } from './components/downloads/DownloadQueueProvi
 import { useDownloadQueue } from './components/downloads/downloadQueueContext';
 import { IconButton } from './components/ui/IconButton';
 import { AppBackdrop } from './components/shell/AppBackdrop';
+import { DocumentTitle } from './components/shell/DocumentTitle';
 import { KeepAliveRoutes } from './components/shell/KeepAliveRoutes';
 import { PlayerBar } from './components/player/PlayerBar';
 import { PlayerProvider } from './components/player/PlayerProvider';
@@ -155,6 +156,7 @@ function App() {
       <SpotlightProvider>
         <PlayerProvider>
           <DownloadQueueProvider>
+            <DocumentTitle />
             <AppBackdrop />
             <div className="app-shell">
               <aside
