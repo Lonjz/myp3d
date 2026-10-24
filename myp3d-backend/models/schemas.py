@@ -376,7 +376,9 @@ class MusicTrack(BaseModel):
 class MusicPair(BaseModel):
     track: MP3Info
     music: MusicTrack
-    changes: list[Literal["title", "artist", "album", "art", "favorite", "unfavorite"]] = Field(default_factory=list)
+    changes: list[
+        Literal["title", "artist", "album", "art", "favorite", "unfavorite", "favorite_music", "unfavorite_music"]
+    ] = Field(default_factory=list)
 
 
 class MusicDiff(BaseModel):

@@ -17,7 +17,7 @@ from services.config import BASE_DIR, OUTPUT_DIR
 from services.mp3_service import get_album_cover, list_mp3_infos, make_square_cover, safe_path_part
 
 SyncStatusName = Literal["syncing", "done", "failed"]
-ChangeName = Literal["title", "artist", "album", "art", "favorite", "unfavorite"]
+ChangeName = Literal["title", "artist", "album", "art", "favorite", "unfavorite", "favorite_music", "unfavorite_music"]
 MatchKey = tuple[str, str]
 
 SCRIPTS_DIR = BASE_DIR / "applescripts"
@@ -28,6 +28,7 @@ RECORD_SEP = "\x1e"
 GROUP_SEP = "\x1d"
 NOT_AUTHORIZED_CODE = "-1743"
 PUSH_CHANGES = ("title", "artist", "album", "art")
+FAVORITE_PUSHES = {"favorite_music": True, "unfavorite_music": False}
 
 
 class MusicError(Exception):
@@ -294,13 +295,46 @@ def _apple_favorites(pairs: list[_Pair]) -> set[str]:
 
 def _mark_favorites(pairs: list[_Pair], starred: set[str], snapshot: Optional[set[str]]) -> None:
     apple = _apple_favorites(pairs)
-    base = starred if snapshot is None else snapshot
     for pair in pairs:
         filename = pair.track.filename
-        if filename in apple and filename not in base and filename not in starred:
-            pair.changes.append("favorite")
-        elif filename in base and filename not in apple and filename in starred:
-            pair.changes.append("unfavorite")
+        in_apple, in_myp3d = filename in apple, filename in starred
+        if in_apple == in_myp3d:
+            continue
+        if snapshot is None or in_myp3d == (filename in snapshot):
+            pair.changes.append("favorite" if in_apple else "unfavorite")
+        else:
+            pair.changes.append("favorite_music" if in_myp3d else "unfavorite_music")
+
+
+def _favorite_push(pair: _Pair) -> Optional[bool]:
+    return next((FAVORITE_PUSHES[change] for change in pair.changes if change in FAVORITE_PUSHES), None)
+
+
+def _push_favorites(pairs: list[_Pair]) -> dict[str, str]:
+    problems: dict[str, str] = {}
+    for state in (True, False):
+        batch = [pair for pair in pairs if _favorite_push(pair) is state]
+        if not batch:
+            continue
+        try:
+            output = run_script(
+                "set_favorites",
+                "true" if state else "false",
+                *(pair.music.info.persistent_id for pair in batch),
+                timeout=EXPORT_TIMEOUT_S,
+            )
+        except MusicError as exc:
+            problems.update({pair.track.filename: exc.detail for pair in batch})
+            continue
+        missing = set(output.split(FIELD_SEP)) if output else set()
+        problems.update(
+            {
+                pair.track.filename: "That song is no longer in Apple Music"
+                for pair in batch
+                if pair.music.info.persistent_id in missing
+            }
+        )
+    return problems
 
 
 def _compare(root: Path) -> _Match:
@@ -433,19 +467,31 @@ def _run_sync(job: _SyncJob, root: Path) -> None:
         _finish(job, "failed", exc.detail if isinstance(exc, MusicError) else "Couldn't read the Apple Music library")
         return
 
-    starring = [pair for pair in matched.pairs if "favorite" in pair.changes or "unfavorite" in pair.changes]
+    pushing = [pair for pair in matched.pairs if _favorite_push(pair) is not None]
+    problems = _push_favorites(pushing)
+    snapshot = _apple_favorites(matched.pairs)
+    for pair in pushing:
+        if pair.track.filename in problems:
+            continue
+        if _favorite_push(pair):
+            snapshot.add(pair.track.filename)
+        else:
+            snapshot.discard(pair.track.filename)
     try:
         favorite_playlist.set_many(
-            [pair.track.filename for pair in starring if "favorite" in pair.changes],
-            [pair.track.filename for pair in starring if "unfavorite" in pair.changes],
+            [pair.track.filename for pair in matched.pairs if "favorite" in pair.changes],
+            [pair.track.filename for pair in matched.pairs if "unfavorite" in pair.changes],
         )
-        favorite_service.save_apple_snapshot(_apple_favorites(matched.pairs))
+        favorite_service.save_apple_snapshot(snapshot)
     except Exception:
-        _finish(job, "failed", "Couldn't save the favourites from Apple Music")
+        _finish(job, "failed", "Couldn't save the favourites")
         return
 
     updates = [pair for pair in matched.pairs if any(change in PUSH_CHANGES for change in pair.changes)]
-    starred_only = sum(1 for pair in starring if not any(change in PUSH_CHANGES for change in pair.changes))
+    starring = [pair for pair in matched.pairs if pair.changes and not any(change in PUSH_CHANGES for change in pair.changes)]
+    with _sync_lock:
+        for filename, detail in problems.items():
+            job.failed.append(BulkFailure(filename=filename, detail=detail))
     adds: list[MP3Info] = []
     seen: set[object] = set()
     for track in matched.unpaired:
@@ -457,8 +503,8 @@ def _run_sync(job: _SyncJob, root: Path) -> None:
         adds.append(track)
 
     with _sync_lock:
-        job.total = starred_only + len(updates) + len(adds)
-        job.updated = starred_only
+        job.total = len(starring) + len(updates) + len(adds)
+        job.updated = sum(1 for pair in starring if pair.track.filename not in problems)
 
     for pair in updates:
         source = OUTPUT_DIR / pair.track.filename
