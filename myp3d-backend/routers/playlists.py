@@ -3,7 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, File, HTTPException, Query, Response, UploadFile
 
 from models.schemas import PlaylistCreate, PlaylistDetail, PlaylistInfo, PlaylistTracksRequest, PlaylistUpdate
-from services import playlist_service
+from services import favorite_playlist, playlist_service
 from services.cover_service import CoverSize, get_image_variant
 from services.mp3_service import make_square_cover
 from services.playlist_service import PlaylistError
@@ -41,7 +41,7 @@ def get_playlist(playlist_id: str):
 @router.put("/{playlist_id}", response_model=PlaylistDetail)
 def update_playlist(playlist_id: str, payload: PlaylistUpdate):
     try:
-        return playlist_service.update(playlist_id, payload.name, payload.filenames, payload.description)
+        return favorite_playlist.update_playlist(playlist_id, payload.name, payload.filenames, payload.description)
     except PlaylistError as exc:
         _raise(exc)
 
@@ -49,7 +49,7 @@ def update_playlist(playlist_id: str, payload: PlaylistUpdate):
 @router.post("/{playlist_id}/tracks", response_model=PlaylistInfo)
 def add_playlist_tracks(playlist_id: str, payload: PlaylistTracksRequest):
     try:
-        return playlist_service.add_tracks(playlist_id, payload.filenames)
+        return favorite_playlist.add_tracks(playlist_id, payload.filenames)
     except PlaylistError as exc:
         _raise(exc)
 

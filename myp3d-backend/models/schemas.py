@@ -327,6 +327,7 @@ class SyncPlaylistRecord(SyncRecordTimes):
     description: str = ""
     filenames: list[str] = Field(default_factory=list)
     cover_hash: Optional[str] = None
+    is_favorites: bool = False
 
 
 class SyncQueueRecord(SyncRecordTimes):
@@ -453,6 +454,7 @@ class PlaylistInfo(BaseModel):
     description: str = ""
     track_count: int = 0
     has_cover: bool = False
+    is_favorites: bool = False
     updated_at: str
 
 

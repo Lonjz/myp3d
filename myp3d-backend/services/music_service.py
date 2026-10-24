@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Literal, Optional
 
 from models.schemas import BulkFailure, MP3Info, MusicDiff, MusicPair, MusicSyncInfo, MusicTrack
-from services import favorite_service
+from services import favorite_playlist, favorite_service
 from services.audio_fingerprint import audio_fingerprint, cover_hash, covers_match
 from services.config import BASE_DIR, OUTPUT_DIR
 from services.mp3_service import get_album_cover, list_mp3_infos, make_square_cover, safe_path_part
@@ -435,11 +435,11 @@ def _run_sync(job: _SyncJob, root: Path) -> None:
 
     starring = [pair for pair in matched.pairs if "favorite" in pair.changes or "unfavorite" in pair.changes]
     try:
-        favorite_service.apply_apple(
+        favorite_playlist.set_many(
             [pair.track.filename for pair in starring if "favorite" in pair.changes],
             [pair.track.filename for pair in starring if "unfavorite" in pair.changes],
-            _apple_favorites(matched.pairs),
         )
+        favorite_service.save_apple_snapshot(_apple_favorites(matched.pairs))
     except Exception:
         _finish(job, "failed", "Couldn't save the favourites from Apple Music")
         return

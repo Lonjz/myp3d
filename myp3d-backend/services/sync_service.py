@@ -24,7 +24,7 @@ from models.schemas import (
     SyncProgress,
     SyncSessionInfo,
 )
-from services import database_sync
+from services import database_sync, favorite_playlist
 from services.audio_fingerprint import id3_tag_length
 from services.database_sync import RecordKind, RecordPull
 from services.config import API_PORT, OUTPUT_DIR
@@ -631,7 +631,10 @@ def _pull_worker(session: _Session) -> None:
         if pulls:
             invalidate_library_cache()
 
-    if not _apply_records(session, record_pulls):
+    applied = _apply_records(session, record_pulls)
+    if record_pulls:
+        favorite_playlist.ensure()
+    if not applied:
         return
 
     with _lock:

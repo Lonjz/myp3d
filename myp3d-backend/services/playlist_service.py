@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS playlist_tracks (
 CREATE INDEX IF NOT EXISTS playlist_tracks_filename ON playlist_tracks(filename);
 """
 
-PLAYLIST_COLUMNS = "id, name, description, cover IS NOT NULL AS has_cover, updated_at"
+PLAYLIST_COLUMNS = "id, name, description, cover IS NOT NULL AS has_cover, is_favorites, updated_at"
 
 
 class PlaylistError(Exception):
@@ -47,6 +47,7 @@ class PlaylistState:
     description: str
     filenames: list[str]
     cover_hash: Optional[str]
+    is_favorites: bool
     created_at: str
     updated_at: str
     deleted_at: Optional[str]
@@ -114,6 +115,7 @@ def _to_info(row: sqlite3.Row, filenames: list[str], names: set[str]) -> Playlis
         description=row["description"],
         track_count=sum(1 for filename in filenames if filename in names),
         has_cover=bool(row["has_cover"]),
+        is_favorites=bool(row["is_favorites"]),
         updated_at=row["updated_at"],
     )
 
@@ -137,6 +139,8 @@ def init() -> None:
         columns = {row["name"] for row in conn.execute("PRAGMA table_info(playlists)")}
         if "description" not in columns:
             conn.execute("ALTER TABLE playlists ADD COLUMN description TEXT NOT NULL DEFAULT ''")
+        if "is_favorites" not in columns:
+            conn.execute("ALTER TABLE playlists ADD COLUMN is_favorites INTEGER NOT NULL DEFAULT 0")
 
 
 def list_playlists() -> list[PlaylistInfo]:
@@ -154,7 +158,7 @@ def list_playlists() -> list[PlaylistInfo]:
 def list_states() -> list[PlaylistState]:
     with _connect() as conn:
         rows = conn.execute(
-            "SELECT id, name, description, cover, created_at, updated_at, deleted_at FROM playlists ORDER BY id"
+            "SELECT id, name, description, cover, is_favorites, created_at, updated_at, deleted_at FROM playlists ORDER BY id"
         ).fetchall()
         tracks: dict[str, list[str]] = {}
         for track in conn.execute("SELECT playlist_id, filename FROM playlist_tracks ORDER BY playlist_id, position"):
@@ -166,12 +170,45 @@ def list_states() -> list[PlaylistState]:
             description=row["description"],
             filenames=tracks.get(row["id"], []),
             cover_hash=cover_digest(row["cover"]) if row["cover"] is not None else None,
+            is_favorites=bool(row["is_favorites"]),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
             deleted_at=row["deleted_at"],
         )
         for row in rows
     ]
+
+
+def favorites_id() -> Optional[str]:
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT id FROM playlists WHERE is_favorites = 1 AND deleted_at IS NULL ORDER BY created_at, id"
+        ).fetchone()
+    return row["id"] if row is not None else None
+
+
+def find_by_name(name: str) -> Optional[str]:
+    with _connect() as conn:
+        rows = conn.execute("SELECT id, name FROM playlists WHERE deleted_at IS NULL ORDER BY created_at, id").fetchall()
+    wanted = name.casefold()
+    return next((row["id"] for row in rows if row["name"].strip().casefold() == wanted), None)
+
+
+def mark_favorites(playlist_id: str) -> None:
+    with _lock, _connect() as conn:
+        _require(conn, playlist_id)
+        conn.execute("UPDATE playlists SET is_favorites = 1 WHERE id = ?", (playlist_id,))
+        _touch(conn, playlist_id)
+
+
+def replace_tracks(playlist_id: str, filenames: list[str]) -> None:
+    cleaned = _clean_filenames(filenames)
+    with _lock, _connect() as conn:
+        _require(conn, playlist_id)
+        if _filenames(conn, playlist_id) == cleaned:
+            return
+        _write_tracks(conn, playlist_id, cleaned)
+        _touch(conn, playlist_id)
 
 
 def stored_filenames(playlist_id: str) -> list[str]:
@@ -303,6 +340,7 @@ def sync_records() -> list[SyncPlaylistRecord]:
             description=state.description,
             filenames=state.filenames,
             cover_hash=state.cover_hash,
+            is_favorites=state.is_favorites,
             created_at=state.created_at,
             updated_at=state.updated_at,
             deleted_at=state.deleted_at,
@@ -323,6 +361,7 @@ def apply_record(record: SyncPlaylistRecord, cover: Optional[bytes]) -> None:
         record.name,
         record.description,
         cover,
+        int(record.is_favorites),
         record.created_at,
         record.updated_at,
         record.deleted_at,
@@ -331,14 +370,14 @@ def apply_record(record: SyncPlaylistRecord, cover: Optional[bytes]) -> None:
         exists = conn.execute("SELECT 1 FROM playlists WHERE id = ?", (record.id,)).fetchone() is not None
         if exists:
             conn.execute(
-                "UPDATE playlists SET name = ?, description = ?, cover = ?, created_at = ?, updated_at = ?, "
-                "deleted_at = ? WHERE id = ?",
+                "UPDATE playlists SET name = ?, description = ?, cover = ?, is_favorites = ?, created_at = ?, "
+                "updated_at = ?, deleted_at = ? WHERE id = ?",
                 (*values, record.id),
             )
         else:
             conn.execute(
-                "INSERT INTO playlists (name, description, cover, created_at, updated_at, deleted_at, id) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO playlists (name, description, cover, is_favorites, created_at, updated_at, deleted_at, id) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (*values, record.id),
             )
         _write_tracks(conn, record.id, filenames)

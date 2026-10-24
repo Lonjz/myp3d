@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from routers import albums, cache, download, export, favorites, mp3s, music, peer, playlists, queue, search, spotify, stats, sync, youtube
-from services import favorite_service, music_playlist_service, playlist_service, queue_service
+from services import favorite_playlist, favorite_service, music_playlist_service, playlist_service, queue_service
 from services.config import API_PORT
 from services.discovery_service import discovery
 
@@ -30,6 +30,7 @@ async def lifespan(_: FastAPI):
     playlist_service.init()
     favorite_service.init()
     music_playlist_service.init()
+    favorite_playlist.ensure()
     yield
     discovery.stop()
 

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Literal, Optional
 
 from models.schemas import BulkFailure, MusicPlaylistDiff, MusicPlaylistEntry, MusicPlaylistSyncInfo
-from services import playlist_service
+from services import favorite_playlist, playlist_service
 from services.db import connect as _connect
 from services.mp3_service import list_mp3_filepaths, make_square_cover
 from services.music_service import (
@@ -451,7 +451,7 @@ def _apply(plan: Plan, file_of_pid: dict[str, str]) -> tuple[str, Optional[str]]
 
     current = next(state for state in playlist_service.list_states() if state.id == plan.playlist_id)
     if plan.write_local:
-        playlist_service.update(
+        favorite_playlist.update_playlist(
             plan.playlist_id,
             plan.name if plan.name != current.name else None,
             plan.local if plan.local != current.filenames else None,
@@ -509,6 +509,7 @@ def _run_sync(job: _SyncJob, root: Path) -> None:
             if art_problem:
                 job.without_art.append(BulkFailure(filename=plan.name, detail=art_problem))
 
+    favorite_playlist.ensure()
     _finish(job, "done")
 
 

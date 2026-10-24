@@ -49,9 +49,15 @@ def init() -> None:
 
 
 def list_filenames() -> set[str]:
+    return set(list_ordered())
+
+
+def list_ordered() -> list[str]:
     with _connect() as conn:
-        rows = conn.execute("SELECT filename FROM favorites WHERE deleted_at IS NULL").fetchall()
-    return {row["filename"] for row in rows}
+        rows = conn.execute(
+            "SELECT filename FROM favorites WHERE deleted_at IS NULL ORDER BY created_at, filename"
+        ).fetchall()
+    return [row["filename"] for row in rows]
 
 
 def _star(conn: sqlite3.Connection, filename: str, now: str) -> None:
@@ -70,10 +76,17 @@ def _unstar(conn: sqlite3.Connection, filename: str, now: str) -> None:
     )
 
 
-def set_favorite(filename: str, on: bool) -> None:
-    cleaned = _clean_filename(filename)
+def set_many(add: Iterable[str], remove: Iterable[str]) -> None:
+    added = [_clean_filename(filename) for filename in add]
+    removed = [_clean_filename(filename) for filename in remove]
+    if not added and not removed:
+        return
+    now = _now()
     with _lock, _connect() as conn:
-        (_star if on else _unstar)(conn, cleaned, _now())
+        for filename in added:
+            _star(conn, filename, now)
+        for filename in removed:
+            _unstar(conn, filename, now)
 
 
 def _read_snapshot(conn: sqlite3.Connection) -> Optional[list[str]]:
@@ -95,16 +108,9 @@ def apple_snapshot() -> Optional[set[str]]:
     return set(snapshot) if snapshot is not None else None
 
 
-def apply_apple(add: Iterable[str], remove: Iterable[str], snapshot: Iterable[str]) -> None:
-    added = [_clean_filename(filename) for filename in add]
-    removed = [_clean_filename(filename) for filename in remove]
-    now = _now()
+def save_apple_snapshot(filenames: Iterable[str]) -> None:
     with _lock, _connect() as conn:
-        for filename in added:
-            _star(conn, filename, now)
-        for filename in removed:
-            _unstar(conn, filename, now)
-        _write_snapshot(conn, snapshot)
+        _write_snapshot(conn, filenames)
 
 
 def rename_track(old: str, new: str) -> None:
