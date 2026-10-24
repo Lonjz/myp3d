@@ -11,12 +11,13 @@ from pathlib import Path
 from typing import Literal, Optional
 
 from models.schemas import BulkFailure, MP3Info, MusicDiff, MusicPair, MusicSyncInfo, MusicTrack
+from services import favorite_service
 from services.audio_fingerprint import audio_fingerprint, cover_hash, covers_match
 from services.config import BASE_DIR, OUTPUT_DIR
 from services.mp3_service import get_album_cover, list_mp3_infos, make_square_cover, safe_path_part
 
 SyncStatusName = Literal["syncing", "done", "failed"]
-ChangeName = Literal["title", "artist", "album", "art"]
+ChangeName = Literal["title", "artist", "album", "art", "favorite", "unfavorite"]
 MatchKey = tuple[str, str]
 
 SCRIPTS_DIR = BASE_DIR / "applescripts"
@@ -26,6 +27,7 @@ FIELD_SEP = "\x1f"
 RECORD_SEP = "\x1e"
 GROUP_SEP = "\x1d"
 NOT_AUTHORIZED_CODE = "-1743"
+PUSH_CHANGES = ("title", "artist", "album", "art")
 
 
 class MusicError(Exception):
@@ -39,6 +41,7 @@ class MusicError(Exception):
 class _LibraryTrack:
     info: MusicTrack
     location: Optional[str] = None
+    favorited: bool = False
 
 
 @dataclass
@@ -129,7 +132,9 @@ def _path_key(path: str) -> str:
 
 
 def _read_library() -> list[_LibraryTrack]:
-    tracks_text, _, locations_text = run_script("export_library").partition(GROUP_SEP)
+    tracks_text, _, rest = run_script("export_library").partition(GROUP_SEP)
+    locations_text, _, favorites_text = rest.partition(GROUP_SEP)
+    favorited = set(favorites_text.split(RECORD_SEP)) if favorites_text else set()
     locations: dict[str, str] = {}
     for record in locations_text.split(RECORD_SEP) if locations_text else []:
         persistent_id, _, location = record.partition(FIELD_SEP)
@@ -145,6 +150,7 @@ def _read_library() -> list[_LibraryTrack]:
             _LibraryTrack(
                 info=MusicTrack(persistent_id=persistent_id, name=name, artist=artist or None, album=album or None),
                 location=locations.get(persistent_id),
+                favorited=persistent_id in favorited,
             )
         )
     return tracks
@@ -282,8 +288,29 @@ def _match(root: Path, library: list[_LibraryTrack], local_tracks: list[MP3Info]
     )
 
 
-def song_links(root: Path) -> tuple[dict[str, str], int]:
+def _apple_favorites(pairs: list[_Pair]) -> set[str]:
+    return {pair.track.filename for pair in pairs if pair.music.favorited}
+
+
+def _mark_favorites(pairs: list[_Pair], starred: set[str], snapshot: Optional[set[str]]) -> None:
+    apple = _apple_favorites(pairs)
+    base = starred if snapshot is None else snapshot
+    for pair in pairs:
+        filename = pair.track.filename
+        if filename in apple and filename not in base and filename not in starred:
+            pair.changes.append("favorite")
+        elif filename in base and filename not in apple and filename in starred:
+            pair.changes.append("unfavorite")
+
+
+def _compare(root: Path) -> _Match:
     matched = _match(root, _read_library(), list_mp3_infos())
+    _mark_favorites(matched.pairs, favorite_service.list_filenames(), favorite_service.apple_snapshot())
+    return matched
+
+
+def song_links(root: Path) -> tuple[dict[str, str], int]:
+    matched = _compare(root)
     filenames: dict[str, str] = {}
     for pair in matched.pairs:
         filenames.setdefault(pair.music.info.persistent_id, pair.track.filename)
@@ -297,7 +324,7 @@ def _track_sort_key(track: MP3Info) -> tuple[str, str]:
 
 def diff(folder: str) -> MusicDiff:
     root = require_folder(folder)
-    matched = _match(root, _read_library(), list_mp3_infos())
+    matched = _compare(root)
     return MusicDiff(
         only_in_music=sorted(
             (music.info for music in matched.only_in_music),
@@ -401,12 +428,24 @@ def _record_failure(job: _SyncJob, filename: str, exc: Exception) -> None:
 
 def _run_sync(job: _SyncJob, root: Path) -> None:
     try:
-        matched = _match(root, _read_library(), list_mp3_infos())
+        matched = _compare(root)
     except Exception as exc:
         _finish(job, "failed", exc.detail if isinstance(exc, MusicError) else "Couldn't read the Apple Music library")
         return
 
-    updates = [pair for pair in matched.pairs if pair.changes]
+    starring = [pair for pair in matched.pairs if "favorite" in pair.changes or "unfavorite" in pair.changes]
+    try:
+        favorite_service.apply_apple(
+            [pair.track.filename for pair in starring if "favorite" in pair.changes],
+            [pair.track.filename for pair in starring if "unfavorite" in pair.changes],
+            _apple_favorites(matched.pairs),
+        )
+    except Exception:
+        _finish(job, "failed", "Couldn't save the favourites from Apple Music")
+        return
+
+    updates = [pair for pair in matched.pairs if any(change in PUSH_CHANGES for change in pair.changes)]
+    starred_only = sum(1 for pair in starring if not any(change in PUSH_CHANGES for change in pair.changes))
     adds: list[MP3Info] = []
     seen: set[object] = set()
     for track in matched.unpaired:
@@ -418,7 +457,8 @@ def _run_sync(job: _SyncJob, root: Path) -> None:
         adds.append(track)
 
     with _sync_lock:
-        job.total = len(updates) + len(adds)
+        job.total = starred_only + len(updates) + len(adds)
+        job.updated = starred_only
 
     for pair in updates:
         source = OUTPUT_DIR / pair.track.filename

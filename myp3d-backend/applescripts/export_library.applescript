@@ -11,6 +11,7 @@ on run
 			set trackAlbums to album of every track
 			set fileIds to persistent ID of every file track
 			set fileLocations to location of every file track
+			set favoriteIds to persistent ID of every track whose favorited is true
 		end tell
 	end tell
 
@@ -21,6 +22,7 @@ on run
 		property als : trackAlbums
 		property fids : fileIds
 		property ls : fileLocations
+		property favs : favoriteIds
 		property tracksOut : {}
 		property locationsOut : {}
 	end script
@@ -42,8 +44,9 @@ on run
 	set AppleScript's text item delimiters to recSep
 	set tracksText to o's tracksOut as text
 	set locationsText to o's locationsOut as text
+	set favoritesText to o's favs as text
 	set AppleScript's text item delimiters to ""
-	return tracksText & groupSep & locationsText
+	return tracksText & groupSep & locationsText & groupSep & favoritesText
 end run
 
 on textOf(v)
