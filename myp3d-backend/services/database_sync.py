@@ -1,13 +1,14 @@
 import hashlib
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Callable, Literal, Optional, Union
 
-from models.schemas import SyncDatabase, SyncDiffRecord, SyncPlaylistRecord, SyncQueueRecord
-from services import playlist_service, queue_service
+from models.schemas import SyncDatabase, SyncDiffRecord, SyncFavoriteRecord, SyncPlaylistRecord, SyncQueueRecord
+from services import favorite_service, playlist_service, queue_service
 
-RecordKind = Literal["playlist", "download"]
-Record = Union[SyncPlaylistRecord, SyncQueueRecord]
+RecordKind = Literal["playlist", "download", "favorite"]
+Record = Union[SyncPlaylistRecord, SyncQueueRecord, SyncFavoriteRecord]
 RecordKey = tuple[RecordKind, str]
 
 
@@ -23,12 +24,17 @@ class RecordPull:
 
 
 def _record_key(record: Record) -> str:
-    return record.id if isinstance(record, SyncPlaylistRecord) else record.uid
+    if isinstance(record, SyncPlaylistRecord):
+        return record.id
+    if isinstance(record, SyncFavoriteRecord):
+        return record.filename
+    return record.uid
 
 
 def _keyed(database: SyncDatabase) -> dict[RecordKey, Record]:
     keyed: dict[RecordKey, Record] = {("playlist", record.id): record for record in database.playlists}
     keyed.update({("download", record.uid): record for record in database.downloads})
+    keyed.update({("favorite", record.filename): record for record in database.favorites})
     return keyed
 
 
@@ -38,7 +44,11 @@ def _stamp(record: Record) -> datetime:
 
 
 def local_database() -> SyncDatabase:
-    return SyncDatabase(playlists=playlist_service.sync_records(), downloads=queue_service.sync_records())
+    return SyncDatabase(
+        playlists=playlist_service.sync_records(),
+        downloads=queue_service.sync_records(),
+        favorites=favorite_service.sync_records(),
+    )
 
 
 def busy_downloads() -> set[str]:
@@ -69,6 +79,8 @@ def plan_pulls(
 def record_name(record: Record) -> str:
     if isinstance(record, SyncPlaylistRecord):
         return record.name
+    if isinstance(record, SyncFavoriteRecord):
+        return Path(record.filename).stem
     return record.title or record.custom_filename or record.url
 
 
@@ -104,6 +116,9 @@ def apply_pull(
     local: SyncDatabase,
     fetch_cover: Callable[[RecordKind, str], bytes],
 ) -> bool:
+    if isinstance(pull.record, SyncFavoriteRecord):
+        favorite_service.apply_record(pull.record)
+        return True
     wanted = pull.record.cover_hash
     cover: Optional[bytes] = None
     if wanted is not None:

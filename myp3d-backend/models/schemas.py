@@ -292,7 +292,7 @@ class SyncDiffTrack(BaseModel):
 
 
 class SyncDiffRecord(BaseModel):
-    kind: Literal["playlist", "download"]
+    kind: Literal["playlist", "download", "favorite"]
     key: str
     name: str
     deleted: bool = False
@@ -346,9 +346,14 @@ class SyncQueueRecord(SyncRecordTimes):
     finished_at: Optional[str] = None
 
 
+class SyncFavoriteRecord(SyncRecordTimes):
+    filename: str = Field(pattern=r"^[^/\\]+\.[mM][pP]3$")
+
+
 class SyncDatabase(BaseModel):
     playlists: list[SyncPlaylistRecord] = Field(default_factory=list)
     downloads: list[SyncQueueRecord] = Field(default_factory=list)
+    favorites: list[SyncFavoriteRecord] = Field(default_factory=list)
 
 
 class MusicStatus(BaseModel):
