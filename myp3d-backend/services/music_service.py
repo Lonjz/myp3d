@@ -423,7 +423,7 @@ def parse_art_state(state: str) -> Optional[str]:
     return reason.strip() or "Music didn't set the cover art"
 
 
-def _add_one(root: Path, source: Path, track: MP3Info, existing: Optional[Path]) -> Optional[str]:
+def _add_one(root: Path, source: Path, track: MP3Info, existing: Optional[Path]) -> tuple[str, Optional[str]]:
     art_path = _write_cover(source)
     try:
         target = existing if existing is not None else _copy_into(root, source, track)
@@ -434,30 +434,27 @@ def _add_one(root: Path, source: Path, track: MP3Info, existing: Optional[Path])
             if existing is None and exc.status_code != 504:
                 target.unlink(missing_ok=True)
             raise
-        return None if art_path is None else parse_art_state(result.partition(FIELD_SEP)[2])
+        persistent_id, _, art_state = result.partition(FIELD_SEP)
+        return persistent_id, None if art_path is None else parse_art_state(art_state)
     finally:
         if art_path:
             Path(art_path).unlink(missing_ok=True)
 
 
-def _replace_audio(source: Path, music: _LibraryTrack) -> None:
-    target = _music_file(music)
-    if target is None:
-        raise MusicError(404, "Couldn't find the song's file in Apple Music")
-    handle, temp = tempfile.mkstemp(prefix=".myp3d-", suffix=".mp3", dir=target.parent)
-    os.close(handle)
-    try:
-        shutil.copyfile(source, temp)
-        os.replace(temp, target)
-    finally:
-        Path(temp).unlink(missing_ok=True)
-    run_script("refresh_track", music.info.persistent_id, timeout=TRACK_TIMEOUT_S)
+def _readd_one(root: Path, source: Path, pair: _Pair) -> Optional[str]:
+    old_file = _music_file(pair.music)
+    persistent_id, art_problem = _add_one(root, source, pair.track, None)
+    run_script("replace_track", pair.music.info.persistent_id, persistent_id, timeout=EXPORT_TIMEOUT_S)
+    if old_file is not None:
+        try:
+            if _is_within(old_file, root):
+                old_file.unlink()
+        except OSError:
+            pass
+    return art_problem
 
 
 def _update_one(source: Path, pair: _Pair) -> Optional[str]:
-    if "audio" in pair.changes:
-        _replace_audio(source, pair.music)
-        return None
     art_path = _write_cover(source) if "art" in pair.changes else None
     try:
         args = [
@@ -536,7 +533,7 @@ def _run_sync(job: _SyncJob, root: Path) -> None:
     for pair in updates:
         source = OUTPUT_DIR / pair.track.filename
         try:
-            art_problem = _update_one(source, pair)
+            art_problem = _readd_one(root, source, pair) if "audio" in pair.changes else _update_one(source, pair)
         except Exception as exc:
             _record_failure(job, source.name, exc)
             continue
@@ -548,7 +545,7 @@ def _run_sync(job: _SyncJob, root: Path) -> None:
     for track in adds:
         source = OUTPUT_DIR / track.filename
         try:
-            art_problem = _add_one(root, source, track, matched.loose.get(track.filename))
+            _, art_problem = _add_one(root, source, track, matched.loose.get(track.filename))
         except Exception as exc:
             _record_failure(job, source.name, exc)
             continue
