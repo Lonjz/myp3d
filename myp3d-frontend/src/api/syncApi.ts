@@ -42,7 +42,7 @@ export interface SyncDiffTrack {
   artist: string | null;
   album: string | null;
   has_cover: boolean;
-  replaces: boolean;
+  updates: boolean;
 }
 
 export interface SyncDiffRecord {

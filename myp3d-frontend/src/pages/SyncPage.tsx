@@ -12,6 +12,7 @@ import {
   ListMusic,
   MonitorSmartphone,
   MonitorUp,
+  Pencil,
   Radio,
   Replace,
   ScanSearch,
@@ -57,21 +58,21 @@ const RECORD_ICONS: Record<SyncDiffRecord['kind'], LucideIcon> = {
 function DiffRow({
   track,
   coverUrl,
-  replacesLabel,
+  updatesLabel,
 }: {
   track: SyncDiffTrack;
   coverUrl: (filename: string) => string;
-  replacesLabel?: string;
+  updatesLabel?: string;
 }) {
   const title = track.title || track.filename;
   return (
     <li className="music-row">
       <Cover src={track.has_cover ? coverUrl(track.filename) : undefined} />
       <TrackText title={title} sub={formatTrackSubtitle(track.artist, track.album)} />
-      {track.replaces && replacesLabel && (
+      {track.updates && updatesLabel && (
         <span className="music-changes">
-          <span className="music-change" title={replacesLabel} aria-label={replacesLabel}>
-            <Replace aria-hidden="true" />
+          <span className="music-change" title={updatesLabel} aria-label={updatesLabel}>
+            <Pencil aria-hidden="true" />
           </span>
         </span>
       )}
@@ -130,7 +131,7 @@ function PairedColumns({ diff, loading, peerName }: { diff: SyncDiff | null; loa
         count={diff.incoming.length + diff.incoming_records.length}
       >
         {diff.incoming.map((track) => (
-          <DiffRow key={track.filename} track={track} coverUrl={peerCover} replacesLabel="Replaces your copy" />
+          <DiffRow key={track.filename} track={track} coverUrl={peerCover} updatesLabel="Updates your copy" />
         ))}
         {diff.incoming_records.map((record) => (
           <RecordRow
@@ -155,7 +156,7 @@ function PairedColumns({ diff, loading, peerName }: { diff: SyncDiff | null; loa
             key={track.filename}
             track={track}
             coverUrl={localCover}
-            replacesLabel={`Replaces the copy on ${peerName}`}
+            updatesLabel={`Updates the copy on ${peerName}`}
           />
         ))}
         {diff.outgoing_records.map((record) => (
