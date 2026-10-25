@@ -1,4 +1,5 @@
 import hashlib
+import os
 import threading
 from io import BytesIO
 from pathlib import Path
@@ -65,6 +66,20 @@ def audio_bounds(handle, size: int) -> tuple[int, int]:
     handle.seek(0)
     start = min(size, id3_tag_length(handle.read(10)))
     return start, _payload_end(handle, start, size)
+
+
+def splice_audio(tags_source: Path, audio_source: Path, destination: Path) -> None:
+    with open(tags_source, "rb") as tagged, open(audio_source, "rb") as audio, open(destination, "wb") as handle:
+        start, end = audio_bounds(tagged, os.fstat(tagged.fileno()).st_size)
+        audio_start, audio_end = audio_bounds(audio, os.fstat(audio.fileno()).st_size)
+        if audio_end <= audio_start:
+            raise OSError("The file has no audio")
+        tagged.seek(0)
+        handle.write(tagged.read(start))
+        audio.seek(audio_start)
+        handle.write(audio.read(audio_end - audio_start))
+        tagged.seek(end)
+        handle.write(tagged.read())
 
 
 def _compute_fingerprint(path: Path, size: int) -> Optional[str]:

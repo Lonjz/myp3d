@@ -14,6 +14,7 @@ import { MusicPage } from './pages/MusicPage';
 import { DownloadsPage } from './pages/DownloadsPage';
 import { SpotifyPage } from './pages/SpotifyPage';
 import { ExportPage } from './pages/ExportPage';
+import { HealthPage } from './pages/HealthPage';
 import { ToastProvider } from './components/messages/ToastProvider';
 import { DownloadQueueProvider } from './components/downloads/DownloadQueueProvider';
 import { useDownloadQueue } from './components/downloads/downloadQueueContext';
@@ -93,12 +94,13 @@ const KEEP_ALIVE_PAGES: KeepAlivePage[] = [
   { path: '/library', element: <LibraryPage /> },
   { path: '/albums', element: <AlbumsPage /> },
   { path: '/playlists', element: <PlaylistsPage /> },
+  { path: '/health', element: <HealthPage /> },
   { path: '/export', element: <ExportPage /> },
   { path: '/sync', element: <SyncPage /> },
   { path: '/music', element: <MusicPage /> },
 ];
 
-const FILL_PATHS = new Set(['/library', '/albums', '/playlists', '/music', '/downloads', '/spotify']);
+const FILL_PATHS = new Set(['/library', '/albums', '/playlists', '/music', '/downloads', '/spotify', '/health']);
 
 function SidebarSearchButton() {
   const { open } = useSpotlight();

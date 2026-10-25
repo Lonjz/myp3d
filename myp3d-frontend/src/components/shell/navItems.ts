@@ -1,4 +1,4 @@
-import { ArrowLeftRight, DiscAlbum, Download, FolderOpen, LayoutDashboard, Library, ListMusic, MonitorPlay } from 'lucide-react';
+import { ArrowLeftRight, DiscAlbum, Download, FolderOpen, HeartPulse, LayoutDashboard, Library, ListMusic, MonitorPlay } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { AppleMusicIcon, SpotifyIcon } from '../ui/BrandIcons';
 
@@ -59,6 +59,13 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ListMusic,
     keywords: ['playlist', 'mix', 'collection'],
     isActive: (pathname) => pathname === '/playlists' || pathname.startsWith('/playlists/'),
+  },
+  {
+    to: '/health',
+    label: 'Health',
+    icon: HeartPulse,
+    keywords: ['silence', 'trim', 'crop', 'fix'],
+    isActive: (pathname) => pathname === '/health',
   },
   {
     to: '/export',

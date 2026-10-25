@@ -1,0 +1,50 @@
+.health-page {
+  width: 100%;
+}
+
+.health-thresholds .segmented__option {
+  width: auto;
+  min-width: 2.75rem;
+  padding-inline: var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+.health-select-all {
+  display: inline-flex;
+  align-items: center;
+  padding-inline: var(--space-2);
+}
+
+.health-trim {
+  font-variant-numeric: tabular-nums;
+}
+
+.health-columns {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  transition: opacity var(--duration-base) var(--ease-standard);
+}
+
+.health-columns.is-busy {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.health-columns .music-column {
+  flex: 1;
+}
+
+.health-row.is-selected,
+.health-row.is-selected:hover {
+  background: var(--selected-bg);
+  box-shadow: var(--selected-shadow);
+}
+
+.health-silence {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}

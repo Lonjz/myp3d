@@ -127,6 +127,22 @@ class MP3Info(BaseModel):
     date_added: Optional[datetime] = None
 
 
+class SilentTrack(MP3Info):
+    silence: float
+
+
+class SilenceScanInfo(BaseModel):
+    status: Literal["scanning", "done", "failed"]
+    total: int = 0
+    done: int = 0
+    tracks: list[SilentTrack] = Field(default_factory=list)
+    error: Optional[str] = None
+
+
+class TrimRequest(BaseModel):
+    filenames: list[str] = Field(min_length=1)
+
+
 class PaginationMeta(BaseModel):
     total: int
     page: int

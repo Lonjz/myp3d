@@ -7,7 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from routers import albums, cache, download, export, favorites, mp3s, music, peer, playlists, queue, search, spotify, stats, sync, youtube
+from routers import albums, cache, download, export, favorites, health, mp3s, music, peer, playlists, queue, search, spotify, stats, sync, youtube
 from services import favorite_playlist, favorite_service, music_playlist_service, playlist_service, queue_service
 from services.config import API_PORT
 from services.discovery_service import discovery
@@ -76,6 +76,7 @@ app.include_router(music.router)
 app.include_router(queue.router)
 app.include_router(spotify.router)
 app.include_router(export.router)
+app.include_router(health.router)
 app.include_router(playlists.router)
 app.include_router(favorites.router)
 
