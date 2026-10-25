@@ -14,7 +14,7 @@ from services.mp3_service import invalidate_library_cache, list_mp3_infos
 
 ScanStatusName = Literal["scanning", "done", "failed"]
 
-MIN_SILENCE_S = 1.5
+MIN_SILENCE_S = 0.5
 TAIL_WINDOW_S = 15
 SAMPLE_RATE = 44100
 CHANNELS = 2

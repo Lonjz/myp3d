@@ -13,7 +13,8 @@ import { emitAppEvent } from '../utils/appEvents';
 import { formatTrackSubtitle } from '../utils/formatters';
 
 const SCAN_POLL_MS = 750;
-const THRESHOLDS = [1.5, 3, 5, 10];
+const THRESHOLDS = [0.5, 1.5, 3, 5, 10];
+const DEFAULT_THRESHOLD = 1.5;
 
 const errorMessage = (err: unknown, fallback: string) => (err instanceof Error ? err.message : fallback);
 const trackCount = (count: number) => `${count} track${count === 1 ? '' : 's'}`;
@@ -54,7 +55,7 @@ export function HealthPage() {
   const { showSuccess, showError } = useToast();
   const [scan, setScan] = useState<SilenceScan | null>(null);
   const [loaded, setLoaded] = useState(false);
-  const [threshold, setThreshold] = usePersistentState('health:threshold', THRESHOLDS[0]);
+  const [threshold, setThreshold] = usePersistentState('health:threshold', DEFAULT_THRESHOLD);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [busy, setBusy] = useState(false);
   const startedRef = useRef(false);
