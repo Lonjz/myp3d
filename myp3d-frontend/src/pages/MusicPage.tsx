@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  AudioWaveform,
   Check,
   CircleAlert,
   DiscAlbum,
@@ -39,6 +40,7 @@ const CHANGE_ICONS: Record<MusicChange, LucideIcon> = {
   artist: MicVocal,
   album: DiscAlbum,
   art: ImageIcon,
+  audio: AudioWaveform,
   favorite: Star,
   unfavorite: StarOff,
   favorite_music: Star,
@@ -53,6 +55,7 @@ const changeTitle = (change: MusicChange, { track, music }: MusicPair) => {
   if (change === 'title') return `${music.name || '-'} → ${track.title}`;
   if (change === 'artist') return `${music.artist || '-'} → ${track.artist}`;
   if (change === 'album') return `${music.album || '-'} → ${track.album}`;
+  if (change === 'audio') return 'Audio from myp3d';
   if (change === 'favorite') return 'Favourite in myp3d';
   if (change === 'unfavorite') return 'Unfavourite in myp3d';
   if (change === 'favorite_music') return 'Favourite in Apple Music';

@@ -17,7 +17,9 @@ from services.config import BASE_DIR, OUTPUT_DIR
 from services.mp3_service import get_album_cover, list_mp3_infos, make_square_cover, safe_path_part
 
 SyncStatusName = Literal["syncing", "done", "failed"]
-ChangeName = Literal["title", "artist", "album", "art", "favorite", "unfavorite", "favorite_music", "unfavorite_music"]
+ChangeName = Literal[
+    "title", "artist", "album", "art", "audio", "favorite", "unfavorite", "favorite_music", "unfavorite_music"
+]
 MatchKey = tuple[str, str]
 
 SCRIPTS_DIR = BASE_DIR / "applescripts"
@@ -27,7 +29,7 @@ FIELD_SEP = "\x1f"
 RECORD_SEP = "\x1e"
 GROUP_SEP = "\x1d"
 NOT_AUTHORIZED_CODE = "-1743"
-PUSH_CHANGES = ("title", "artist", "album", "art")
+PUSH_CHANGES = ("title", "artist", "album", "art", "audio")
 FAVORITE_PUSHES = {"favorite_music": True, "unfavorite_music": False}
 
 
@@ -227,6 +229,13 @@ def _changes(track: MP3Info, music: _LibraryTrack) -> list[ChangeName]:
     return changes
 
 
+def _audio_changes(fingerprint: Optional[str], music: _LibraryTrack) -> list[ChangeName]:
+    music_file = _music_file(music)
+    if fingerprint is None or music_file is None or music_file.suffix.lower() != ".mp3":
+        return []
+    return ["audio"] if audio_fingerprint(music_file) != fingerprint else []
+
+
 def _first_unused(candidates: list[_LibraryTrack], used: set[str]) -> Optional[_LibraryTrack]:
     return next((candidate for candidate in candidates if candidate.info.persistent_id not in used), None)
 
@@ -267,7 +276,8 @@ def _match(root: Path, library: list[_LibraryTrack], local_tracks: list[MP3Info]
         music = _first_unused(by_key.get(_local_key(track), []), used)
         if music is not None:
             used.add(music.info.persistent_id)
-            pairs.append(_Pair(track, music, _changes(track, music)))
+            changes = _changes(track, music) or _audio_changes(local_fingerprints.get(track.filename), music)
+            pairs.append(_Pair(track, music, changes))
         else:
             unpaired.append(track)
 
@@ -430,7 +440,24 @@ def _add_one(root: Path, source: Path, track: MP3Info, existing: Optional[Path])
             Path(art_path).unlink(missing_ok=True)
 
 
+def _replace_audio(source: Path, music: _LibraryTrack) -> None:
+    target = _music_file(music)
+    if target is None:
+        raise MusicError(404, "Couldn't find the song's file in Apple Music")
+    handle, temp = tempfile.mkstemp(prefix=".myp3d-", suffix=".mp3", dir=target.parent)
+    os.close(handle)
+    try:
+        shutil.copyfile(source, temp)
+        os.replace(temp, target)
+    finally:
+        Path(temp).unlink(missing_ok=True)
+    run_script("refresh_track", music.info.persistent_id, timeout=TRACK_TIMEOUT_S)
+
+
 def _update_one(source: Path, pair: _Pair) -> Optional[str]:
+    if "audio" in pair.changes:
+        _replace_audio(source, pair.music)
+        return None
     art_path = _write_cover(source) if "art" in pair.changes else None
     try:
         args = [

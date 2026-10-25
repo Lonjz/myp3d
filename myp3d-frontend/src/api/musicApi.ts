@@ -18,6 +18,7 @@ export type MusicChange =
   | 'artist'
   | 'album'
   | 'art'
+  | 'audio'
   | 'favorite'
   | 'unfavorite'
   | 'favorite_music'

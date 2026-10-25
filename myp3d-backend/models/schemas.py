@@ -408,7 +408,7 @@ class MusicPair(BaseModel):
     track: MP3Info
     music: MusicTrack
     changes: list[
-        Literal["title", "artist", "album", "art", "favorite", "unfavorite", "favorite_music", "unfavorite_music"]
+        Literal["title", "artist", "album", "art", "audio", "favorite", "unfavorite", "favorite_music", "unfavorite_music"]
     ] = Field(default_factory=list)
 
 
