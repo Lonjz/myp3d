@@ -4,8 +4,8 @@ on run argv
 	set newName to item 2 of argv
 	set newDescription to item 3 of argv
 	set artPath to item 4 of argv
-	set trackIds to {}
-	if (count of argv) > 4 then set trackIds to items 5 thru -1 of argv
+	set changes to {}
+	if (count of argv) > 4 then set changes to items 5 thru -1 of argv
 	set artData to missing value
 	if artPath is not "" then set artData to read (POSIX file artPath) as JPEG picture
 
@@ -17,9 +17,6 @@ on run argv
 			if (count of matches) is 0 then error "That playlist is no longer in Apple Music" number 1
 			set targetPlaylist to item 1 of matches
 			if name of targetPlaylist is not newName then set name of targetPlaylist to newName
-			try
-				delete every track of targetPlaylist
-			end try
 		end if
 
 		set currentDescription to ""
@@ -29,9 +26,15 @@ on run argv
 		if currentDescription is missing value then set currentDescription to ""
 		if currentDescription is not newDescription then set description of targetPlaylist to newDescription
 
-		repeat with trackId in trackIds
+		repeat with change in changes
+			set changeText to change as text
+			set trackId to text 2 thru -1 of changeText
 			try
-				duplicate (some track of library playlist 1 whose persistent ID is (trackId as text)) to targetPlaylist
+				if changeText starts with "-" then
+					delete (first track of targetPlaylist whose persistent ID is trackId)
+				else
+					duplicate (first track of library playlist 1 whose persistent ID is trackId) to targetPlaylist
+				end if
 			end try
 		end repeat
 

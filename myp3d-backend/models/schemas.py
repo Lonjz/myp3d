@@ -494,7 +494,7 @@ class PlaylistTracksRequest(BaseModel):
 class MusicPlaylistEntry(BaseModel):
     key: str
     name: str
-    action: Literal["import", "export", "pull", "push", "merge", "link", "delete_local", "delete_music", "in_sync"]
+    action: Literal["import", "export", "pull", "push", "link", "delete_local", "delete_music", "in_sync"]
     track_count: int = 0
     left_out: int = 0
     playlist_id: Optional[str] = None
