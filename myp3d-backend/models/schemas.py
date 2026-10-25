@@ -287,6 +287,7 @@ class SyncManifestEntry(BaseModel):
     filename: str
     size: int
     fingerprint: Optional[str] = None
+    audio_fingerprint: Optional[str] = None
     title: Optional[str] = None
     artist: Optional[str] = None
     album: Optional[str] = None
@@ -299,7 +300,7 @@ class SyncDiffTrack(BaseModel):
     artist: Optional[str] = None
     album: Optional[str] = None
     has_cover: bool = False
-    replaces: bool = False
+    updates: bool = False
 
 
 class SyncDiffRecord(BaseModel):

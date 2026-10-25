@@ -51,6 +51,22 @@ def local_database() -> SyncDatabase:
     )
 
 
+def translate(database: SyncDatabase, filenames: dict[str, str]) -> SyncDatabase:
+    if not filenames:
+        return database
+    return SyncDatabase(
+        playlists=[
+            record.model_copy(update={"filenames": [filenames.get(name, name) for name in record.filenames]})
+            for record in database.playlists
+        ],
+        downloads=database.downloads,
+        favorites=[
+            record.model_copy(update={"filename": filenames.get(record.filename, record.filename)})
+            for record in database.favorites
+        ],
+    )
+
+
 def busy_downloads() -> set[str]:
     return queue_service.active_uids()
 

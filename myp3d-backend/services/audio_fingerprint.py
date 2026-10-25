@@ -61,11 +61,16 @@ def _payload_end(handle, start: int, size: int) -> int:
     return end
 
 
+def audio_bounds(handle, size: int) -> tuple[int, int]:
+    handle.seek(0)
+    start = min(size, id3_tag_length(handle.read(10)))
+    return start, _payload_end(handle, start, size)
+
+
 def _compute_fingerprint(path: Path, size: int) -> Optional[str]:
     try:
         with open(path, "rb") as handle:
-            start = min(size, id3_tag_length(handle.read(10)))
-            end = _payload_end(handle, start, size)
+            start, end = audio_bounds(handle, size)
             length = end - start
             if length <= 0:
                 return None

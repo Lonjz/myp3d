@@ -24,8 +24,8 @@ from models.schemas import (
     SyncProgress,
     SyncSessionInfo,
 )
-from services import database_sync, favorite_playlist
-from services.audio_fingerprint import id3_tag_length
+from services import database_sync, favorite_playlist, favorite_service, playlist_service
+from services.audio_fingerprint import audio_bounds, audio_fingerprint, id3_tag_length
 from services.database_sync import RecordKind, RecordPull
 from services.config import API_PORT, OUTPUT_DIR
 from services.device_service import get_device
@@ -33,6 +33,7 @@ from services.discovery_service import discovery
 from services.mp3_service import invalidate_library_cache, list_mp3_filepaths, list_mp3_infos
 
 SyncStatusName = Literal["requested", "incoming", "paired", "syncing", "done", "declined", "failed", "cancelled"]
+PullKind = Literal["new", "update"]
 
 ACTIVE_STATUSES = {"requested", "incoming", "paired", "syncing"}
 PEER_STATUSES = {"paired", "syncing"}
@@ -74,6 +75,29 @@ class _Session:
             remote=self.remote.model_copy(),
             error=self.error,
         )
+
+
+@dataclass
+class _Pull:
+    entry: dict
+    kind: PullKind
+    source: Optional[str]
+    target: str
+    retag: bool = False
+
+
+@dataclass
+class _Plan:
+    pulls: list[_Pull]
+    filenames: dict[str, str]
+    pairs: dict[str, str]
+
+    def renames(self) -> dict[str, str]:
+        return {
+            pull.source: pull.target
+            for pull in self.pulls
+            if pull.kind == "update" and pull.source is not None and pull.source != pull.target
+        }
 
 
 _opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -345,6 +369,7 @@ def _local_manifest() -> list[SyncManifestEntry]:
                 filename=path.name,
                 size=size,
                 fingerprint=_fingerprint(path),
+                audio_fingerprint=audio_fingerprint(path),
                 title=info.title if info else None,
                 artist=info.artist if info else None,
                 album=info.album if info else None,
@@ -393,6 +418,20 @@ def peer_file(session_id: str, host: str, filename: str) -> Path:
     return path
 
 
+def peer_tags(session_id: str, host: str, filename: str) -> tuple[bytes, bytes]:
+    path = peer_file(session_id, host, filename)
+    try:
+        with open(path, "rb") as handle:
+            size = os.fstat(handle.fileno()).st_size
+            start, end = audio_bounds(handle, size)
+            handle.seek(0)
+            head = handle.read(start)
+            handle.seek(end)
+            return head, handle.read()
+    except OSError as exc:
+        raise SyncError(404, "MP3 file not found") from exc
+
+
 def _remote_manifest(session: _Session) -> dict[str, dict]:
     entries = _request_json(
         session,
@@ -439,29 +478,103 @@ def _differs(local: dict, remote: dict) -> bool:
     return remote_fingerprint is not None and remote_fingerprint != local.get("fingerprint")
 
 
-def _plan_pulls(local: dict[str, dict], remote: dict[str, dict], overwrite: bool) -> list[tuple[dict, bool]]:
-    pulls: list[tuple[dict, bool]] = []
+def _audio(entry: dict) -> Optional[str]:
+    fingerprint = entry.get("audio_fingerprint")
+    return fingerprint if isinstance(fingerprint, str) and fingerprint else None
+
+
+def _pair(local: dict[str, dict], remote: dict[str, dict]) -> dict[str, str]:
+    groups: dict[str, tuple[list[str], list[str]]] = {}
+    for filename, entry in local.items():
+        fingerprint = _audio(entry)
+        if fingerprint is not None:
+            groups.setdefault(fingerprint, ([], []))[0].append(filename)
     for filename, entry in remote.items():
-        current = local.get(filename)
-        if current is None:
-            pulls.append((entry, False))
-        elif overwrite and _differs(current, entry):
-            pulls.append((entry, True))
-    return pulls
+        fingerprint = _audio(entry)
+        if fingerprint in groups:
+            groups[fingerprint][1].append(filename)
+
+    pairs: dict[str, str] = {}
+    for mine, theirs in groups.values():
+        same = set(mine) & set(theirs)
+        pairs.update((filename, filename) for filename in same)
+        pairs.update(
+            zip(
+                sorted(filename for filename in mine if filename not in same),
+                sorted(filename for filename in theirs if filename not in same),
+            )
+        )
+    return pairs
+
+
+def _free_name(filename: str, taken: set[str]) -> str:
+    if filename.casefold() not in taken:
+        return filename
+    path = Path(filename)
+    counter = 2
+    while f"{path.stem} ({counter}){path.suffix}".casefold() in taken:
+        counter += 1
+    return f"{path.stem} ({counter}){path.suffix}"
+
+
+def _plan_pulls(local: dict[str, dict], remote: dict[str, dict], prefer_remote: bool) -> _Plan:
+    pairs = _pair(local, remote)
+    by_remote = {theirs: mine for mine, theirs in pairs.items()}
+    taken = {filename.casefold() for filename in local}
+    pulls: list[_Pull] = []
+    filenames: dict[str, str] = {}
+
+    for filename in sorted(by_remote):
+        entry = remote[filename]
+        mine = by_remote[filename]
+        filenames[filename] = mine
+        if not prefer_remote:
+            continue
+        retag = _differs(local[mine], entry)
+        target = mine
+        if filename != mine and (filename.casefold() == mine.casefold() or filename.casefold() not in taken):
+            target = filename
+            taken.add(target.casefold())
+        if retag or target != mine:
+            pulls.append(_Pull(entry, "update", mine, target, retag))
+            filenames[filename] = target
+
+    for filename in sorted(set(remote) - set(by_remote)):
+        target = _free_name(filename, taken)
+        taken.add(target.casefold())
+        pulls.append(_Pull(remote[filename], "new", None, target))
+        filenames[filename] = target
+
+    return _Plan(pulls, filenames, pairs)
+
+
+def _record_pulls(
+    plan: _Plan,
+    local_database: SyncDatabase,
+    remote_database: SyncDatabase,
+    prefer_remote: bool,
+    busy: set[str] = frozenset(),
+) -> list[RecordPull]:
+    return database_sync.plan_pulls(
+        database_sync.translate(local_database, plan.renames()),
+        database_sync.translate(remote_database, plan.filenames),
+        prefer_remote,
+        busy,
+    )
 
 
 def _text(value: Any) -> Optional[str]:
     return value if isinstance(value, str) else None
 
 
-def _diff_track(entry: dict, replaces: bool = False) -> SyncDiffTrack:
+def _diff_track(entry: dict, kind: Optional[PullKind] = None) -> SyncDiffTrack:
     return SyncDiffTrack(
         filename=entry["filename"],
         title=_text(entry.get("title")),
         artist=_text(entry.get("artist")),
         album=_text(entry.get("album")),
         has_cover=entry.get("has_cover") is True,
-        replaces=replaces,
+        updates=kind == "update",
     )
 
 
@@ -479,14 +592,15 @@ def diff() -> SyncDiff:
     local = _local_entries()
     incoming = _plan_pulls(local, remote, session.direction == "outgoing")
     outgoing = _plan_pulls(remote, local, session.direction == "incoming")
-    moving = {entry["filename"] for entry, _ in incoming + outgoing}
+    incoming_moving = {pull.entry["filename"] for pull in incoming.pulls}
+    outgoing_moving = {pull.entry["filename"] for pull in outgoing.pulls}
 
     remote_database = _remote_database(session)
     local_database = database_sync.local_database()
-    incoming_records = database_sync.plan_pulls(
-        local_database, remote_database, session.direction == "outgoing", database_sync.busy_downloads()
+    incoming_records = _record_pulls(
+        incoming, local_database, remote_database, session.direction == "outgoing", database_sync.busy_downloads()
     )
-    outgoing_records = database_sync.plan_pulls(remote_database, local_database, session.direction == "incoming")
+    outgoing_records = _record_pulls(outgoing, remote_database, local_database, session.direction == "incoming")
     moving_records = {(pull.kind, pull.key) for pull in incoming_records + outgoing_records}
 
     def visible(pulls: list[RecordPull]) -> list[SyncDiffRecord]:
@@ -496,12 +610,16 @@ def diff() -> SyncDiff:
         )
 
     return SyncDiff(
-        incoming=sorted((_diff_track(entry, replaces) for entry, replaces in incoming), key=_diff_sort_key),
+        incoming=sorted((_diff_track(pull.entry, pull.kind) for pull in incoming.pulls), key=_diff_sort_key),
         both=sorted(
-            (_diff_track(entry) for filename, entry in local.items() if filename in remote and filename not in moving),
+            (
+                _diff_track(local[mine])
+                for mine, theirs in incoming.pairs.items()
+                if mine not in outgoing_moving and theirs not in incoming_moving
+            ),
             key=_diff_sort_key,
         ),
-        outgoing=sorted((_diff_track(entry, replaces) for entry, replaces in outgoing), key=_diff_sort_key),
+        outgoing=sorted((_diff_track(pull.entry, pull.kind) for pull in outgoing.pulls), key=_diff_sort_key),
         incoming_records=visible(incoming_records),
         both_records=sorted(
             database_sync.shared_records(local_database, remote_database, moving_records),
@@ -552,11 +670,11 @@ def _report(session: _Session) -> bool:
     return True
 
 
-def _download(session: _Session, filename: str, overwrite: bool) -> bool:
-    destination = OUTPUT_DIR / filename
+def _download(session: _Session, filename: str, target: str, overwrite: bool) -> bool:
+    destination = OUTPUT_DIR / target
     if destination.exists() and not overwrite:
         return True
-    partial = OUTPUT_DIR / f".{filename}.part"
+    partial = OUTPUT_DIR / f".{target}.part"
     url = _peer_url(session, f"/peer/sessions/{session.id}/files/{urllib.parse.quote(filename)}")
     try:
         with _opener.open(url, timeout=TRANSFER_TIMEOUT_S) as response, open(partial, "wb") as handle:
@@ -569,6 +687,68 @@ def _download(session: _Session, filename: str, overwrite: bool) -> bool:
     except (urllib.error.URLError, OSError):
         partial.unlink(missing_ok=True)
         return False
+
+
+def _fetch_tags(session: _Session, filename: str) -> tuple[bytes, bytes]:
+    url = _peer_url(session, f"/peer/sessions/{session.id}/tags/{urllib.parse.quote(filename)}")
+    with _opener.open(url, timeout=TRANSFER_TIMEOUT_S) as response:
+        body = response.read()
+        head_length = int(response.headers.get("X-Head-Length", ""))
+    if not 0 <= head_length <= len(body):
+        raise ValueError("The tags didn't arrive intact")
+    return body[:head_length], body[head_length:]
+
+
+def _copy_range(source, destination, length: int) -> None:
+    while length > 0:
+        chunk = source.read(min(COPY_CHUNK_BYTES, length))
+        if not chunk:
+            raise OSError("The file ended early")
+        destination.write(chunk)
+        length -= len(chunk)
+
+
+def _retag(session: _Session, pull: _Pull, source: str) -> bool:
+    path = OUTPUT_DIR / source
+    partial = OUTPUT_DIR / f".{source}.tags.part"
+    try:
+        try:
+            head, trailer = _fetch_tags(session, pull.entry["filename"])
+        except ValueError:
+            return _download(session, pull.entry["filename"], source, True)
+        with open(path, "rb") as original, open(partial, "wb") as handle:
+            start, end = audio_bounds(original, os.fstat(original.fileno()).st_size)
+            handle.write(head)
+            original.seek(start)
+            _copy_range(original, handle, end - start)
+            handle.write(trailer)
+        if partial.stat().st_size != pull.entry.get("size") or _fingerprint(partial) != pull.entry.get("fingerprint"):
+            return _download(session, pull.entry["filename"], source, True)
+        shutil.copyfile(partial, path)
+        return True
+    except (urllib.error.URLError, OSError):
+        return False
+    finally:
+        partial.unlink(missing_ok=True)
+
+
+def _rename(source: str, target: str) -> bool:
+    try:
+        (OUTPUT_DIR / source).rename(OUTPUT_DIR / target)
+    except OSError:
+        return False
+    playlist_service.rename_track(source, target)
+    favorite_service.rename_track(source, target)
+    return True
+
+
+def _apply_pull(session: _Session, pull: _Pull) -> bool:
+    if pull.kind == "new":
+        return _download(session, pull.entry["filename"], pull.target, False)
+    source = pull.source or pull.target
+    if pull.retag and not _retag(session, pull, source):
+        return False
+    return source == pull.target or _rename(source, pull.target)
 
 
 def _apply_records(session: _Session, pulls: list[RecordPull]) -> bool:
@@ -599,11 +779,10 @@ def _pull_worker(session: _Session) -> None:
         _fail(session, exc.detail)
         return
 
-    pulls = [
-        (entry["filename"], overwrite)
-        for entry, overwrite in _plan_pulls(_local_entries(), remote, session.direction == "outgoing")
-    ]
-    record_pulls = database_sync.plan_pulls(
+    plan = _plan_pulls(_local_entries(), remote, session.direction == "outgoing")
+    pulls = plan.pulls
+    record_pulls = _record_pulls(
+        plan,
         database_sync.local_database(),
         remote_database,
         session.direction == "outgoing",
@@ -616,10 +795,10 @@ def _pull_worker(session: _Session) -> None:
         return
 
     try:
-        for filename, overwrite in pulls:
+        for pull in pulls:
             if not _still_syncing(session):
                 return
-            succeeded = _download(session, filename, overwrite)
+            succeeded = _apply_pull(session, pull)
             with _lock:
                 if succeeded:
                     session.local.done += 1

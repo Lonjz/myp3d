@@ -70,6 +70,19 @@ def get_peer_file(session_id: str, filename: str, request: Request):
     return FileResponse(path, media_type="audio/mpeg", filename=filename)
 
 
+@router.get("/sessions/{session_id}/tags/{filename}")
+def get_peer_tags(session_id: str, filename: str, request: Request):
+    try:
+        head, trailer = sync_service.peer_tags(session_id, _client_host(request), filename)
+    except SyncError as exc:
+        _raise(exc)
+    return Response(
+        content=head + trailer,
+        media_type="application/octet-stream",
+        headers={"X-Head-Length": str(len(head))},
+    )
+
+
 @router.get("/sessions/{session_id}/covers/{filename}")
 def get_peer_cover(session_id: str, filename: str, request: Request, size: Optional[CoverSize] = Query(None)):
     try:
