@@ -50,7 +50,6 @@ export type MusicPlaylistAction =
   | 'export'
   | 'pull'
   | 'push'
-  | 'merge'
   | 'link'
   | 'delete_local'
   | 'delete_music'

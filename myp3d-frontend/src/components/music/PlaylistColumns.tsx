@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Check, CircleMinus, GitMerge, Link, ListMusic, RefreshCw, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, CircleMinus, Link, ListMusic, RefreshCw, Trash2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { MusicPlaylistAction, MusicPlaylistDiff, MusicPlaylistEntry } from '../../api/musicApi';
 import { playlistApi } from '../../api/playlistApi';
@@ -10,8 +10,7 @@ const ACTION_BADGES: Record<Exclude<MusicPlaylistAction, 'in_sync'>, { icon: Luc
   export: { icon: ArrowUp, label: 'Add to Apple Music' },
   pull: { icon: ArrowDown, label: 'Update in myp3d' },
   push: { icon: ArrowUp, label: 'Update in Apple Music' },
-  merge: { icon: GitMerge, label: 'Merge both' },
-  link: { icon: Link, label: 'Link to the Apple Music playlist with the same name' },
+  link: { icon: Link, label: 'Link with the Apple Music playlist of the same name and combine their songs' },
   delete_local: { icon: Trash2, label: 'Delete in myp3d', danger: true },
   delete_music: { icon: Trash2, label: 'Delete in Apple Music', danger: true },
 };
