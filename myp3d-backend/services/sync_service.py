@@ -25,7 +25,7 @@ from models.schemas import (
     SyncSessionInfo,
 )
 from services import database_sync, favorite_playlist, favorite_service, playlist_service
-from services.audio_fingerprint import audio_bounds, audio_fingerprint, id3_tag_length
+from services.audio_fingerprint import audio_bounds, audio_fingerprint, id3_tag_length, splice_audio
 from services.database_sync import RecordKind, RecordPull
 from services.config import API_PORT, OUTPUT_DIR
 from services.device_service import get_device
@@ -34,6 +34,7 @@ from services.mp3_service import invalidate_library_cache, list_mp3_filepaths, l
 
 SyncStatusName = Literal["requested", "incoming", "paired", "syncing", "done", "declined", "failed", "cancelled"]
 PullKind = Literal["new", "update"]
+AudioSwap = Literal["theirs", "splice"]
 
 ACTIVE_STATUSES = {"requested", "incoming", "paired", "syncing"}
 PEER_STATUSES = {"paired", "syncing"}
@@ -84,6 +85,8 @@ class _Pull:
     source: Optional[str]
     target: str
     retag: bool = False
+    swap: Optional[AudioSwap] = None
+    same_audio: bool = True
 
 
 @dataclass
@@ -104,7 +107,7 @@ _opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 _lock = threading.Lock()
 _session: Optional[_Session] = None
 _fingerprint_lock = threading.Lock()
-_fingerprints: dict[tuple[str, int, int], str] = {}
+_fingerprints: dict[tuple[str, str, int, int], str] = {}
 
 
 def _peer_url(session: _Session, path: str) -> str:
@@ -330,29 +333,49 @@ def dismiss() -> None:
         _session = None
 
 
-def _fingerprint(path: Path) -> Optional[str]:
+def _file_digest(handle, size: int) -> str:
+    digest = hashlib.sha1(str(size).encode("ascii"))
+    head_length = id3_tag_length(handle.read(10)) + FINGERPRINT_SAMPLE_BYTES
+    handle.seek(0)
+    digest.update(handle.read(head_length))
+    handle.seek(max(head_length, size - FINGERPRINT_SAMPLE_BYTES))
+    digest.update(handle.read())
+    return digest.hexdigest()
+
+
+def _tag_digest(handle, size: int) -> str:
+    start, end = audio_bounds(handle, size)
+    handle.seek(0)
+    digest = hashlib.sha1(handle.read(start))
+    handle.seek(end)
+    digest.update(handle.read())
+    return digest.hexdigest()
+
+
+def _cached_digest(path: Path, kind: str, compute) -> Optional[str]:
     try:
         stats = path.stat()
-        key = (path.name, stats.st_size, stats.st_mtime_ns)
+        key = (kind, path.name, stats.st_size, stats.st_mtime_ns)
         with _fingerprint_lock:
             cached = _fingerprints.get(key)
         if cached is not None:
             return cached
-
-        digest = hashlib.sha1(str(stats.st_size).encode("ascii"))
         with open(path, "rb") as handle:
-            head_length = id3_tag_length(handle.read(10)) + FINGERPRINT_SAMPLE_BYTES
-            handle.seek(0)
-            digest.update(handle.read(head_length))
-            handle.seek(max(head_length, stats.st_size - FINGERPRINT_SAMPLE_BYTES))
-            digest.update(handle.read())
+            fingerprint = compute(handle, stats.st_size)
     except OSError:
         return None
 
-    fingerprint = digest.hexdigest()
     with _fingerprint_lock:
         _fingerprints[key] = fingerprint
     return fingerprint
+
+
+def _fingerprint(path: Path) -> Optional[str]:
+    return _cached_digest(path, "file", _file_digest)
+
+
+def _tag_fingerprint(path: Path) -> Optional[str]:
+    return _cached_digest(path, "tags", _tag_digest)
 
 
 def _local_manifest() -> list[SyncManifestEntry]:
@@ -370,6 +393,8 @@ def _local_manifest() -> list[SyncManifestEntry]:
                 size=size,
                 fingerprint=_fingerprint(path),
                 audio_fingerprint=audio_fingerprint(path),
+                tag_fingerprint=_tag_fingerprint(path),
+                duration=info.duration if info else None,
                 title=info.title if info else None,
                 artist=info.artist if info else None,
                 album=info.album if info else None,
@@ -483,7 +508,26 @@ def _audio(entry: dict) -> Optional[str]:
     return fingerprint if isinstance(fingerprint, str) and fingerprint else None
 
 
-def _pair(local: dict[str, dict], remote: dict[str, dict]) -> dict[str, str]:
+def _field(entry: dict, name: str) -> str:
+    value = entry.get(name)
+    return value.strip().casefold() if isinstance(value, str) else ""
+
+
+def _song_key(filename: str, entry: dict) -> Optional[tuple]:
+    title, artist = _field(entry, "title"), _field(entry, "artist")
+    if not title or not artist or not isinstance(entry.get("duration"), (int, float)):
+        return None
+    return filename.casefold(), title, artist, _field(entry, "album"), entry.get("has_cover") is True
+
+
+def _swap(local: dict, remote: dict, prefer_remote: bool) -> Optional[AudioSwap]:
+    ours, theirs = local["duration"], remote["duration"]
+    if theirs < ours or (theirs == ours and prefer_remote):
+        return "theirs" if prefer_remote else "splice"
+    return None
+
+
+def _pair(local: dict[str, dict], remote: dict[str, dict]) -> tuple[dict[str, str], set[str]]:
     groups: dict[str, tuple[list[str], list[str]]] = {}
     for filename, entry in local.items():
         fingerprint = _audio(entry)
@@ -504,7 +548,21 @@ def _pair(local: dict[str, dict], remote: dict[str, dict]) -> dict[str, str]:
                 sorted(filename for filename in theirs if filename not in same),
             )
         )
-    return pairs
+
+    unpaired: dict[tuple, str] = {}
+    for filename in sorted(local):
+        key = _song_key(filename, local[filename]) if filename not in pairs else None
+        if key is not None:
+            unpaired.setdefault(key, filename)
+    paired_remote = set(pairs.values())
+    retracked: set[str] = set()
+    for filename in sorted(remote):
+        key = _song_key(filename, remote[filename]) if filename not in paired_remote else None
+        mine = unpaired.pop(key, None) if key is not None else None
+        if mine is not None:
+            pairs[mine] = filename
+            retracked.add(mine)
+    return pairs, retracked
 
 
 def _free_name(filename: str, taken: set[str]) -> str:
@@ -518,7 +576,7 @@ def _free_name(filename: str, taken: set[str]) -> str:
 
 
 def _plan_pulls(local: dict[str, dict], remote: dict[str, dict], prefer_remote: bool) -> _Plan:
-    pairs = _pair(local, remote)
+    pairs, retracked = _pair(local, remote)
     by_remote = {theirs: mine for mine, theirs in pairs.items()}
     taken = {filename.casefold() for filename in local}
     pulls: list[_Pull] = []
@@ -528,15 +586,24 @@ def _plan_pulls(local: dict[str, dict], remote: dict[str, dict], prefer_remote: 
         entry = remote[filename]
         mine = by_remote[filename]
         filenames[filename] = mine
+        same_audio = mine not in retracked
+        swap = None if same_audio else _swap(local[mine], entry, prefer_remote)
         if not prefer_remote:
+            if swap is not None:
+                pulls.append(_Pull(entry, "update", mine, mine, swap=swap, same_audio=False))
             continue
-        retag = _differs(local[mine], entry)
+        if swap is not None:
+            retag = False
+        elif same_audio:
+            retag = _differs(local[mine], entry)
+        else:
+            retag = entry.get("tag_fingerprint") != local[mine].get("tag_fingerprint")
         target = mine
         if filename != mine and (filename.casefold() == mine.casefold() or filename.casefold() not in taken):
             target = filename
             taken.add(target.casefold())
-        if retag or target != mine:
-            pulls.append(_Pull(entry, "update", mine, target, retag))
+        if swap is not None or retag or target != mine:
+            pulls.append(_Pull(entry, "update", mine, target, retag, swap, same_audio))
             filenames[filename] = target
 
     for filename in sorted(set(remote) - set(by_remote)):
@@ -567,14 +634,15 @@ def _text(value: Any) -> Optional[str]:
     return value if isinstance(value, str) else None
 
 
-def _diff_track(entry: dict, kind: Optional[PullKind] = None) -> SyncDiffTrack:
+def _diff_track(entry: dict, pull: Optional[_Pull] = None) -> SyncDiffTrack:
     return SyncDiffTrack(
         filename=entry["filename"],
         title=_text(entry.get("title")),
         artist=_text(entry.get("artist")),
         album=_text(entry.get("album")),
         has_cover=entry.get("has_cover") is True,
-        updates=kind == "update",
+        updates=pull is not None and pull.kind == "update" and pull.swap is None,
+        audio=pull is not None and pull.swap is not None,
     )
 
 
@@ -610,7 +678,7 @@ def diff() -> SyncDiff:
         )
 
     return SyncDiff(
-        incoming=sorted((_diff_track(pull.entry, pull.kind) for pull in incoming.pulls), key=_diff_sort_key),
+        incoming=sorted((_diff_track(pull.entry, pull) for pull in incoming.pulls), key=_diff_sort_key),
         both=sorted(
             (
                 _diff_track(local[mine])
@@ -619,7 +687,7 @@ def diff() -> SyncDiff:
             ),
             key=_diff_sort_key,
         ),
-        outgoing=sorted((_diff_track(pull.entry, pull.kind) for pull in outgoing.pulls), key=_diff_sort_key),
+        outgoing=sorted((_diff_track(pull.entry, pull) for pull in outgoing.pulls), key=_diff_sort_key),
         incoming_records=visible(incoming_records),
         both_records=sorted(
             database_sync.shared_records(local_database, remote_database, moving_records),
@@ -715,14 +783,17 @@ def _retag(session: _Session, pull: _Pull, source: str) -> bool:
         try:
             head, trailer = _fetch_tags(session, pull.entry["filename"])
         except ValueError:
-            return _download(session, pull.entry["filename"], source, True)
+            return pull.same_audio and _download(session, pull.entry["filename"], source, True)
         with open(path, "rb") as original, open(partial, "wb") as handle:
             start, end = audio_bounds(original, os.fstat(original.fileno()).st_size)
             handle.write(head)
             original.seek(start)
             _copy_range(original, handle, end - start)
             handle.write(trailer)
-        if partial.stat().st_size != pull.entry.get("size") or _fingerprint(partial) != pull.entry.get("fingerprint"):
+        if not pull.same_audio:
+            if _tag_fingerprint(partial) != pull.entry.get("tag_fingerprint"):
+                return False
+        elif partial.stat().st_size != pull.entry.get("size") or _fingerprint(partial) != pull.entry.get("fingerprint"):
             return _download(session, pull.entry["filename"], source, True)
         shutil.copyfile(partial, path)
         return True
@@ -730,6 +801,29 @@ def _retag(session: _Session, pull: _Pull, source: str) -> bool:
         return False
     finally:
         partial.unlink(missing_ok=True)
+
+
+def _swap_audio(session: _Session, pull: _Pull, source: str) -> bool:
+    path = OUTPUT_DIR / source
+    download = OUTPUT_DIR / f".{source}.audio.part"
+    joined = OUTPUT_DIR / f".{source}.joined.part"
+    url = _peer_url(session, f"/peer/sessions/{session.id}/files/{urllib.parse.quote(pull.entry['filename'])}")
+    try:
+        with _opener.open(url, timeout=TRANSFER_TIMEOUT_S) as response, open(download, "wb") as handle:
+            shutil.copyfileobj(response, handle, COPY_CHUNK_BYTES)
+        if audio_fingerprint(download) != _audio(pull.entry):
+            return False
+        if pull.swap == "splice":
+            splice_audio(path, download, joined)
+            shutil.copyfile(joined, path)
+        else:
+            shutil.copyfile(download, path)
+        return True
+    except (urllib.error.URLError, OSError):
+        return False
+    finally:
+        download.unlink(missing_ok=True)
+        joined.unlink(missing_ok=True)
 
 
 def _rename(source: str, target: str) -> bool:
@@ -746,6 +840,8 @@ def _apply_pull(session: _Session, pull: _Pull) -> bool:
     if pull.kind == "new":
         return _download(session, pull.entry["filename"], pull.target, False)
     source = pull.source or pull.target
+    if pull.swap is not None and not _swap_audio(session, pull, source):
+        return False
     if pull.retag and not _retag(session, pull, source):
         return False
     return source == pull.target or _rename(source, pull.target)

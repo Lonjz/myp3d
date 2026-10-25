@@ -43,6 +43,7 @@ export interface SyncDiffTrack {
   album: string | null;
   has_cover: boolean;
   updates: boolean;
+  audio: boolean;
 }
 
 export interface SyncDiffRecord {

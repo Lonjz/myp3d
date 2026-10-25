@@ -3,6 +3,7 @@ import {
   ArrowDown,
   ArrowLeftRight,
   ArrowUp,
+  AudioWaveform,
   Check,
   CircleAlert,
   CircleCheck,
@@ -59,21 +60,32 @@ function DiffRow({
   track,
   coverUrl,
   updatesLabel,
+  audioLabel,
 }: {
   track: SyncDiffTrack;
   coverUrl: (filename: string) => string;
   updatesLabel?: string;
+  audioLabel?: string;
 }) {
   const title = track.title || track.filename;
+  const showUpdates = track.updates && updatesLabel;
+  const showAudio = track.audio && audioLabel;
   return (
     <li className="music-row">
       <Cover src={track.has_cover ? coverUrl(track.filename) : undefined} />
       <TrackText title={title} sub={formatTrackSubtitle(track.artist, track.album)} />
-      {track.updates && updatesLabel && (
+      {(showUpdates || showAudio) && (
         <span className="music-changes">
-          <span className="music-change" title={updatesLabel} aria-label={updatesLabel}>
-            <Pencil aria-hidden="true" />
-          </span>
+          {showUpdates && (
+            <span className="music-change" title={updatesLabel} aria-label={updatesLabel}>
+              <Pencil aria-hidden="true" />
+            </span>
+          )}
+          {showAudio && (
+            <span className="music-change" title={audioLabel} aria-label={audioLabel}>
+              <AudioWaveform aria-hidden="true" />
+            </span>
+          )}
         </span>
       )}
     </li>
@@ -131,7 +143,13 @@ function PairedColumns({ diff, loading, peerName }: { diff: SyncDiff | null; loa
         count={diff.incoming.length + diff.incoming_records.length}
       >
         {diff.incoming.map((track) => (
-          <DiffRow key={track.filename} track={track} coverUrl={peerCover} updatesLabel="Updates your copy" />
+          <DiffRow
+            key={track.filename}
+            track={track}
+            coverUrl={peerCover}
+            updatesLabel="Updates your copy"
+            audioLabel="Takes the shorter audio"
+          />
         ))}
         {diff.incoming_records.map((record) => (
           <RecordRow
@@ -157,6 +175,7 @@ function PairedColumns({ diff, loading, peerName }: { diff: SyncDiff | null; loa
             track={track}
             coverUrl={localCover}
             updatesLabel={`Updates the copy on ${peerName}`}
+            audioLabel={`Shortens the audio on ${peerName}`}
           />
         ))}
         {diff.outgoing_records.map((record) => (
