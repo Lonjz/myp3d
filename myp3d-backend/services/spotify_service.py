@@ -148,7 +148,7 @@ def format_title(name: str, artists: list[str]) -> str:
 
 
 def default_filename(name: str) -> Optional[str]:
-    letters = re.sub(r"[^a-z ]", "", base_title(name).lower())
+    letters = re.sub(r"[^a-z0-9 ]", "", base_title(name).lower())
     return " ".join(letters.split()) or None
 
 
