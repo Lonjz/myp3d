@@ -423,7 +423,7 @@ def parse_art_state(state: str) -> Optional[str]:
     return reason.strip() or "Music didn't set the cover art"
 
 
-def _add_one(root: Path, source: Path, track: MP3Info, existing: Optional[Path]) -> tuple[str, Optional[str]]:
+def _add_one(root: Path, source: Path, track: MP3Info, existing: Optional[Path]) -> tuple[str, Path, Optional[str]]:
     art_path = _write_cover(source)
     try:
         target = existing if existing is not None else _copy_into(root, source, track)
@@ -435,7 +435,7 @@ def _add_one(root: Path, source: Path, track: MP3Info, existing: Optional[Path])
                 target.unlink(missing_ok=True)
             raise
         persistent_id, _, art_state = result.partition(FIELD_SEP)
-        return persistent_id, None if art_path is None else parse_art_state(art_state)
+        return persistent_id, target, None if art_path is None else parse_art_state(art_state)
     finally:
         if art_path:
             Path(art_path).unlink(missing_ok=True)
@@ -443,12 +443,19 @@ def _add_one(root: Path, source: Path, track: MP3Info, existing: Optional[Path])
 
 def _readd_one(root: Path, source: Path, pair: _Pair) -> Optional[str]:
     old_file = _music_file(pair.music)
-    persistent_id, art_problem = _add_one(root, source, pair.track, None)
+    persistent_id, target, art_problem = _add_one(root, source, pair.track, None)
     run_script("replace_track", pair.music.info.persistent_id, persistent_id, timeout=EXPORT_TIMEOUT_S)
-    if old_file is not None:
+    try:
+        if old_file is None or not _is_within(old_file, root):
+            return art_problem
+        target.replace(old_file)
+    except OSError:
+        return art_problem
+    try:
+        run_script("relocate_track", persistent_id, str(old_file), timeout=TRACK_TIMEOUT_S)
+    except MusicError:
         try:
-            if _is_within(old_file, root):
-                old_file.unlink()
+            old_file.replace(target)
         except OSError:
             pass
     return art_problem
@@ -545,7 +552,7 @@ def _run_sync(job: _SyncJob, root: Path) -> None:
     for track in adds:
         source = OUTPUT_DIR / track.filename
         try:
-            _, art_problem = _add_one(root, source, track, matched.loose.get(track.filename))
+            _, _, art_problem = _add_one(root, source, track, matched.loose.get(track.filename))
         except Exception as exc:
             _record_failure(job, source.name, exc)
             continue
