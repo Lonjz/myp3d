@@ -1,3 +1,4 @@
+import re
 import shutil
 import subprocess
 import threading
@@ -7,10 +8,24 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Optional
 
-from models.schemas import BulkFailure, BulkResult, MP3Info, SilenceScanInfo, SilentTrack
+import eyed3
+
+from models.schemas import (
+    ArtistFixItem,
+    ArtistTrack,
+    BulkFailure,
+    BulkResult,
+    MP3Info,
+    NamingTrack,
+    RenameItem,
+    SilenceScanInfo,
+    SilentTrack,
+)
+from services import favorite_service, playlist_service
 from services.audio_fingerprint import splice_audio
 from services.config import OUTPUT_DIR, get_ffmpeg_path
 from services.mp3_service import invalidate_library_cache, list_mp3_infos
+from services.spotify_service import default_filename, format_title
 
 ScanStatusName = Literal["scanning", "done", "failed"]
 
@@ -23,6 +38,10 @@ SILENCE_LEVEL = 1
 KEEP_PAD_S = 0.25
 SCAN_WORKERS = 4
 FFMPEG_TIMEOUT_S = 120.0
+
+VALID_NAME = re.compile(r"[a-z0-9]+(?: [a-z0-9]+)*\.mp3")
+ARTIST_SPLIT = re.compile(r"\s*,\s*|\s+&\s+")
+FEATURED = re.compile(r"[(\[](?:feat\.?|ft\.?|featuring|with)\s([^)\]]*)[)\]]", re.I)
 
 
 class HealthError(Exception):
@@ -208,10 +227,14 @@ def _trim_one(path: Path) -> None:
         joined_part.unlink(missing_ok=True)
 
 
-def trim(filenames: list[str]) -> BulkResult:
+def _ensure_idle() -> None:
     with _lock:
         if _scan is not None and _scan.status == "scanning":
             raise HealthError(409, "Wait for the scan to finish")
+
+
+def trim(filenames: list[str]) -> BulkResult:
+    _ensure_idle()
     _ffmpeg()
 
     updated: list[str] = []
@@ -238,4 +261,111 @@ def trim(filenames: list[str]) -> BulkResult:
             if _scan is not None:
                 _scan.tracks = [track for track in _scan.tracks if track.filename not in trimmed]
 
+    return BulkResult(success=not failed, updated=updated, failed=failed)
+
+
+def _track_path(filename: str) -> Path:
+    path = OUTPUT_DIR / filename
+    if not _is_safe_filename(filename) or not path.is_file():
+        raise ValueError("MP3 file not found")
+    return path
+
+
+def _suggest_name(track: MP3Info) -> Optional[str]:
+    return default_filename(track.title or "") or default_filename(Path(track.filename).stem)
+
+
+def naming_issues() -> list[NamingTrack]:
+    return [
+        NamingTrack(**track.model_dump(), suggested=_suggest_name(track))
+        for track in list_mp3_infos()
+        if not VALID_NAME.fullmatch(track.filename)
+    ]
+
+
+def _rename_one(item: RenameItem) -> None:
+    path = _track_path(item.filename)
+    name = f"{' '.join(item.new_name.split())}.mp3"
+    if not VALID_NAME.fullmatch(name):
+        raise ValueError("Use only lowercase letters, numbers and spaces")
+    if name == item.filename:
+        return
+    target = OUTPUT_DIR / name
+    if target.exists() and not target.samefile(path):
+        raise ValueError("A file with that name already exists")
+    path.rename(target)
+    playlist_service.rename_track(item.filename, name)
+    favorite_service.rename_track(item.filename, name)
+
+
+def rename(items: list[RenameItem]) -> BulkResult:
+    _ensure_idle()
+    updated: list[str] = []
+    failed: list[BulkFailure] = []
+    for item in {item.filename: item for item in items}.values():
+        try:
+            _rename_one(item)
+        except (OSError, ValueError) as exc:
+            failed.append(BulkFailure(filename=item.filename, detail=str(exc) or "Couldn't rename the song"))
+            continue
+        updated.append(item.filename)
+
+    if updated:
+        invalidate_library_cache()
+    return BulkResult(success=not failed, updated=updated, failed=failed)
+
+
+def _split_artists(value: Optional[str]) -> list[str]:
+    return list(dict.fromkeys(name for name in ARTIST_SPLIT.split((value or "").strip()) if name))
+
+
+def _featured_title(title: str, primary: str, artists: list[str]) -> str:
+    existing = [name for match in FEATURED.findall(title) for name in _split_artists(match)]
+    names: dict[str, str] = {primary.casefold(): primary}
+    for name in [*existing, *artists]:
+        names.setdefault(name.casefold(), name)
+    return format_title(title, list(names.values()))
+
+
+def artist_issues() -> list[ArtistTrack]:
+    issues: list[ArtistTrack] = []
+    for track in list_mp3_infos():
+        artists = _split_artists(track.artist)
+        if len(artists) < 2:
+            continue
+        title = track.title or Path(track.filename).stem
+        titles = [_featured_title(title, artist, artists) for artist in artists]
+        issues.append(ArtistTrack(**track.model_dump(), artists=artists, titles=titles))
+    return issues
+
+
+def _fix_artist_one(item: ArtistFixItem) -> None:
+    path = _track_path(item.filename)
+    audio = eyed3.load(str(path))
+    if audio is None or audio.tag is None:
+        raise ValueError("Couldn't read the tags")
+    artists = _split_artists(audio.tag.artist)
+    if len(artists) < 2:
+        raise ValueError("The song has only one artist")
+    if item.artist not in artists:
+        raise ValueError("That artist isn't on the song")
+    audio.tag.title = _featured_title(audio.tag.title or path.stem, item.artist, artists)
+    audio.tag.artist = item.artist
+    audio.tag.save(version=(2, 3, 0))
+
+
+def fix_artists(items: list[ArtistFixItem]) -> BulkResult:
+    _ensure_idle()
+    updated: list[str] = []
+    failed: list[BulkFailure] = []
+    for item in {item.filename: item for item in items}.values():
+        try:
+            _fix_artist_one(item)
+        except (OSError, ValueError, eyed3.Error) as exc:
+            failed.append(BulkFailure(filename=item.filename, detail=str(exc) or "Couldn't fix the artist"))
+            continue
+        updated.append(item.filename)
+
+    if updated:
+        invalidate_library_cache()
     return BulkResult(success=not failed, updated=updated, failed=failed)

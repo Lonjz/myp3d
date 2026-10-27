@@ -143,6 +143,33 @@ class TrimRequest(BaseModel):
     filenames: list[str] = Field(min_length=1)
 
 
+class NamingTrack(MP3Info):
+    suggested: Optional[str] = None
+
+
+class ArtistTrack(MP3Info):
+    artists: list[str]
+    titles: list[str]
+
+
+class RenameItem(BaseModel):
+    filename: str
+    new_name: str
+
+
+class RenameRequest(BaseModel):
+    items: list[RenameItem] = Field(min_length=1)
+
+
+class ArtistFixItem(BaseModel):
+    filename: str
+    artist: str
+
+
+class ArtistFixRequest(BaseModel):
+    items: list[ArtistFixItem] = Field(min_length=1)
+
+
 class PaginationMeta(BaseModel):
     total: int
     page: int
