@@ -2,6 +2,14 @@
   width: 100%;
 }
 
+.health-check {
+  display: contents;
+}
+
+.health-check[hidden] {
+  display: none;
+}
+
 .health-thresholds .segmented__option {
   width: auto;
   min-width: 2.75rem;
@@ -17,7 +25,7 @@
   padding-inline: var(--space-2);
 }
 
-.health-trim {
+.health-fix {
   font-variant-numeric: tabular-nums;
 }
 
@@ -47,4 +55,69 @@
 .health-silence {
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
+}
+
+.health-current-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 14rem;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.health-name-arrow {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--color-text-muted);
+}
+
+.health-name {
+  flex: 0 1 16rem;
+  min-width: 8rem;
+}
+
+.health-name .icon-field {
+  min-height: 2.25rem;
+  padding-inline: var(--space-3);
+}
+
+.health-name .icon-field input {
+  height: 2.1rem;
+}
+
+.health-name .icon-field.is-invalid {
+  border-color: color-mix(in srgb, var(--color-danger) 60%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-danger) 14%, transparent);
+}
+
+.health-artists {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  max-width: 50%;
+}
+
+.health-artist {
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+.health-artist:hover,
+.health-artist:focus-visible {
+  color: var(--color-text);
+  outline: none;
+}
+
+.health-artist.is-active {
+  background: var(--selected-bg);
+  box-shadow: var(--selected-shadow);
+  color: var(--color-text);
 }
