@@ -14,6 +14,11 @@ on run argv
 		if newArtist is not "" then set artist of targetTrack to newArtist
 		if newAlbum is not "" then set album of targetTrack to newAlbum
 		if album artist of targetTrack is not "" then set album artist of targetTrack to ""
+		if newArtist is not "" and newAlbum is "" then
+			set currentAlbum to album of targetTrack
+			set album of targetTrack to "myp3d " & currentAlbum
+			set album of targetTrack to currentAlbum
+		end if
 		set artState to "noart"
 		if artData is not missing value then
 			set artState to my setArtwork(targetTrack, artData)
