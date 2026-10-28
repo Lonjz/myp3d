@@ -7,6 +7,7 @@ on run argv
 	tell application "Music"
 		set newTrack to add trackFile
 		if newTrack is missing value then error "Music couldn't add the file" number 1
+		if album artist of newTrack is not "" then set album artist of newTrack to ""
 		set artState to "noart"
 		if artData is not missing value then
 			if my hasReadableArtwork(newTrack) then

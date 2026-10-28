@@ -13,6 +13,7 @@ on run argv
 		if newName is not "" then set name of targetTrack to newName
 		if newArtist is not "" then set artist of targetTrack to newArtist
 		if newAlbum is not "" then set album of targetTrack to newAlbum
+		if album artist of targetTrack is not "" then set album artist of targetTrack to ""
 		set artState to "noart"
 		if artData is not missing value then
 			set artState to my setArtwork(targetTrack, artData)
