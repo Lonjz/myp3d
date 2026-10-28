@@ -9,6 +9,7 @@ on run
 			set trackNames to name of every track
 			set trackArtists to artist of every track
 			set trackAlbums to album of every track
+			set trackAlbumArtists to album artist of every track
 			set fileIds to persistent ID of every file track
 			set fileLocations to location of every file track
 			set favoriteIds to persistent ID of every track whose favorited is true
@@ -20,6 +21,7 @@ on run
 		property ns : trackNames
 		property ars : trackArtists
 		property als : trackAlbums
+		property aas : trackAlbumArtists
 		property fids : fileIds
 		property ls : fileLocations
 		property favs : favoriteIds
@@ -31,7 +33,8 @@ on run
 		set end of o's tracksOut to (my textOf(item i of o's ids)) & fieldSep & ¬
 			(my textOf(item i of o's ns)) & fieldSep & ¬
 			(my textOf(item i of o's ars)) & fieldSep & ¬
-			(my textOf(item i of o's als))
+			(my textOf(item i of o's als)) & fieldSep & ¬
+			(my textOf(item i of o's aas))
 	end repeat
 
 	repeat with i from 1 to count of o's fids

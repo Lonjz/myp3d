@@ -13,6 +13,8 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { usePersistentState } from '../hooks/usePersistentState';
+import { useSelection } from '../hooks/useSelection';
+import type { Selection } from '../hooks/useSelection';
 import { emitAppEvent, subscribeAppEvent } from '../utils/appEvents';
 import { normalizeFilenameInput, stripMp3Extension } from '../utils/filenames';
 import { formatTrackSubtitle } from '../utils/formatters';
@@ -31,35 +33,6 @@ const CHECKS: { value: CheckName; label: string; icon: LucideIcon }[] = [
 const errorMessage = (err: unknown, fallback: string) => (err instanceof Error ? err.message : fallback);
 const trackCount = (count: number) => `${count} track${count === 1 ? '' : 's'}`;
 const stopClick = (event: { stopPropagation: () => void }) => event.stopPropagation();
-
-function useSelection(keys: string[]) {
-  const [selected, setSelected] = useState<Set<string>>(() => new Set());
-  const chosen = keys.filter((key) => selected.has(key));
-  const allChosen = keys.length > 0 && chosen.length === keys.length;
-
-  const toggle = useCallback((key: string) => {
-    setSelected((current) => {
-      const next = new Set(current);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }, []);
-
-  const toggleAll = () => setSelected(allChosen ? new Set() : new Set(keys));
-
-  const drop = (removed: string[]) => {
-    setSelected((current) => {
-      const next = new Set(current);
-      removed.forEach((key) => next.delete(key));
-      return next;
-    });
-  };
-
-  return { keys, selected, chosen, allChosen, toggle, toggleAll, drop };
-}
-
-type Selection = ReturnType<typeof useSelection>;
 
 function useFix(verb: string, past: string, failure: string) {
   const { showSuccess, showError } = useToast();

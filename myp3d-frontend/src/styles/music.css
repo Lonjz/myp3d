@@ -186,6 +186,12 @@
   gap: var(--space-1);
 }
 
+.music-album-artist {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 14rem;
+}
+
 .music-change {
   display: inline-flex;
   align-items: center;

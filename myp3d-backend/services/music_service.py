@@ -10,7 +10,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Optional
 
-from models.schemas import BulkFailure, MP3Info, MusicDiff, MusicPair, MusicSyncInfo, MusicTrack
+from models.schemas import (
+    BulkFailure,
+    BulkResult,
+    MP3Info,
+    MusicAlbumIssue,
+    MusicDiff,
+    MusicPair,
+    MusicSyncInfo,
+    MusicTrack,
+)
 from services import favorite_playlist, favorite_service
 from services.audio_fingerprint import audio_fingerprint, cover_hash, covers_match
 from services.config import BASE_DIR, OUTPUT_DIR
@@ -146,12 +155,18 @@ def _read_library() -> list[_LibraryTrack]:
 
     tracks: list[_LibraryTrack] = []
     for record in tracks_text.split(RECORD_SEP) if tracks_text else []:
-        persistent_id, name, artist, album = (record.split(FIELD_SEP) + ["", "", ""])[:4]
+        persistent_id, name, artist, album, album_artist = (record.split(FIELD_SEP) + ["", "", "", ""])[:5]
         if not persistent_id:
             continue
         tracks.append(
             _LibraryTrack(
-                info=MusicTrack(persistent_id=persistent_id, name=name, artist=artist or None, album=album or None),
+                info=MusicTrack(
+                    persistent_id=persistent_id,
+                    name=name,
+                    artist=artist or None,
+                    album=album or None,
+                    album_artist=album_artist.strip() or None,
+                ),
                 location=locations.get(persistent_id),
                 favorited=persistent_id in favorited,
             )
@@ -380,6 +395,48 @@ def diff(folder: str) -> MusicDiff:
         ),
         only_in_library=sorted(matched.unpaired, key=_track_sort_key),
     )
+
+
+def _album_artist_tracks() -> dict[str, list[MusicTrack]]:
+    albums: dict[str, list[MusicTrack]] = {}
+    for track in _read_library():
+        if track.info.album_artist:
+            albums.setdefault(_normalize(track.info.album), []).append(track.info)
+    return albums
+
+
+def album_issues() -> list[MusicAlbumIssue]:
+    issues = [
+        MusicAlbumIssue(
+            key=key,
+            album=tracks[0].album,
+            album_artists=list(dict.fromkeys(track.album_artist for track in tracks if track.album_artist)),
+            artists=list(dict.fromkeys(track.artist for track in tracks if track.artist)),
+            track_count=len(tracks),
+        )
+        for key, tracks in _album_artist_tracks().items()
+    ]
+    return sorted(issues, key=lambda issue: issue.key)
+
+
+def clear_album_artists(keys: list[str]) -> BulkResult:
+    albums = _album_artist_tracks()
+    wanted = [key for key in dict.fromkeys(keys) if key in albums]
+    ids = [track.persistent_id for key in wanted for track in albums[key]]
+    if not ids:
+        return BulkResult(success=True, updated=[], failed=[])
+    try:
+        output = run_script("clear_album_artist", *ids, timeout=EXPORT_TIMEOUT_S)
+    except MusicError as exc:
+        return BulkResult(success=False, updated=[], failed=[BulkFailure(filename=key, detail=exc.detail) for key in wanted])
+    missing = set(output.split(FIELD_SEP)) if output else set()
+    failed = [
+        BulkFailure(filename=key, detail="Some songs are no longer in Apple Music")
+        for key in wanted
+        if any(track.persistent_id in missing for track in albums[key])
+    ]
+    failed_keys = {failure.filename for failure in failed}
+    return BulkResult(success=not failed, updated=[key for key in wanted if key not in failed_keys], failed=failed)
 
 
 def _copy_into(root: Path, source: Path, track: MP3Info) -> Path:

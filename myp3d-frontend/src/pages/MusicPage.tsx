@@ -4,6 +4,7 @@ import {
   Check,
   CircleAlert,
   DiscAlbum,
+  Eraser,
   Folder,
   Image as ImageIcon,
   ImageOff,
@@ -23,17 +24,20 @@ import { mp3Api } from '../api/mp3Api';
 import type { BulkResult, MP3Info } from '../api/mp3Api';
 import type { MusicChange, MusicPair, MusicTrack } from '../api/musicApi';
 import { Cover, DiffColumn, TrackText } from '../components/diff/DiffColumns';
+import { AlbumColumns } from '../components/music/AlbumColumns';
 import { MusicJobPanel } from '../components/music/MusicJobPanel';
 import { PlaylistColumns } from '../components/music/PlaylistColumns';
+import { useAlbumHealth } from '../components/music/useAlbumHealth';
 import { useMusicSync } from '../components/music/useMusicSync';
 import { usePlaylistMusicSync } from '../components/music/usePlaylistMusicSync';
+import { Checkbox } from '../components/ui/Checkbox';
 import { EmptyState } from '../components/ui/EmptyState';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { AppleMusicIcon } from '../components/ui/BrandIcons';
 import { formatTrackSubtitle } from '../utils/formatters';
 
-type MusicStep = 'songs' | 'playlists';
+type MusicStep = 'songs' | 'playlists' | 'albums';
 
 const CHANGE_ICONS: Record<MusicChange, LucideIcon> = {
   title: Music,
@@ -143,6 +147,7 @@ export function MusicPage() {
   const { available, folder, setFolder } = songs;
   const [step, setStep] = useState<MusicStep>('songs');
   const playlists = usePlaylistMusicSync(folder, available === true && step === 'playlists');
+  const albums = useAlbumHealth(available === true && step === 'albums');
 
   if (available === null) {
     return (
@@ -178,6 +183,10 @@ export function MusicPage() {
   const switchStep = (next: MusicStep) => {
     if (next === step) return;
     setStep(next);
+    if (next === 'albums') {
+      if (albums.albums) void albums.scan();
+      return;
+    }
     const target = next === 'songs' ? songs : playlists;
     if (target.diff && !target.job) void target.scan();
   };
@@ -188,6 +197,11 @@ export function MusicPage() {
   };
 
   const renderBody = () => {
+    if (step === 'albums') {
+      if (!albums.albums) return <EmptyState icon={DiscAlbum} loading={albums.scanning} />;
+      return <AlbumColumns albums={albums.albums} selection={albums.selection} busy={albums.busy || albums.scanning} />;
+    }
+
     if (step === 'playlists') {
       if (playlists.job) {
         const { job } = playlists;
@@ -276,6 +290,75 @@ export function MusicPage() {
     );
   };
 
+  const syncTools = (
+    <>
+      <IconField
+        icon={Folder}
+        label="Apple Music folder"
+        className={`music-folder ${folderMissing ? 'is-invalid' : ''}`.trim()}
+        value={folder}
+        onChange={(e) => setFolder(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') void active.scan();
+        }}
+        aria-invalid={folderMissing}
+        disabled={jobOpen}
+        spellCheck={false}
+      />
+      <IconButton
+        icon={ScanSearch}
+        label="Compare again"
+        className="sync-toolbar__push"
+        onClick={() => void active.scan()}
+        disabled={active.scanning || folderMissing || jobOpen}
+      />
+      <button
+        type="button"
+        className="btn-primary music-add"
+        onClick={startSync}
+        disabled={active.busy || active.scanning || jobOpen || anySyncing || songsBlocking || pendingCount === 0}
+        title={songsBlocking ? 'Sync songs first' : 'Sync with Apple Music'}
+      >
+        <RefreshCw aria-hidden="true" />
+        {pendingCount}
+      </button>
+    </>
+  );
+
+  const albumLocked = albums.albums === null || albums.scanning || albums.busy || anySyncing;
+  const albumChosen = albums.selection.chosen.length;
+  const albumTools = (
+    <>
+      <span className="health-select-all">
+        <Checkbox
+          label={albums.selection.allChosen ? 'Deselect all' : 'Select all'}
+          checked={albums.selection.allChosen}
+          indeterminate={albumChosen > 0 && !albums.selection.allChosen}
+          onChange={albums.selection.toggleAll}
+          disabled={albums.selection.keys.length === 0 || albumLocked}
+        />
+      </span>
+      <IconButton
+        icon={ScanSearch}
+        label="Scan again"
+        className="sync-toolbar__push"
+        onClick={() => void albums.scan()}
+        disabled={albums.scanning || albums.busy}
+      />
+      <button
+        type="button"
+        className="btn-primary health-fix"
+        onClick={() => void albums.fix()}
+        disabled={albumChosen === 0 || albumLocked}
+        aria-label={`Clear the album artist on ${albumChosen} album${albumChosen === 1 ? '' : 's'}`}
+        title={anySyncing ? 'Wait for the sync to finish' : 'Clear album artist'}
+      >
+        <Eraser aria-hidden="true" />
+        {albumChosen}
+      </button>
+    </>
+  );
+
   return (
     <div className="page page--fill sync-page music-page">
       <div className="sync-toolbar glass">
@@ -303,37 +386,19 @@ export function MusicPage() {
             <ListMusic aria-hidden="true" />
             {songsPending && <span className="segmented__dot" aria-hidden="true" />}
           </button>
+          <button
+            type="button"
+            className={`segmented__option ${step === 'albums' ? 'is-active' : ''}`.trim()}
+            aria-pressed={step === 'albums'}
+            aria-label="Album artists"
+            title="Album artists"
+            onClick={() => switchStep('albums')}
+            disabled={anySyncing}
+          >
+            <DiscAlbum aria-hidden="true" />
+          </button>
         </div>
-        <IconField
-          icon={Folder}
-          label="Apple Music folder"
-          className={`music-folder ${folderMissing ? 'is-invalid' : ''}`.trim()}
-          value={folder}
-          onChange={(e) => setFolder(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') void active.scan();
-          }}
-          aria-invalid={folderMissing}
-          disabled={jobOpen}
-          spellCheck={false}
-        />
-        <IconButton
-          icon={ScanSearch}
-          label="Compare again"
-          className="sync-toolbar__push"
-          onClick={() => void active.scan()}
-          disabled={active.scanning || folderMissing || jobOpen}
-        />
-        <button
-          type="button"
-          className="btn-primary music-add"
-          onClick={startSync}
-          disabled={active.busy || active.scanning || jobOpen || anySyncing || songsBlocking || pendingCount === 0}
-          title={songsBlocking ? 'Sync songs first' : 'Sync with Apple Music'}
-        >
-          <RefreshCw aria-hidden="true" />
-          {pendingCount}
-        </button>
+        {step === 'albums' ? albumTools : syncTools}
       </div>
 
       {renderBody()}

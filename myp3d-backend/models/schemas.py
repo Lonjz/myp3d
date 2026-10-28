@@ -429,6 +429,19 @@ class MusicTrack(BaseModel):
     name: str
     artist: Optional[str] = None
     album: Optional[str] = None
+    album_artist: Optional[str] = None
+
+
+class MusicAlbumIssue(BaseModel):
+    key: str
+    album: Optional[str] = None
+    album_artists: list[str]
+    artists: list[str]
+    track_count: int
+
+
+class MusicAlbumFixRequest(BaseModel):
+    keys: list[str] = Field(min_length=1)
 
 
 class MusicPair(BaseModel):

@@ -11,6 +11,15 @@ export interface MusicTrack {
   name: string;
   artist: string | null;
   album: string | null;
+  album_artist: string | null;
+}
+
+export interface MusicAlbumIssue {
+  key: string;
+  album: string | null;
+  album_artists: string[];
+  artists: string[];
+  track_count: number;
 }
 
 export type MusicChange =
@@ -120,5 +129,13 @@ export const musicApi = {
 
   dismissPlaylistSync(): Promise<{ success: boolean }> {
     return apiFetch('/music/playlists/sync/dismiss', jsonInit('POST', {}), 'Failed to close the playlist sync');
+  },
+
+  albums(): Promise<MusicAlbumIssue[]> {
+    return apiFetch('/music/albums', undefined, 'Failed to check the album artists');
+  },
+
+  fixAlbums(keys: string[]): Promise<BulkResult> {
+    return apiFetch('/music/albums/fix', jsonInit('POST', { keys }), 'Failed to clear the album artists');
   },
 };

@@ -3,6 +3,9 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 
 from models.schemas import (
+    BulkResult,
+    MusicAlbumFixRequest,
+    MusicAlbumIssue,
     MusicDiff,
     MusicFolderRequest,
     MusicPlaylistDiff,
@@ -99,3 +102,21 @@ def dismiss_music_playlist_sync():
     except MusicError as exc:
         _raise(exc)
     return {"success": True}
+
+
+@router.get("/albums", response_model=list[MusicAlbumIssue])
+def get_music_album_issues():
+    try:
+        return music_service.album_issues()
+    except MusicError as exc:
+        _raise(exc)
+
+
+@router.post("/albums/fix", response_model=BulkResult)
+def fix_music_albums(payload: MusicAlbumFixRequest):
+    if _is_syncing(music_service.get_sync()) or _is_syncing(music_playlist_service.get_sync()):
+        raise HTTPException(status_code=409, detail="Wait for the sync to finish")
+    try:
+        return music_service.clear_album_artists(payload.keys)
+    except MusicError as exc:
+        _raise(exc)
