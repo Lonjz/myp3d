@@ -890,6 +890,8 @@ def _apply_records(session: _Session, pulls: list[RecordPull]) -> bool:
             succeeded = True
         except Exception:
             succeeded = False
+        if not database_sync.is_visible(pull):
+            continue
         with _lock:
             if succeeded:
                 session.local.done += 1
@@ -919,7 +921,7 @@ def _pull_worker(session: _Session) -> None:
     )
 
     with _lock:
-        session.local.total = len(pulls) + len(record_pulls)
+        session.local.total = len(pulls) + sum(database_sync.is_visible(pull) for pull in record_pulls)
     if not _report(session):
         return
 
