@@ -24,7 +24,7 @@ from models.schemas import (
     SyncProgress,
     SyncSessionInfo,
 )
-from services import database_sync, favorite_playlist, favorite_service, playlist_service
+from services import database_sync, date_service, favorite_playlist, favorite_service, playlist_service
 from services.audio_fingerprint import audio_bounds, audio_fingerprint, id3_tag_length, splice_audio
 from services.database_sync import RecordKind, RecordPull
 from services.config import API_PORT, OUTPUT_DIR
@@ -833,6 +833,7 @@ def _rename(source: str, target: str) -> bool:
         return False
     playlist_service.rename_track(source, target)
     favorite_service.rename_track(source, target)
+    date_service.rename_track(source, target)
     return True
 
 

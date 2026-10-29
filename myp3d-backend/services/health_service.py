@@ -21,7 +21,7 @@ from models.schemas import (
     SilenceScanInfo,
     SilentTrack,
 )
-from services import favorite_service, playlist_service
+from services import date_service, favorite_service, playlist_service
 from services.audio_fingerprint import splice_audio
 from services.config import OUTPUT_DIR, get_ffmpeg_path
 from services.mp3_service import invalidate_library_cache, list_mp3_infos
@@ -296,6 +296,7 @@ def _rename_one(item: RenameItem) -> None:
     path.rename(target)
     playlist_service.rename_track(item.filename, name)
     favorite_service.rename_track(item.filename, name)
+    date_service.rename_track(item.filename, name)
 
 
 def rename(items: list[RenameItem]) -> BulkResult:

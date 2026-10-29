@@ -17,6 +17,7 @@ from yt_dlp import YoutubeDL
 from yt_dlp.utils import download_range_func
 
 from models.schemas import AlbumInfo, MP3Info
+from services import date_service
 from services.config import OUTPUT_DIR, get_cookies_from_browser, get_ffmpeg_path, get_player_client_args
 
 
@@ -126,7 +127,7 @@ def list_mp3_infos() -> list[MP3Info]:
         with _cache_lock:
             generation = _library_cache.generation
 
-        mp3_infos = [get_mp3_info(filepath) for filepath in list_mp3_filepaths()]
+        mp3_infos = with_real_dates([get_mp3_info(filepath) for filepath in list_mp3_filepaths()])
 
         with _cache_lock:
             if _library_cache.generation == generation:
@@ -490,14 +491,22 @@ def set_cover_images(tag: eyed3.id3.tag.Tag, image_data: bytes, mime_type: str) 
     tag.images.set(id3_frames.ImageFrame.OTHER, image_data, mime_type, description="")
 
 
+def with_real_dates(infos: list[MP3Info]) -> list[MP3Info]:
+    dates = date_service.resolve({info.filename: info.date_added for info in infos if info.date_added})
+    for info in infos:
+        info.date_added = dates.get(info.filename, info.date_added)
+    return infos
+
+
 def get_mp3_info(filepath: Path) -> MP3Info:
     """Extract MP3 metadata."""
     audio = eyed3.load(str(filepath))
     file_stats = filepath.stat()
+    created = getattr(file_stats, "st_birthtime", file_stats.st_ctime)
     info = MP3Info(
         filename=filepath.name,
         file_size=file_stats.st_size,
-        date_added=datetime.fromtimestamp(file_stats.st_ctime, tz=timezone.utc),
+        date_added=datetime.fromtimestamp(min(created, file_stats.st_mtime), tz=timezone.utc),
     )
     if audio and audio.tag:
         info.title = audio.tag.title

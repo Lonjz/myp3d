@@ -17,7 +17,7 @@ from models.schemas import (
     PaginatedMP3Response,
     PaginationMeta,
 )
-from services import favorite_service, playlist_service
+from services import date_service, favorite_service, playlist_service
 from services.config import OUTPUT_DIR
 from services.cover_service import CoverSize, get_cover_variant
 from services.mp3_service import (
@@ -32,6 +32,7 @@ from services.mp3_service import (
     set_album_cover,
     set_cover_images,
     set_track_tags,
+    with_real_dates,
 )
 
 router = APIRouter(prefix="/mp3s", tags=["MP3s"])
@@ -160,6 +161,7 @@ def bulk_delete(payload: BulkTracksRequest):
 
     playlist_service.remove_tracks(deleted)
     favorite_service.remove_tracks(deleted)
+    date_service.remove_tracks(deleted)
     invalidate_library_cache()
     return BulkResult(success=not failed, updated=deleted, failed=failed)
 
@@ -184,7 +186,7 @@ def get_mp3_metadata(filename: str):
     filepath = _resolve_mp3_path(filename)
     if not filepath.exists() or filepath.suffix.lower() != ".mp3":
         raise HTTPException(status_code=404, detail="MP3 file not found")
-    return get_mp3_info(filepath)
+    return with_real_dates([get_mp3_info(filepath)])[0]
 
 
 @router.put("/{filename}/metadata")
@@ -219,6 +221,7 @@ def update_metadata(filename: str, metadata: MetadataUpdate):
         filepath.rename(new_path)
         playlist_service.rename_track(filepath.name, new_name)
         favorite_service.rename_track(filepath.name, new_name)
+        date_service.rename_track(filepath.name, new_name)
         new_filename = new_name
 
     invalidate_library_cache()
@@ -296,6 +299,7 @@ def delete_mp3(filename: str):
     filepath.unlink()
     playlist_service.remove_tracks([filepath.name])
     favorite_service.remove_tracks([filepath.name])
+    date_service.remove_tracks([filepath.name])
     invalidate_library_cache()
     return {"success": True, "message": f"Deleted: {filename}"}
 
