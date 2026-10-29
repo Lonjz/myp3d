@@ -34,6 +34,13 @@ export function DashboardPage() {
   const { showError } = useToast();
   const [stats, setStats] = useState<LibraryStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hadStats, setHadStats] = useState(false);
+  const [revealing, setRevealing] = useState(false);
+
+  if (stats && !hadStats) {
+    setHadStats(true);
+    setRevealing(true);
+  }
 
   const loadStats = useCallback(async () => {
     setLoading(true);
@@ -49,6 +56,8 @@ export function DashboardPage() {
   useEffect(() => {
     void loadStats();
   }, [loadStats]);
+
+  useEffect(() => () => setRevealing(false), []);
 
   useEffect(() => subscribeAppEvent('library-changed', () => void loadStats()), [loadStats]);
   useEffect(() => subscribeAppEvent('favorites-changed', () => void loadStats()), [loadStats]);
@@ -82,7 +91,7 @@ export function DashboardPage() {
   const coverRatio = stats.total_tracks ? stats.tracks_with_cover / stats.total_tracks : 0;
 
   return (
-    <div className="page dashboard">
+    <div className={revealing ? 'page dashboard dashboard--reveal' : 'page dashboard'}>
       <div className="stat-grid">
         <StatTile label="Tracks" value={stats.total_tracks.toLocaleString()} icon={Music} to="/library?issue=any" />
         <StatTile label="Albums" value={stats.total_albums.toLocaleString()} icon={DiscAlbum} to="/albums" />

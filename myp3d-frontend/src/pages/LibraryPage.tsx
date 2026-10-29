@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useEffectEvent, useMemo, useState } from 'react';
+import { useEffect, useEffectEvent, useMemo, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -198,6 +198,10 @@ export function LibraryPage() {
   };
 
   const hasSelection = selection.size > 0;
+  const browsePresence = usePresence(!hasSelection);
+  const selectionPresence = usePresence(hasSelection);
+  const showSelection = hasSelection ? !browsePresence.mounted : selectionPresence.mounted;
+  const toolbarState = (showSelection ? selectionPresence.closing : browsePresence.closing) ? 'closed' : 'open';
   const playSelected = () => {
     if (hasSelection) player.playTracks(selection.tracks, 0);
   };
@@ -374,8 +378,8 @@ export function LibraryPage() {
         hasMore={hasMore}
         onEndReached={loadMore}
         resetKey={queryParams}
-        toolbar={hasSelection ? (
-          <Fragment key="selection">
+        toolbar={showSelection ? (
+          <div key="selection" className="library-toolbar__set" data-state={toolbarState}>
             <IconButton icon={X} label="Clear selection" onClick={selection.clear} />
             <span className="library-selection-count" title="Selected">
               <ListChecks aria-hidden="true" />
@@ -386,9 +390,9 @@ export function LibraryPage() {
             <IconButton icon={ListPlus} label="Add to playlist" onClick={addSelectedToPlaylist} disabled={deleting} />
             {downloadControl}
             <IconButton icon={Trash2} label="Delete selected" variant="danger" onClick={deleteSelected} disabled={deleting} />
-          </Fragment>
+          </div>
         ) : (
-          <Fragment key="browse">
+          <div key="browse" className="library-toolbar__set" data-state={toolbarState}>
             <IconField
               icon={Search}
               label="Search"
@@ -424,7 +428,7 @@ export function LibraryPage() {
             <IconButton icon={RefreshCw} label="Refresh" onClick={() => void refresh()} />
             {downloads.progress && downloadControl}
             <span className="library-count">{mp3s.length} / {totalItems}</span>
-          </Fragment>
+          </div>
         )}
       />
 

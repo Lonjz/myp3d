@@ -251,9 +251,18 @@
   background: color-mix(in srgb, var(--color-lavender) 22%, transparent);
 }
 
-.library-toolbar > * {
+.library-toolbar > *,
+.library-toolbar__set > * {
   --pop-y: 4px;
   animation: pop-in var(--duration-enter) var(--ease-spring) backwards;
+}
+
+.library-toolbar__set {
+  display: contents;
+}
+
+.library-toolbar__set[data-state='closed'] > * {
+  animation: pop-out var(--duration-exit) var(--ease-in) both;
 }
 
 .library-table--selectable th:first-child,

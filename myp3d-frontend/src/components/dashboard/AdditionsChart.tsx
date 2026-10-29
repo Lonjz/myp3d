@@ -63,34 +63,36 @@ export function AdditionsChart({ months, days }: AdditionsChartProps) {
 
   return (
     <ChartCard title="Added" icon={CalendarPlus} className="chart-card--span-2" actions={toggle}>
-      {view === 'days' && <AdditionsCalendar days={days} />}
-      {view === 'months' && (
-        <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={months} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
-            <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
-            <XAxis
-              dataKey="month"
-              tickFormatter={formatMonthShort}
-              tick={AXIS_TICK}
-              axisLine={false}
-              tickLine={false}
-            />
-            <YAxis allowDecimals={false} tick={AXIS_TICK} axisLine={false} tickLine={false} />
-            <Tooltip
-              cursor={{ fill: CHART_COLORS.cursor }}
-              content={(props) => <ChartTooltip {...props} unit="tracks" formatLabel={formatMonthLong} />}
-            />
-            <Bar
-              dataKey="track_count"
-              fill={CHART_COLORS.series}
-              activeBar={{ fill: CHART_COLORS.seriesActive }}
-              radius={COLUMN_RADIUS}
-              maxBarSize={MAX_BAR_SIZE}
-              isAnimationActive={ANIMATE_CHARTS}
-            />
-          </BarChart>
-        </ResponsiveContainer>
-      )}
+      <div key={view} className="chart-card__view motion-fade">
+        {view === 'days' && <AdditionsCalendar days={days} />}
+        {view === 'months' && (
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={months} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
+              <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
+              <XAxis
+                dataKey="month"
+                tickFormatter={formatMonthShort}
+                tick={AXIS_TICK}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis allowDecimals={false} tick={AXIS_TICK} axisLine={false} tickLine={false} />
+              <Tooltip
+                cursor={{ fill: CHART_COLORS.cursor }}
+                content={(props) => <ChartTooltip {...props} unit="tracks" formatLabel={formatMonthLong} />}
+              />
+              <Bar
+                dataKey="track_count"
+                fill={CHART_COLORS.series}
+                activeBar={{ fill: CHART_COLORS.seriesActive }}
+                radius={COLUMN_RADIUS}
+                maxBarSize={MAX_BAR_SIZE}
+                isAnimationActive={ANIMATE_CHARTS}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
     </ChartCard>
   );
 }

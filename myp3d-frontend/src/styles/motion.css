@@ -150,6 +150,12 @@
   }
 }
 
+@keyframes grow-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+
 @keyframes pulse-ring {
   from {
     opacity: 0.9;
@@ -198,6 +204,13 @@
     from,
     to {
       opacity: 0;
+    }
+  }
+
+  @keyframes grow-x {
+    from,
+    to {
+      transform: none;
     }
   }
 
