@@ -75,6 +75,9 @@
   color: inherit;
   opacity: 0.75;
   cursor: pointer;
+  transition:
+    opacity var(--duration-fast) var(--ease-standard),
+    background var(--duration-fast) var(--ease-standard);
 }
 
 .drop-message__close svg {

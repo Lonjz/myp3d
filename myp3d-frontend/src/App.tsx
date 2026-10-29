@@ -30,6 +30,7 @@ import { NAV_ITEMS } from './components/shell/navItems';
 import { SpotlightProvider } from './components/spotlight/SpotlightProvider';
 import { useSpotlight } from './components/spotlight/spotlightContext';
 import { SPOTLIGHT_SHORTCUT_LABEL } from './components/spotlight/spotlightTypes';
+import { usePresence } from './hooks/usePresence';
 
 function safeDecode(value: string): string {
   try {
@@ -146,6 +147,7 @@ function App() {
   const location = useLocation();
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const sidebarOverlay = usePresence(isMobileSidebarOpen);
   const [sidebarPathname, setSidebarPathname] = useState(location.pathname);
   const isFillPage = FILL_PATHS.has(location.pathname.replace(/(.)\/+$/, '$1'));
 
@@ -200,11 +202,12 @@ function App() {
                   </nav>
                 </aside>
 
-                {isMobileSidebarOpen && (
+                {sidebarOverlay.mounted && (
                   <button
                     type="button"
                     aria-label="Close navigation"
-                    className="sidebar-overlay"
+                    className="sidebar-overlay motion-fade"
+                    data-state={sidebarOverlay.closing ? 'closed' : 'open'}
                     onClick={() => setIsMobileSidebarOpen(false)}
                   />
                 )}

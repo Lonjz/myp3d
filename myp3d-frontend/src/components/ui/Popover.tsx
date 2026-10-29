@@ -12,12 +12,23 @@ interface PopoverProps {
   onClose: () => void;
   label: string;
   role?: 'dialog' | 'group';
+  align?: 'center' | 'end';
   className?: string;
   onKeyDown?: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
   children: ReactNode;
 }
 
-export function Popover({ anchorRef, open, onClose, label, role = 'dialog', className, onKeyDown, children }: PopoverProps) {
+export function Popover({
+  anchorRef,
+  open,
+  onClose,
+  label,
+  role = 'dialog',
+  align = 'center',
+  className,
+  onKeyDown,
+  children,
+}: PopoverProps) {
   const { mounted, closing } = usePresence(open);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -27,17 +38,15 @@ export function Popover({ anchorRef, open, onClose, label, role = 'dialog', clas
     if (!open || !anchor || !panel) return;
     const rect = anchor.getBoundingClientRect();
     const height = panel.offsetHeight;
-    const left = Math.min(
-      Math.max(VIEWPORT_GAP, rect.left + (rect.width - panel.offsetWidth) / 2),
-      window.innerWidth - panel.offsetWidth - VIEWPORT_GAP,
-    );
+    const preferredLeft = align === 'end' ? rect.right - panel.offsetWidth : rect.left + (rect.width - panel.offsetWidth) / 2;
+    const left = Math.min(Math.max(VIEWPORT_GAP, preferredLeft), window.innerWidth - panel.offsetWidth - VIEWPORT_GAP);
     const below = rect.bottom + POPOVER_GAP;
     const top =
       below + height > window.innerHeight - VIEWPORT_GAP ? Math.max(VIEWPORT_GAP, rect.top - height - POPOVER_GAP) : below;
     Object.assign(panel.style, { top: `${top}px`, left: `${left}px`, visibility: 'visible' });
     const initial = panel.querySelector<HTMLElement>('[aria-pressed="true"]') ?? panel.querySelector<HTMLElement>('button');
     initial?.focus();
-  }, [open, anchorRef]);
+  }, [open, anchorRef, align]);
 
   useEffect(() => {
     if (!open) return undefined;

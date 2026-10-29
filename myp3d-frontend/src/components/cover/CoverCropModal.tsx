@@ -1,6 +1,7 @@
 import Cropper from 'react-easy-crop';
 import type { Area, Point } from 'react-easy-crop';
 import { Check, X, ZoomIn } from 'lucide-react';
+import { useLingering } from '../../hooks/usePresence';
 import { IconButton } from '../ui/IconButton';
 
 interface CoverCropModalProps {
@@ -30,16 +31,15 @@ export function CoverCropModal({
   onCancel,
   onApply,
 }: CoverCropModalProps) {
-  if (!isOpen || !cropSource) {
-    return null;
-  }
+  const { value: source, closing } = useLingering(isOpen ? cropSource : null);
+  if (!source) return null;
 
   return (
-    <div className="crop-modal-backdrop">
-      <div className="crop-modal glass" role="dialog" aria-label="Crop cover">
+    <div className="crop-modal-backdrop motion-fade" data-state={closing ? 'closed' : 'open'}>
+      <div className="crop-modal glass motion-pop" role="dialog" aria-label="Crop cover">
         <div className="cropper-wrap">
           <Cropper
-            image={cropSource}
+            image={source}
             crop={crop}
             zoom={zoom}
             aspect={1}

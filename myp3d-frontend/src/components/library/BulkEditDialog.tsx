@@ -99,21 +99,7 @@ export function BulkEditDialog({ tracks: selectedTracks, closing, onClose, onSav
   const preview = coverPreview || (sharedCoverTrack ? mp3Api.getCoverUrl(sharedCoverTrack.filename, 'medium') : null);
 
   return createPortal(
-    isCropModalOpen ? (
-      <CoverCropModal
-        isOpen={isCropModalOpen}
-        cropSource={cropSource}
-        crop={crop}
-        zoom={zoom}
-        isApplyingCrop={isApplyingCrop}
-        zoomInputId="bulkCropZoom"
-        onCropChange={setCrop}
-        onZoomChange={setZoom}
-        onCropComplete={handleCropComplete}
-        onCancel={handleCancelCrop}
-        onApply={handleApplyCrop}
-      />
-    ) : (
+    <>
       <div className="confirm-layer" data-state={closing ? 'closed' : 'open'}>
         <div className="confirm-scrim motion-fade" onMouseDown={saving ? undefined : onClose} />
         <div
@@ -185,7 +171,20 @@ export function BulkEditDialog({ tracks: selectedTracks, closing, onClose, onSav
           </div>
         </div>
       </div>
-    ),
+      <CoverCropModal
+        isOpen={isCropModalOpen}
+        cropSource={cropSource}
+        crop={crop}
+        zoom={zoom}
+        isApplyingCrop={isApplyingCrop}
+        zoomInputId="bulkCropZoom"
+        onCropChange={setCrop}
+        onZoomChange={setZoom}
+        onCropComplete={handleCropComplete}
+        onCancel={handleCancelCrop}
+        onApply={handleApplyCrop}
+      />
+    </>,
     document.body,
   );
 }

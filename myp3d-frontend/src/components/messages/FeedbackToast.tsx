@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { CircleAlert, CircleCheck, Info, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { useLingering } from '../../hooks/usePresence';
 
 export type FeedbackMessage = {
   type: 'success' | 'error' | 'info';
@@ -25,6 +26,7 @@ export function FeedbackToast({
   autoHideMs = 4200,
 }: FeedbackToastProps) {
   const onCloseRef = useRef(onClose);
+  const { value: shown, closing } = useLingering(message);
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -42,21 +44,22 @@ export function FeedbackToast({
     return () => window.clearTimeout(timeoutId);
   }, [message, autoHideMs]);
 
-  if (!message) {
+  if (!shown) {
     return null;
   }
 
-  const { icon: StatusIcon, label } = MESSAGE_ICONS[message.type];
+  const { icon: StatusIcon, label } = MESSAGE_ICONS[shown.type];
 
   return (
-    <div className="drop-message-layer" aria-live={message.type === 'error' ? 'assertive' : 'polite'}>
+    <div className="drop-message-layer" aria-live={shown.type === 'error' ? 'assertive' : 'polite'}>
       <div
-        key={`${message.type}:${message.text}`}
-        className={`drop-message drop-message--${message.type} glass motion-pop`}
-        role={message.type === 'error' ? 'alert' : 'status'}
+        key={`${shown.type}:${shown.text}`}
+        className={`drop-message drop-message--${shown.type} glass motion-pop`}
+        role={shown.type === 'error' ? 'alert' : 'status'}
+        data-state={closing ? 'closed' : 'open'}
       >
         <StatusIcon className="drop-message__icon" aria-label={label} />
-        <span className="drop-message__text">{message.text}</span>
+        <span className="drop-message__text">{shown.text}</span>
         <button
           type="button"
           className="drop-message__close"

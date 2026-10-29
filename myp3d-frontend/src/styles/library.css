@@ -196,6 +196,7 @@
   font: inherit;
   letter-spacing: inherit;
   cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-standard);
 }
 
 .library-sort-button:hover,

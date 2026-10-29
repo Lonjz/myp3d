@@ -106,9 +106,7 @@ export function QueueItemDialog({ item, closing, onClose, onSaved }: QueueItemDi
   return (
     <>
       {createPortal(
-        cropModalProps.isOpen ? (
-          <CoverCropModal {...cropModalProps} />
-        ) : (
+        <>
           <div className="confirm-layer" data-state={closing ? 'closed' : 'open'}>
             <div className="confirm-scrim motion-fade" onMouseDown={saving ? undefined : onClose} />
             <form
@@ -155,7 +153,8 @@ export function QueueItemDialog({ item, closing, onClose, onSaved }: QueueItemDi
               </div>
             </form>
           </div>
-        ),
+          <CoverCropModal {...cropModalProps} />
+        </>,
         document.body,
       )}
       <ConfirmDialog {...overwriteDialogProps} />

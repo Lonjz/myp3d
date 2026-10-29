@@ -16,6 +16,7 @@ import {
   VolumeX,
 } from 'lucide-react';
 import { mp3Api } from '../../api/mp3Api';
+import { useLingering, usePresence } from '../../hooks/usePresence';
 import { IconButton } from '../ui/IconButton';
 import { usePlayer } from './playerContext';
 import { QueuePopover } from './QueuePopover';
@@ -29,33 +30,40 @@ export function PlayerBar() {
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const queueButtonRef = useRef<HTMLSpanElement>(null);
   const closeQueue = useCallback(() => setIsQueueOpen(false), []);
+  const { value: track, closing } = useLingering(currentTrack);
+  const queuePresence = usePresence(isQueueOpen);
 
-  if (!currentTrack) return null;
+  if (!track) return null;
 
   const volumeLevel = state.muted ? 0 : state.volume;
   const VolumeIcon = volumeLevel === 0 ? VolumeX : volumeLevel < 0.5 ? Volume1 : Volume2;
   const volumeStyle = { '--progress': `${volumeLevel * 100}%` } as CSSProperties;
-  const detailsPath = `/details/${encodeURIComponent(currentTrack.filename)}`;
+  const detailsPath = `/details/${encodeURIComponent(track.filename)}`;
 
   return (
     <div className="player-dock">
       <div className="player-dock__inner">
-        <div className="player-bar glass motion-pop" role="region" aria-label="Player">
+        <div
+          className="player-bar glass motion-pop"
+          role="region"
+          aria-label="Player"
+          data-state={closing ? 'closed' : 'open'}
+        >
           <SeekBar compact />
 
           <div className="player-bar__track">
             <Link to={detailsPath} className="player-bar__art" aria-label="Open track">
-              {currentTrack.has_cover ? (
-                <img src={mp3Api.getCoverUrl(currentTrack.filename, 'thumb')} alt="" />
+              {track.has_cover ? (
+                <img src={mp3Api.getCoverUrl(track.filename, 'thumb')} alt="" />
               ) : (
                 <Music aria-hidden="true" />
               )}
             </Link>
-            <div key={currentTrack.filename} className="player-bar__text motion-fade">
-              <Link to={detailsPath} className="player-bar__title" title={currentTrack.title || currentTrack.filename}>
-                {currentTrack.title || currentTrack.filename}
+            <div key={track.filename} className="player-bar__text motion-fade">
+              <Link to={detailsPath} className="player-bar__title" title={track.title || track.filename}>
+                {track.title || track.filename}
               </Link>
-              <span className="player-bar__artist">{currentTrack.artist || '—'}</span>
+              <span className="player-bar__artist">{track.artist || '—'}</span>
             </div>
           </div>
 
@@ -125,7 +133,9 @@ export function PlayerBar() {
           </div>
         </div>
 
-        {isQueueOpen && <QueuePopover anchorRef={queueButtonRef} onClose={closeQueue} />}
+        {queuePresence.mounted && (
+          <QueuePopover anchorRef={queueButtonRef} closing={queuePresence.closing} onClose={closeQueue} />
+        )}
       </div>
     </div>
   );

@@ -108,16 +108,15 @@ function MatchCell({ row, onChoose, onChooseUrl }: MatchCellProps) {
         )}
         <ChevronDown className="spotify-match__chevron" aria-hidden="true" />
       </button>
-      {open && (
-        <MatchPicker
-          anchorRef={anchorRef}
-          candidates={match.candidates}
-          choice={choice}
-          onChoose={(candidate) => onChoose(row.ref.id, candidate)}
-          onChooseUrl={(url) => onChooseUrl(row.ref.id, url)}
-          onClose={() => setOpen(false)}
-        />
-      )}
+      <MatchPicker
+        anchorRef={anchorRef}
+        open={open}
+        candidates={match.candidates}
+        choice={choice}
+        onChoose={(candidate) => onChoose(row.ref.id, candidate)}
+        onChooseUrl={(url) => onChooseUrl(row.ref.id, url)}
+        onClose={() => setOpen(false)}
+      />
     </>
   );
 }

@@ -3,6 +3,7 @@ import type { CSSProperties, MouseEvent } from 'react';
 import { History, Music } from 'lucide-react';
 import type { LibraryStats } from '../../api/mp3Api';
 import { usePersistentState } from '../../hooks/usePersistentState';
+import { useLingering } from '../../hooks/usePresence';
 
 interface AdditionsCalendarProps {
   days: LibraryStats['additions_by_day'];
@@ -73,6 +74,7 @@ export function AdditionsCalendar({ days }: AdditionsCalendarProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
   const [hovered, setHovered] = useState<HoveredDay | null>(null);
+  const tooltip = useLingering(hovered);
   const today = startOfToday();
   const todayKey = dayKey(today);
   const counts = new Map(days.map((day) => [day.date, day.track_count]));
@@ -164,14 +166,18 @@ export function AdditionsCalendar({ days }: AdditionsCalendarProps) {
           </div>
         </div>
       </div>
-      {hovered && (
-        <div className="chart-tooltip calendar__tooltip glass" style={{ left: hovered.left, top: hovered.top }}>
+      {tooltip.value && (
+        <div
+          className="chart-tooltip calendar__tooltip glass motion-fade"
+          style={{ left: tooltip.value.left, top: tooltip.value.top }}
+          data-state={tooltip.closing ? 'closed' : 'open'}
+        >
           <div className="chart-tooltip__value">
             <span className="chart-tooltip__key" aria-hidden="true" />
-            <strong>{hovered.count.toLocaleString()}</strong>
-            <span>{hovered.count === 1 ? 'track' : 'tracks'}</span>
+            <strong>{tooltip.value.count.toLocaleString()}</strong>
+            <span>{tooltip.value.count === 1 ? 'track' : 'tracks'}</span>
           </div>
-          <div className="chart-tooltip__label">{hovered.date}</div>
+          <div className="chart-tooltip__label">{tooltip.value.date}</div>
         </div>
       )}
       <div className="calendar__years" role="group" aria-label="Range">

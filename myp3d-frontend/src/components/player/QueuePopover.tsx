@@ -8,10 +8,11 @@ import { usePlayer } from './playerContext';
 
 interface QueuePopoverProps {
   anchorRef: RefObject<HTMLElement | null>;
+  closing: boolean;
   onClose: () => void;
 }
 
-export function QueuePopover({ anchorRef, onClose }: QueuePopoverProps) {
+export function QueuePopover({ anchorRef, closing, onClose }: QueuePopoverProps) {
   const { state, jumpTo, remove, clear } = usePlayer();
   const panelRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLOListElement>(null);
@@ -42,7 +43,13 @@ export function QueuePopover({ anchorRef, onClose }: QueuePopoverProps) {
   }, [anchorRef, onClose]);
 
   return (
-    <div ref={panelRef} className="queue-popover glass motion-pop" role="dialog" aria-label="Queue">
+    <div
+      ref={panelRef}
+      className="queue-popover glass motion-pop"
+      role="dialog"
+      aria-label="Queue"
+      data-state={closing ? 'closed' : 'open'}
+    >
       <div className="queue-popover__header">
         <span className="queue-popover__title">
           <ListOrdered aria-hidden="true" />

@@ -77,12 +77,14 @@
   color: var(--color-text);
   font-size: var(--text-sm);
   font-weight: var(--font-weight-medium);
-  text-decoration: none;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition: text-decoration-color var(--duration-fast) var(--ease-standard);
 }
 
 .player-bar__title:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  text-decoration-color: currentColor;
 }
 
 .player-bar__artist {
@@ -197,6 +199,7 @@
   background: var(--color-text);
   box-shadow: 0 1px 4px rgba(8, 4, 24, 0.45);
   opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-standard);
 }
 
 .seek-slider:hover::-webkit-slider-thumb,
@@ -569,6 +572,11 @@
   color: var(--color-text);
   fill: currentColor;
   opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+
+.track-index__number {
+  transition: opacity var(--duration-fast) var(--ease-standard);
 }
 
 tr:hover .track-index__number,

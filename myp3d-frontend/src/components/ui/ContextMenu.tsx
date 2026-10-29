@@ -18,12 +18,13 @@ interface ContextMenuProps {
   y: number;
   label: string;
   actions: MenuAction[];
+  closing?: boolean;
   onClose: () => void;
 }
 
 const menuItems = (menu: HTMLElement | null) => [...(menu?.querySelectorAll<HTMLButtonElement>('.context-menu__item') ?? [])];
 
-export function ContextMenu({ x, y, label, actions, onClose }: ContextMenuProps) {
+export function ContextMenu({ x, y, label, actions, closing = false, onClose }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
 
@@ -89,6 +90,7 @@ export function ContextMenu({ x, y, label, actions, onClose }: ContextMenuProps)
       className="context-menu glass motion-pop"
       role="menu"
       aria-label={label}
+      data-state={closing ? 'closed' : 'open'}
       onKeyDown={moveFocus}
       onContextMenu={(event) => event.preventDefault()}
     >

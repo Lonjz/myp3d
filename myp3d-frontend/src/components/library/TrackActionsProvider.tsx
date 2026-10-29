@@ -21,7 +21,7 @@ import { mp3Api } from '../../api/mp3Api';
 import type { AlbumInfo, MP3Info } from '../../api/mp3Api';
 import { playlistApi } from '../../api/playlistApi';
 import type { PlaylistInfo } from '../../api/playlistApi';
-import { usePresence } from '../../hooks/usePresence';
+import { useLingering, usePresence } from '../../hooks/usePresence';
 import { emitAppEvent } from '../../utils/appEvents';
 import { useFavorites } from '../favorites/useFavorites';
 import { useToast } from '../messages/toastContext';
@@ -84,6 +84,7 @@ export function TrackActionsProvider({ children }: { children: ReactNode }) {
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const shownMenu = useLingering(menu);
   const closeMenu = useCallback(() => setMenu(null), []);
 
   const addToPlaylist = useCallback((filenames: string[]) => {
@@ -283,13 +284,14 @@ export function TrackActionsProvider({ children }: { children: ReactNode }) {
     <TrackActionsContext.Provider value={value}>
       {children}
 
-      {menu && (
+      {shownMenu.value && (
         <ContextMenu
-          key={menu.id}
-          x={menu.x}
-          y={menu.y}
-          label={menu.track.title || menu.track.filename}
-          actions={menu.actions}
+          key={shownMenu.value.id}
+          x={shownMenu.value.x}
+          y={shownMenu.value.y}
+          label={shownMenu.value.track.title || shownMenu.value.track.filename}
+          actions={shownMenu.value.actions}
+          closing={shownMenu.closing}
           onClose={closeMenu}
         />
       )}

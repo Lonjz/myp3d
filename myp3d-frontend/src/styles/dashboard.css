@@ -625,6 +625,9 @@
   aspect-ratio: 1;
   border-radius: 3px;
   background: rgba(255, 255, 255, 0.06);
+  transition:
+    box-shadow var(--duration-fast) var(--ease-standard),
+    filter var(--duration-fast) var(--ease-standard);
 }
 
 .calendar__day.is-blank {
