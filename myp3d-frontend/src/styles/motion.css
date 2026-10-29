@@ -1,3 +1,25 @@
+.motion-fade {
+  animation: fade-in var(--duration-fast) var(--ease-out) both;
+}
+
+.motion-pop {
+  animation: pop-in var(--duration-enter) var(--ease-spring) both;
+}
+
+[data-state='closed'] {
+  pointer-events: none;
+}
+
+[data-state='closed'] .motion-fade,
+.motion-fade[data-state='closed'] {
+  animation: fade-out var(--duration-exit) var(--ease-in) both;
+}
+
+[data-state='closed'] .motion-pop,
+.motion-pop[data-state='closed'] {
+  animation: pop-out var(--duration-exit) var(--ease-in) both;
+}
+
 .sidebar-link,
 .details-song-item,
 .query-result-item {
@@ -19,8 +41,8 @@
   transform: scale(0.94);
   pointer-events: none;
   transition:
-    opacity 220ms var(--ease-standard),
-    transform 300ms var(--ease-spring);
+    opacity var(--duration-base) var(--ease-standard),
+    transform var(--duration-enter) var(--ease-spring);
 }
 
 .details-song-item::before,
@@ -50,7 +72,7 @@
 .details-sidebar,
 .details-title,
 .edit-container {
-  animation: panel-rise 460ms var(--ease-spring) backwards;
+  animation: panel-rise var(--duration-rise) var(--ease-spring) backwards;
 }
 
 .data-table > .library-table-wrap,
@@ -70,9 +92,38 @@
 
 .library-table tbody tr,
 .query-result-item,
-.details-song-item {
-  animation: row-rise 380ms var(--ease-standard) backwards;
-  animation-delay: calc(min(var(--row, 0), 14) * 22ms + 100ms);
+.details-song-item,
+.downloads-row,
+.spotify-row,
+.sync-peer {
+  animation: row-rise var(--duration-row) var(--ease-out) backwards;
+  animation-delay: calc(min(var(--row, 0), 14) * var(--stagger-row) + 100ms);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--pop-y, 8px)) scale(0.95);
+  }
+}
+
+@keyframes pop-out {
+  to {
+    opacity: 0;
+    transform: translateY(calc(var(--pop-y, 8px) * 0.75)) scale(0.96);
+  }
 }
 
 @keyframes panel-rise {
@@ -89,24 +140,89 @@
   }
 }
 
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@keyframes pulse-ring {
+  from {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .data-table > .library-toolbar,
-  .data-table > .library-table-wrap,
-  .query-sidebar,
-  .query-preview-card,
-  .download-form,
-  .details-sidebar,
-  .details-title,
-  .edit-container,
-  .library-table tbody tr,
-  .query-result-item,
-  .details-song-item {
-    animation: none;
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes pop-out {
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes panel-rise {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes row-rise {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes shimmer {
+    from,
+    to {
+      background-position: 50% 0;
+    }
+  }
+
+  @keyframes pulse-ring {
+    from,
+    to {
+      opacity: 0;
+    }
   }
 
   .sidebar-link::before,
   .details-song-item::before,
-  .query-result-item::before {
+  .query-result-item::before,
+  .checkbox::before,
+  .checkbox__mark {
     transform: none;
+  }
+
+  .btn-primary:active:not(:disabled),
+  .icon-btn:active:not(:disabled),
+  .stat-tile--link:hover,
+  .album-tile:hover .album-tile__cover img {
+    transform: none;
+  }
+
+  .sidebar,
+  .app-content,
+  .sync-meter span {
+    transition: none;
+  }
+
+  .app-shell {
+    --sidebar-label-transition: opacity var(--duration-fast) var(--ease-standard);
   }
 }
