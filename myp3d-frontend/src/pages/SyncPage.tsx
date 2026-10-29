@@ -4,6 +4,7 @@ import {
   ArrowLeftRight,
   ArrowUp,
   AudioWaveform,
+  CalendarClock,
   Check,
   CircleAlert,
   CircleCheck,
@@ -61,20 +62,23 @@ function DiffRow({
   coverUrl,
   updatesLabel,
   audioLabel,
+  datedLabel,
 }: {
   track: SyncDiffTrack;
   coverUrl: (filename: string) => string;
   updatesLabel?: string;
   audioLabel?: string;
+  datedLabel?: string;
 }) {
   const title = track.title || track.filename;
   const showUpdates = track.updates && updatesLabel;
   const showAudio = track.audio && audioLabel;
+  const showDated = track.dated && datedLabel;
   return (
     <li className="music-row">
       <Cover src={track.has_cover ? coverUrl(track.filename) : undefined} />
       <TrackText title={title} sub={formatTrackSubtitle(track.artist, track.album)} />
-      {(showUpdates || showAudio) && (
+      {(showUpdates || showAudio || showDated) && (
         <span className="music-changes">
           {showUpdates && (
             <span className="music-change" title={updatesLabel} aria-label={updatesLabel}>
@@ -84,6 +88,11 @@ function DiffRow({
           {showAudio && (
             <span className="music-change" title={audioLabel} aria-label={audioLabel}>
               <AudioWaveform aria-hidden="true" />
+            </span>
+          )}
+          {showDated && (
+            <span className="music-change" title={datedLabel} aria-label={datedLabel}>
+              <CalendarClock aria-hidden="true" />
             </span>
           )}
         </span>
@@ -149,6 +158,7 @@ function PairedColumns({ diff, loading, peerName }: { diff: SyncDiff | null; loa
             coverUrl={peerCover}
             updatesLabel="Updates your copy"
             audioLabel="Takes the shorter audio"
+            datedLabel="Takes the earlier date"
           />
         ))}
         {diff.incoming_records.map((record) => (
@@ -176,6 +186,7 @@ function PairedColumns({ diff, loading, peerName }: { diff: SyncDiff | null; loa
             coverUrl={localCover}
             updatesLabel={`Updates the copy on ${peerName}`}
             audioLabel={`Shortens the audio on ${peerName}`}
+            datedLabel={`Takes the earlier date on ${peerName}`}
           />
         ))}
         {diff.outgoing_records.map((record) => (

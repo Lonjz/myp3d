@@ -44,6 +44,7 @@ export interface SyncDiffTrack {
   has_cover: boolean;
   updates: boolean;
   audio: boolean;
+  dated: boolean;
 }
 
 export interface SyncDiffRecord {

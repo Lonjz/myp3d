@@ -9,6 +9,7 @@ import urllib.parse
 import urllib.request
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal, Optional
 
@@ -87,6 +88,7 @@ class _Pull:
     retag: bool = False
     swap: Optional[AudioSwap] = None
     same_audio: bool = True
+    redate: bool = False
 
 
 @dataclass
@@ -399,6 +401,7 @@ def _local_manifest() -> list[SyncManifestEntry]:
                 artist=info.artist if info else None,
                 album=info.album if info else None,
                 has_cover=info.has_cover if info else False,
+                date_added=info.date_added if info else None,
             )
         )
     return entries
@@ -513,6 +516,24 @@ def _field(entry: dict, name: str) -> str:
     return value.strip().casefold() if isinstance(value, str) else ""
 
 
+def _added(entry: dict) -> Optional[datetime]:
+    value = entry.get("date_added")
+    if isinstance(value, datetime):
+        return value
+    if not isinstance(value, str):
+        return None
+    try:
+        stamp = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return stamp if stamp.tzinfo is not None else stamp.replace(tzinfo=timezone.utc)
+
+
+def _redates(local: dict, remote: dict) -> bool:
+    ours, theirs = _added(local), _added(remote)
+    return theirs is not None and (ours is None or theirs < ours)
+
+
 def _song_key(filename: str, entry: dict) -> Optional[tuple]:
     title, artist = _field(entry, "title"), _field(entry, "artist")
     if not title or not artist or not isinstance(entry.get("duration"), (int, float)):
@@ -588,9 +609,10 @@ def _plan_pulls(local: dict[str, dict], remote: dict[str, dict], prefer_remote: 
         filenames[filename] = mine
         same_audio = mine not in retracked
         swap = None if same_audio else _swap(local[mine], entry, prefer_remote)
+        redate = _redates(local[mine], entry)
         if not prefer_remote:
-            if swap is not None:
-                pulls.append(_Pull(entry, "update", mine, mine, swap=swap, same_audio=False))
+            if swap is not None or redate:
+                pulls.append(_Pull(entry, "update", mine, mine, swap=swap, same_audio=same_audio, redate=redate))
             continue
         if swap is not None:
             retag = False
@@ -602,8 +624,8 @@ def _plan_pulls(local: dict[str, dict], remote: dict[str, dict], prefer_remote: 
         if filename != mine and (filename.casefold() == mine.casefold() or filename.casefold() not in taken):
             target = filename
             taken.add(target.casefold())
-        if swap is not None or retag or target != mine:
-            pulls.append(_Pull(entry, "update", mine, target, retag, swap, same_audio))
+        if swap is not None or retag or target != mine or redate:
+            pulls.append(_Pull(entry, "update", mine, target, retag, swap, same_audio, redate))
             filenames[filename] = target
 
     for filename in sorted(set(remote) - set(by_remote)):
@@ -641,8 +663,9 @@ def _diff_track(entry: dict, pull: Optional[_Pull] = None) -> SyncDiffTrack:
         artist=_text(entry.get("artist")),
         album=_text(entry.get("album")),
         has_cover=entry.get("has_cover") is True,
-        updates=pull is not None and pull.kind == "update" and pull.swap is None,
+        updates=pull is not None and pull.kind == "update" and (pull.retag or pull.source != pull.target),
         audio=pull is not None and pull.swap is not None,
+        dated=pull is not None and pull.redate,
     )
 
 
@@ -837,7 +860,7 @@ def _rename(source: str, target: str) -> bool:
     return True
 
 
-def _apply_pull(session: _Session, pull: _Pull) -> bool:
+def _apply_file(session: _Session, pull: _Pull) -> bool:
     if pull.kind == "new":
         return _download(session, pull.entry["filename"], pull.target, False)
     source = pull.source or pull.target
@@ -846,6 +869,15 @@ def _apply_pull(session: _Session, pull: _Pull) -> bool:
     if pull.retag and not _retag(session, pull, source):
         return False
     return source == pull.target or _rename(source, pull.target)
+
+
+def _apply_pull(session: _Session, pull: _Pull) -> bool:
+    if not _apply_file(session, pull):
+        return False
+    stamp = _added(pull.entry)
+    if stamp is not None and (pull.kind == "new" or pull.redate):
+        date_service.set_date(pull.target, stamp)
+    return True
 
 
 def _apply_records(session: _Session, pulls: list[RecordPull]) -> bool:

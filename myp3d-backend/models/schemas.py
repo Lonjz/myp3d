@@ -337,6 +337,7 @@ class SyncManifestEntry(BaseModel):
     artist: Optional[str] = None
     album: Optional[str] = None
     has_cover: bool = False
+    date_added: Optional[datetime] = None
 
 
 class SyncDiffTrack(BaseModel):
@@ -347,6 +348,7 @@ class SyncDiffTrack(BaseModel):
     has_cover: bool = False
     updates: bool = False
     audio: bool = False
+    dated: bool = False
 
 
 class SyncDiffRecord(BaseModel):
