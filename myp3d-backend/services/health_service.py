@@ -30,7 +30,7 @@ from services.spotify_service import default_filename, format_title
 ScanStatusName = Literal["scanning", "done", "failed"]
 
 MIN_SILENCE_S = 0.5
-TAIL_WINDOW_S = 15
+TAIL_WINDOW_S = 2
 SAMPLE_RATE = 44100
 CHANNELS = 2
 SCAN_BLOCK = 4410
@@ -95,15 +95,19 @@ def _run(args: list[str], capture: bool = True) -> subprocess.CompletedProcess:
     )
 
 
-def _measure_tail(path: Path, whole: bool = False) -> Optional[float]:
-    window = [] if whole else ["-sseof", f"-{TAIL_WINDOW_S}"]
+def _decode(path: Path, window: Optional[int]) -> array:
+    seek = [] if window is None else ["-sseof", f"-{window}"]
     result = _run(
-        [*window, "-i", str(path), "-map", "0:a:0", "-ac", str(CHANNELS), "-ar", str(SAMPLE_RATE), "-f", "s16le", "-"]
+        [*seek, "-i", str(path), "-map", "0:a:0", "-ac", str(CHANNELS), "-ar", str(SAMPLE_RATE), "-f", "s16le", "-"]
     )
     if result.returncode != 0:
-        return None
+        raise OSError("ffmpeg couldn't read the song")
     samples = array("h")
     samples.frombytes(result.stdout[: len(result.stdout) // 2 * 2])
+    return samples
+
+
+def _trailing_silence(samples: array) -> Optional[float]:
     frames = len(samples) // CHANNELS
     end = frames * CHANNELS
     while end > 0:
@@ -114,10 +118,20 @@ def _measure_tail(path: Path, whole: bool = False) -> Optional[float]:
                 if abs(samples[index]) > SILENCE_LEVEL:
                     return (frames - 1 - index // CHANNELS) / SAMPLE_RATE
         end = start
-    return frames / SAMPLE_RATE if frames and not whole else None
+    return None
 
 
-def silent_tail(path: Path) -> Optional[float]:
+def _measure_tail(path: Path, duration: float) -> Optional[float]:
+    window = TAIL_WINDOW_S
+    while window < duration:
+        silence = _trailing_silence(_decode(path, window))
+        if silence is not None:
+            return silence
+        window *= 2
+    return _trailing_silence(_decode(path, None))
+
+
+def silent_tail(path: Path, duration: Optional[float] = None) -> Optional[float]:
     try:
         stats = path.stat()
     except OSError:
@@ -128,7 +142,7 @@ def silent_tail(path: Path) -> Optional[float]:
     if cached is not None and cached[0] == stats.st_size and cached[1] == stats.st_mtime_ns:
         return cached[2]
     try:
-        value = _measure_tail(path)
+        value = _measure_tail(path, duration or _stream_length(path))
     except (OSError, subprocess.SubprocessError):
         return None
     with _lock:
@@ -137,7 +151,7 @@ def silent_tail(path: Path) -> Optional[float]:
 
 
 def _scan_one(job: _ScanJob, track: MP3Info) -> None:
-    silence = silent_tail(OUTPUT_DIR / track.filename)
+    silence = silent_tail(OUTPUT_DIR / track.filename, track.duration)
     with _lock:
         job.done += 1
         if silence is not None and silence >= MIN_SILENCE_S:
@@ -197,14 +211,13 @@ def _is_safe_filename(name: str) -> bool:
 
 
 def _trim_one(path: Path) -> None:
-    if silent_tail(path) is None:
-        raise ValueError("ffmpeg couldn't read the song")
-    silence = _measure_tail(path, whole=True)
+    length = _stream_length(path)
+    silence = _measure_tail(path, length)
     if silence is None:
         raise ValueError("The song is all silence")
     if silence < MIN_SILENCE_S:
         raise ValueError("The song doesn't end in silence")
-    cut = _stream_length(path) - silence + KEEP_PAD_S
+    cut = length - silence + KEEP_PAD_S
     if cut <= KEEP_PAD_S:
         raise ValueError("The song is all silence")
 
