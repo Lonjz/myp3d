@@ -1,31 +1,23 @@
-import os
-import base64
-import binascii
 import hashlib
-import importlib
 import threading
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from io import BytesIO
-from typing import Callable, Literal, Optional
+from typing import Iterator, Literal, Optional
 
 import eyed3
-from eyed3.id3 import frames as id3_frames
-from yt_dlp import YoutubeDL
-from yt_dlp.utils import download_range_func
 
 from models.schemas import AlbumInfo, MP3Info
 from services import date_service
-from services.config import OUTPUT_DIR, get_cookies_from_browser, get_ffmpeg_path, get_player_client_args
+from services.config import OUTPUT_DIR
+from services.cover_service import set_cover_images
 
 
 CACHE_TTL_SECONDS = 120.0
-COVER_SIZE = (500, 500)
 NO_ALBUM_LABEL = "(No Album)"
-UNSAFE_PATH_CHARS = set('/:\\*?"<>|')
-MAX_PATH_PART_LENGTH = 120
+IN_USE = "The song is in use. Stop playing it and try again"
 
 
 @dataclass
@@ -66,6 +58,7 @@ class _LibraryCache:
 _cache_lock = threading.Lock()
 _rebuild_lock = threading.Lock()
 _library_cache = _LibraryCache()
+_file_infos: dict[str, tuple[int, int, MP3Info]] = {}
 
 
 def invalidate_library_cache() -> None:
@@ -89,15 +82,18 @@ def _album_key(normalized_album: str) -> str:
     return hashlib.sha1(normalized_album.encode("utf-8")).hexdigest()
 
 
-def safe_path_part(value: Optional[str], fallback: str) -> str:
-    cleaned = "".join("_" if char in UNSAFE_PATH_CHARS or ord(char) < 32 else char for char in value or "")
-    cleaned = cleaned.strip().strip(".").strip()[:MAX_PATH_PART_LENGTH].strip()
-    return cleaned or fallback
-
-
 def make_album_key(album_name: Optional[str]) -> str:
     normalized_album = _normalize_album_value(album_name).casefold()
     return _album_key(normalized_album)
+
+
+def sweep_partial_files() -> None:
+    for path in OUTPUT_DIR.glob(".*.part"):
+        path.unlink(missing_ok=True)
+
+
+def library_names() -> set[str]:
+    return {path.name for path in list_mp3_filepaths()}
 
 
 def list_mp3_filepaths() -> list[Path]:
@@ -114,6 +110,26 @@ def _cached_mp3_infos() -> Optional[list[MP3Info]]:
     return None
 
 
+def _read_library() -> list[MP3Info]:
+    seen: dict[str, tuple[int, int, MP3Info]] = {}
+    infos: list[MP3Info] = []
+    for path in list_mp3_filepaths():
+        try:
+            stats = path.stat()
+            cached = _file_infos.get(path.name)
+            if cached is not None and cached[:2] == (stats.st_size, stats.st_mtime_ns):
+                info = cached[2]
+            else:
+                info = get_mp3_info(path)
+        except OSError:
+            continue
+        seen[path.name] = (stats.st_size, stats.st_mtime_ns, info)
+        infos.append(info.model_copy())
+    _file_infos.clear()
+    _file_infos.update(seen)
+    return infos
+
+
 def list_mp3_infos() -> list[MP3Info]:
     cached = _cached_mp3_infos()
     if cached is not None:
@@ -127,7 +143,7 @@ def list_mp3_infos() -> list[MP3Info]:
         with _cache_lock:
             generation = _library_cache.generation
 
-        mp3_infos = with_real_dates([get_mp3_info(filepath) for filepath in list_mp3_filepaths()])
+        mp3_infos = with_real_dates(_read_library())
 
         with _cache_lock:
             if _library_cache.generation == generation:
@@ -193,12 +209,6 @@ def build_album_groups() -> dict[str, AlbumGroup]:
     return groups
 
 
-def list_albums() -> list[AlbumInfo]:
-    groups = build_album_groups()
-    albums = [group.to_info() for group in groups.values()]
-    return sorted(albums, key=lambda album: (album.album_name or "").lower())
-
-
 MP3FilterBy = Literal["all", "title", "artist", "filename", "album"]
 MP3SortBy = Literal["date_added", "filename", "size", "artist", "title", "album", "duration"]
 MP3DurationRange = Literal["any", "under-2", "2-3", "3-4", "4-5", "5-7", "over-7"]
@@ -215,14 +225,14 @@ DURATION_RANGES: dict[str, tuple[float, float]] = {
 }
 
 
-def _is_blank(value: Optional[str]) -> bool:
+def is_blank(value: Optional[str]) -> bool:
     return not (value or "").strip()
 
 
 def duplicate_filenames(tracks: list[MP3Info]) -> set[str]:
     groups: dict[tuple[str, str], list[str]] = {}
     for track in tracks:
-        if _is_blank(track.title) or _is_blank(track.artist):
+        if is_blank(track.title) or is_blank(track.artist):
             continue
         key = (track.title.strip().casefold(), track.artist.strip().casefold())
         groups.setdefault(key, []).append(track.filename)
@@ -231,11 +241,11 @@ def duplicate_filenames(tracks: list[MP3Info]) -> set[str]:
 
 def _has_issue(track: MP3Info, issue: MP3Issue, duplicates: set[str], listed: set[str]) -> bool:
     if issue == "title":
-        return _is_blank(track.title)
+        return is_blank(track.title)
     if issue == "artist":
-        return _is_blank(track.artist)
+        return is_blank(track.artist)
     if issue == "album":
-        return _is_blank(track.album)
+        return is_blank(track.album)
     if issue == "cover":
         return not track.has_cover
     if issue == "duplicate":
@@ -343,7 +353,7 @@ def query_albums(
     sort_by: Literal["album_name", "track_count", "total_size", "date_added"],
     sort_direction: Literal["asc", "desc"],
 ) -> tuple[list[AlbumInfo], int]:
-    albums = list_albums()
+    albums = [group.to_info() for group in build_album_groups().values()]
     search_query = search.strip().casefold()
 
     if search_query:
@@ -384,6 +394,17 @@ def get_album_group(album_key: str) -> Optional[AlbumGroup]:
     return groups.get(album_key)
 
 
+@contextmanager
+def edit_tags(path: Path) -> Iterator[eyed3.id3.tag.Tag]:
+    audio = eyed3.load(str(path))
+    if audio is None:
+        raise ValueError("Couldn't read the song's tags")
+    if audio.tag is None:
+        audio.initTag()
+    yield audio.tag
+    audio.tag.save(version=(2, 3, 0))
+
+
 def set_track_tags(
     filepaths: list[Path],
     artist: Optional[str] = None,
@@ -393,102 +414,27 @@ def set_track_tags(
         return
 
     for filepath in filepaths:
-        audio = eyed3.load(str(filepath))
-        if audio is None:
+        try:
+            with edit_tags(filepath) as tag:
+                if artist is not None:
+                    tag.artist = artist.strip() or None
+                if album is not None:
+                    tag.album = album.strip() or None
+        except ValueError:
             continue
-        if audio.tag is None:
-            audio.initTag()
-        if artist is not None:
-            audio.tag.artist = artist.strip() or None
-        if album is not None:
-            audio.tag.album = album.strip() or None
-        audio.tag.save(version=(2, 3, 0))
 
     invalidate_library_cache()
 
 
 def set_album_cover(filepaths: list[Path], image_data: bytes, mime_type: str) -> None:
     for filepath in filepaths:
-        audio = eyed3.load(str(filepath))
-        if audio is None:
+        try:
+            with edit_tags(filepath) as tag:
+                set_cover_images(tag, image_data, mime_type)
+        except ValueError:
             continue
-        if audio.tag is None:
-            audio.initTag()
-        set_cover_images(audio.tag, image_data, mime_type)
-        audio.tag.save(version=(2, 3, 0))
 
     invalidate_library_cache()
-
-
-def get_album_cover(filepaths: list[Path]) -> Optional[tuple[bytes, str]]:
-    for filepath in filepaths:
-        audio = eyed3.load(str(filepath))
-        if not audio or not audio.tag or not audio.tag.images:
-            continue
-        image = audio.tag.images[0]
-        return image.image_data, image.mime_type or "image/jpeg"
-    return None
-
-
-def _decode_base64_image(image_base64: str) -> bytes:
-    """Decode either raw base64 or a data URL into image bytes."""
-    if not image_base64:
-        raise ValueError("Cover image data is empty")
-
-    payload = image_base64
-    if image_base64.startswith("data:"):
-        parts = image_base64.split(",", 1)
-        if len(parts) != 2:
-            raise ValueError("Invalid cover image data URL")
-        payload = parts[1]
-
-    try:
-        return base64.b64decode(payload, validate=True)
-    except (binascii.Error, ValueError) as exc:
-        raise ValueError("Invalid base64 cover image data") from exc
-
-
-def make_square_cover(image_data: bytes) -> tuple[bytes, str]:
-    """Center-crop and resize an image to a 500x500 JPEG cover."""
-    try:
-        image_module = importlib.import_module("PIL.Image")
-        image_ops_module = importlib.import_module("PIL.ImageOps")
-    except ModuleNotFoundError as exc:
-        raise ValueError("Pillow is required for cover image processing. Install dependencies and try again.") from exc
-
-    unidentified_image_error = getattr(image_module, "UnidentifiedImageError", Exception)
-
-    try:
-        with image_module.open(BytesIO(image_data)) as image:
-            image = image.convert("RGB")
-            resampling_enum = getattr(image_module, "Resampling", None)
-            if resampling_enum is not None:
-                resampling = resampling_enum.LANCZOS
-            else:
-                # Older Pillow versions expose filters at module level.
-                resampling = getattr(image_module, "LANCZOS", getattr(image_module, "BICUBIC", 3))
-            square = image_ops_module.fit(image, COVER_SIZE, method=resampling, centering=(0.5, 0.5))
-            output = BytesIO()
-            square.save(output, format="JPEG", quality=92)
-            return output.getvalue(), "image/jpeg"
-    except unidentified_image_error as exc:
-        raise ValueError("Uploaded cover is not a valid image") from exc
-
-
-def square_cover_from_base64(image_base64: str) -> tuple[bytes, str]:
-    return make_square_cover(_decode_base64_image(image_base64))
-
-
-def set_cover_images(tag: eyed3.id3.tag.Tag, image_data: bytes, mime_type: str) -> None:
-    """Write cover art using a single APIC frame shaped like common iTunes files."""
-    # Clear all existing APIC frames so stale descriptors/types do not confuse players.
-    existing_descriptions = [img.description for img in list(tag.images)]
-    for description in existing_descriptions:
-        while tag.images.remove(description) is not None:
-            pass
-
-    # Match the observed iTunes style: picture_type=OTHER (0), empty description.
-    tag.images.set(id3_frames.ImageFrame.OTHER, image_data, mime_type, description="")
 
 
 def with_real_dates(infos: list[MP3Info]) -> list[MP3Info]:
@@ -499,7 +445,6 @@ def with_real_dates(infos: list[MP3Info]) -> list[MP3Info]:
 
 
 def get_mp3_info(filepath: Path) -> MP3Info:
-    """Extract MP3 metadata."""
     audio = eyed3.load(str(filepath))
     file_stats = filepath.stat()
     created = getattr(file_stats, "st_birthtime", file_stats.st_ctime)
@@ -513,129 +458,9 @@ def get_mp3_info(filepath: Path) -> MP3Info:
         info.artist = audio.tag.artist
         info.album = audio.tag.album
         info.has_cover = bool(audio.tag.images)
+    info.album_key = make_album_key(info.album)
     if audio and audio.info:
         info.duration = audio.info.time_secs
     return info
 
 
-_download_locks: dict[str, threading.Lock] = {}
-_download_locks_guard = threading.Lock()
-
-
-def _download_lock(key: str) -> threading.Lock:
-    with _download_locks_guard:
-        lock = _download_locks.get(key)
-        if lock is None:
-            lock = threading.Lock()
-            _download_locks[key] = lock
-        return lock
-
-
-def validate_trim_range(start_time: Optional[float], end_time: Optional[float]) -> None:
-    if (start_time is None) ^ (end_time is None):
-        raise ValueError("Both start and end times are required for trimming")
-    if start_time is not None:
-        if start_time < 0:
-            raise ValueError("Trim start must be 0 or greater")
-        if end_time is None or end_time <= start_time:
-            raise ValueError("Trim end must be greater than start")
-
-
-def download_as_mp3(
-    url: str,
-    metadata: Optional[dict] = None,
-    custom_name: Optional[str] = None,
-    start_time: Optional[float] = None,
-    end_time: Optional[float] = None,
-    progress_hook: Optional[Callable[[dict], None]] = None,
-) -> str:
-    lock_key = custom_name.strip().lower() if custom_name and custom_name.strip() else url
-    with _download_lock(lock_key):
-        return _download_as_mp3(url, metadata, custom_name, start_time, end_time, progress_hook)
-
-
-def _download_as_mp3(
-    url: str,
-    metadata: Optional[dict] = None,
-    custom_name: Optional[str] = None,
-    start_time: Optional[float] = None,
-    end_time: Optional[float] = None,
-    progress_hook: Optional[Callable[[dict], None]] = None,
-) -> str:
-    """Download YouTube video as MP3, optionally using yt-dlp download sections."""
-    ffmpeg_path = get_ffmpeg_path()
-    custom_name = custom_name.strip().lower() if custom_name else None
-
-    if custom_name:
-        outtmpl = str(OUTPUT_DIR / f"{custom_name}.%(ext)s")
-    else:
-        outtmpl = str(OUTPUT_DIR / "%(title)s.%(ext)s")
-
-    ydl_opts = {
-        "format": "bestaudio/best",
-        "outtmpl": outtmpl,
-        "js_runtimes": {
-            "node": {},
-        },
-        "postprocessors": [
-            {
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "mp3",
-                "preferredquality": "320",
-            }
-        ],
-        "quiet": True,
-        "noplaylist": True,
-    }
-
-    player_client_args = get_player_client_args()
-    if player_client_args:
-        ydl_opts["extractor_args"] = player_client_args
-
-    if start_time is not None and end_time is not None:
-        ydl_opts["download_ranges"] = download_range_func(None, [(start_time, end_time)])
-        ydl_opts["force_keyframes_at_cuts"] = True
-
-    if ffmpeg_path:
-        ydl_opts["ffmpeg_location"] = ffmpeg_path
-
-    if progress_hook:
-        ydl_opts["progress_hooks"] = [progress_hook]
-
-    try:
-        with YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-    except Exception:
-        cookies_from_browser = get_cookies_from_browser()
-        if not cookies_from_browser:
-            raise
-        retry_opts = {**ydl_opts, "cookiesfrombrowser": cookies_from_browser}
-        with YoutubeDL(retry_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-
-    with YoutubeDL(ydl_opts) as ydl:
-        filename = ydl.prepare_filename(info)
-        mp3_file = os.path.splitext(filename)[0] + ".mp3"
-        if custom_name:
-            mp3_file = str(OUTPUT_DIR / f"{custom_name}.mp3")
-
-    # Apply metadata if provided
-    if metadata and any(metadata.values()):
-        audio = eyed3.load(mp3_file)
-        if audio.tag is None:
-            audio.initTag()
-        if metadata.get("title"):
-            audio.tag.title = metadata["title"]
-        if metadata.get("artist"):
-            audio.tag.artist = metadata["artist"]
-        if metadata.get("album"):
-            audio.tag.album = metadata["album"]
-        if metadata.get("cover_image_base64"):
-            processed_cover, mime_type = square_cover_from_base64(metadata["cover_image_base64"])
-            set_cover_images(audio.tag, processed_cover, mime_type)
-        elif metadata.get("cover_image"):
-            set_cover_images(audio.tag, metadata["cover_image"], "image/jpeg")
-        audio.tag.save(version=(2, 3, 0))
-
-    invalidate_library_cache()
-    return os.path.basename(mp3_file)

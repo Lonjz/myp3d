@@ -16,6 +16,7 @@ from services.mp3_service import (
     NO_ALBUM_LABEL,
     build_album_groups,
     duplicate_filenames,
+    is_blank,
     list_mp3_infos,
 )
 
@@ -36,8 +37,6 @@ DURATION_LABELS: dict[str, str] = {
 }
 
 
-def _is_blank(value: str | None) -> bool:
-    return not (value or "").strip()
 
 
 def _month_keys(now: datetime, count: int) -> list[str]:
@@ -63,7 +62,7 @@ def compute_library_stats() -> LibraryStats:
     artist_counts: Counter[str] = Counter()
     artist_display: dict[str, str] = {}
     for track in tracks:
-        if _is_blank(track.artist):
+        if is_blank(track.artist):
             continue
         name = track.artist.strip()
         key = name.casefold()
@@ -115,9 +114,9 @@ def compute_library_stats() -> LibraryStats:
         average_duration=total_duration / len(durations) if durations else 0.0,
         tracks_with_cover=sum(1 for track in tracks if track.has_cover),
         health=LibraryHealth(
-            missing_title=sum(1 for track in tracks if _is_blank(track.title)),
-            missing_artist=sum(1 for track in tracks if _is_blank(track.artist)),
-            missing_album=sum(1 for track in tracks if _is_blank(track.album)),
+            missing_title=sum(1 for track in tracks if is_blank(track.title)),
+            missing_artist=sum(1 for track in tracks if is_blank(track.artist)),
+            missing_album=sum(1 for track in tracks if is_blank(track.album)),
             missing_cover=sum(1 for track in tracks if not track.has_cover),
             duplicates=len(duplicate_filenames(tracks)),
             unlisted=sum(1 for track in tracks if track.filename not in listed),

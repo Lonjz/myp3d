@@ -14,13 +14,8 @@ from services import sync_service
 from services.cover_service import CoverSize
 from services.device_service import get_device
 from services.discovery_service import discovery
-from services.sync_service import SyncError
 
 router = APIRouter(prefix="/sync", tags=["Sync"])
-
-
-def _raise(exc: SyncError) -> None:
-    raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 def _status() -> SyncStatus:
@@ -61,67 +56,43 @@ def get_sync_session():
 
 @router.post("/requests", response_model=SyncSessionInfo)
 def create_sync_request(payload: SyncRequestCreate):
-    try:
-        return sync_service.request_sync(payload.peer_id)
-    except SyncError as exc:
-        _raise(exc)
+    return sync_service.request_sync(payload.peer_id)
 
 
 @router.post("/session/accept", response_model=SyncSessionInfo)
 def accept_sync_request():
-    try:
-        return sync_service.accept()
-    except SyncError as exc:
-        _raise(exc)
+    return sync_service.accept()
 
 
 @router.get("/session/diff", response_model=SyncDiff)
 def get_sync_diff():
-    try:
-        return sync_service.diff()
-    except SyncError as exc:
-        _raise(exc)
+    return sync_service.diff()
 
 
 @router.get("/session/cover/{filename}")
 def get_peer_cover(filename: str, size: Optional[CoverSize] = Query(None)):
-    try:
-        content, media_type = sync_service.peer_cover(filename, size)
-    except SyncError as exc:
-        _raise(exc)
+    content, media_type = sync_service.peer_cover(filename, size)
     return Response(content=content, media_type=media_type)
 
 
 @router.post("/session/start", response_model=SyncSessionInfo)
 def start_sync():
-    try:
-        return sync_service.start()
-    except SyncError as exc:
-        _raise(exc)
+    return sync_service.start()
 
 
 @router.post("/session/decline")
 def decline_sync_request():
-    try:
-        sync_service.decline()
-    except SyncError as exc:
-        _raise(exc)
+    sync_service.decline()
     return {"success": True}
 
 
 @router.post("/session/cancel")
 def cancel_sync():
-    try:
-        sync_service.cancel()
-    except SyncError as exc:
-        _raise(exc)
+    sync_service.cancel()
     return {"success": True}
 
 
 @router.post("/session/dismiss")
 def dismiss_sync():
-    try:
-        sync_service.dismiss()
-    except SyncError as exc:
-        _raise(exc)
+    sync_service.dismiss()
     return {"success": True}

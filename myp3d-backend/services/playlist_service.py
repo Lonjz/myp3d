@@ -3,13 +3,14 @@ import sqlite3
 import threading
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from pathlib import Path
 from typing import Iterable, Optional
 
 from models.schemas import MP3Info, PlaylistDetail, PlaylistInfo, SyncPlaylistRecord
 from services.db import connect as _connect
-from services.mp3_service import list_mp3_filepaths, list_mp3_infos
+from services.db import now as _now
+from services.mp3_service import library_names, list_mp3_infos
+from services.errors import AppError
+from services.filenames import is_track_name
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS playlists (
@@ -33,12 +34,6 @@ CREATE INDEX IF NOT EXISTS playlist_tracks_filename ON playlist_tracks(filename)
 PLAYLIST_COLUMNS = "id, name, description, cover IS NOT NULL AS has_cover, is_favorites, updated_at"
 
 
-class PlaylistError(Exception):
-    def __init__(self, status_code: int, detail: str) -> None:
-        super().__init__(detail)
-        self.status_code = status_code
-        self.detail = detail
-
 
 @dataclass
 class PlaylistState:
@@ -56,28 +51,24 @@ class PlaylistState:
 _lock = threading.Lock()
 
 
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 def _clean_name(name: str) -> str:
     cleaned = name.strip()
     if not cleaned:
-        raise PlaylistError(400, "Name is required")
+        raise AppError(400, "Name is required")
     return cleaned
 
 
 def _clean_filenames(filenames: Iterable[str]) -> list[str]:
     cleaned: list[str] = []
     for filename in filenames:
-        if Path(filename).name != filename or not filename.lower().endswith(".mp3"):
-            raise PlaylistError(400, f"Invalid file name: {filename}")
+        if not is_track_name(filename):
+            raise AppError(400, f"Invalid file name: {filename}")
         cleaned.append(filename)
     return cleaned
 
 
-def _library_names() -> set[str]:
-    return {path.name for path in list_mp3_filepaths()}
 
 
 def _require(conn: sqlite3.Connection, playlist_id: str) -> sqlite3.Row:
@@ -85,7 +76,7 @@ def _require(conn: sqlite3.Connection, playlist_id: str) -> sqlite3.Row:
         f"SELECT {PLAYLIST_COLUMNS} FROM playlists WHERE id = ? AND deleted_at IS NULL", (playlist_id,)
     ).fetchone()
     if row is None:
-        raise PlaylistError(404, "Playlist not found")
+        raise AppError(404, "Playlist not found")
     return row
 
 
@@ -144,7 +135,7 @@ def init() -> None:
 
 
 def list_playlists() -> list[PlaylistInfo]:
-    names = _library_names()
+    names = library_names()
     with _connect() as conn:
         rows = conn.execute(
             f"SELECT {PLAYLIST_COLUMNS} FROM playlists WHERE deleted_at IS NULL ORDER BY name COLLATE NOCASE, id"
@@ -194,6 +185,32 @@ def favorites_id() -> Optional[str]:
             "SELECT id FROM playlists WHERE is_favorites = 1 AND deleted_at IS NULL ORDER BY created_at, id"
         ).fetchone()
     return row["id"] if row is not None else None
+
+
+def had_favorites() -> bool:
+    with _connect() as conn:
+        return conn.execute("SELECT 1 FROM playlists WHERE is_favorites = 1").fetchone() is not None
+
+
+def merge_favorites() -> None:
+    with _lock, _connect() as conn:
+        rows = conn.execute(
+            "SELECT id FROM playlists WHERE is_favorites = 1 AND deleted_at IS NULL ORDER BY created_at, id"
+        ).fetchall()
+        if len(rows) < 2:
+            return
+        keep = rows[0]["id"]
+        merged = _filenames(conn, keep)
+        now = _now()
+        for row in rows[1:]:
+            merged += [filename for filename in _filenames(conn, row["id"]) if filename not in merged]
+            _write_tracks(conn, row["id"], [])
+            conn.execute(
+                "UPDATE playlists SET cover = NULL, updated_at = ?, deleted_at = ? WHERE id = ?",
+                (now, now, row["id"]),
+            )
+        _write_tracks(conn, keep, merged)
+        _touch(conn, keep)
 
 
 def find_by_name(name: str) -> Optional[str]:
@@ -254,7 +271,7 @@ def update(
 ) -> PlaylistDetail:
     cleaned_name = _clean_name(name) if name is not None else None
     cleaned = _clean_filenames(filenames) if filenames is not None else None
-    names = _library_names() if cleaned is not None else set()
+    names = library_names() if cleaned is not None else set()
     with _lock, _connect() as conn:
         _require(conn, playlist_id)
         if cleaned_name is not None:
@@ -274,7 +291,7 @@ def update(
 
 def add_tracks(playlist_id: str, filenames: list[str]) -> PlaylistInfo:
     cleaned = _clean_filenames(filenames)
-    names = _library_names()
+    names = library_names()
     with _lock, _connect() as conn:
         row = _require(conn, playlist_id)
         current = _filenames(conn, playlist_id)
@@ -287,7 +304,7 @@ def add_tracks(playlist_id: str, filenames: list[str]) -> PlaylistInfo:
 
 
 def set_cover(playlist_id: str, cover: bytes) -> PlaylistInfo:
-    names = _library_names()
+    names = library_names()
     with _lock, _connect() as conn:
         _require(conn, playlist_id)
         conn.execute("UPDATE playlists SET cover = ? WHERE id = ?", (cover, playlist_id))

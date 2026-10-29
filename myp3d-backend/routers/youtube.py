@@ -11,7 +11,6 @@ def youtube_search(
     query: str = Query(..., min_length=1, description="YouTube search query"),
     limit: int = Query(12, ge=1, le=30, description="Maximum number of results"),
 ):
-    """Search YouTube using yt-dlp without requiring an API key."""
     try:
         results = search_youtube(query, limit)
         return YouTubeSearchResponse(query=query, results=results)

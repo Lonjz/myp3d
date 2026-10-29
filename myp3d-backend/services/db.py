@@ -1,10 +1,18 @@
 import sqlite3
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from typing import Iterator
 
-from services.config import BASE_DIR
+from services.config import DB_PATH
 
-DB_PATH = BASE_DIR / "myp3d.db"
+
+def now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def enable_wal() -> None:
+    with connect() as conn:
+        conn.execute("PRAGMA journal_mode=WAL")
 
 
 @contextmanager

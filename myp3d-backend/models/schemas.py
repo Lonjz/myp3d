@@ -12,6 +12,7 @@ class DownloadRequest(BaseModel):
     cover_image_base64: Optional[str] = None
     start_time: Optional[float] = None
     end_time: Optional[float] = None
+    overwrite: bool = False
 
 
 class DownloadResponse(BaseModel):
@@ -121,6 +122,7 @@ class MP3Info(BaseModel):
     title: Optional[str] = None
     artist: Optional[str] = None
     album: Optional[str] = None
+    album_key: str = ""
     has_cover: bool = False
     file_size: int = 0
     duration: Optional[float] = None
@@ -176,6 +178,10 @@ class PaginationMeta(BaseModel):
     limit: int
     total_pages: int
     returned: int
+
+    @classmethod
+    def of(cls, total: int, page: int, limit: int, returned: int) -> "PaginationMeta":
+        return cls(total=total, page=page, limit=limit, total_pages=max(1, (total + limit - 1) // limit), returned=returned)
 
 
 class AlbumInfo(BaseModel):
@@ -282,8 +288,8 @@ class LibraryStats(BaseModel):
 
 
 class SyncDevice(BaseModel):
-    id: str
-    name: str
+    id: str = Field(max_length=64)
+    name: str = Field(max_length=64)
 
 
 class SyncPeer(SyncDevice):
@@ -304,9 +310,10 @@ class SyncRequestCreate(BaseModel):
 
 
 class SyncIncomingRequest(BaseModel):
-    session_id: str
+    session_id: str = Field(pattern=r"^[0-9a-f]{32}$")
     device: SyncDevice
     port: int = Field(ge=1, le=65535)
+    version: str = "0"
 
 
 class SyncProgress(BaseModel):

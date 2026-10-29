@@ -1,3 +1,4 @@
+import os
 import re
 import shutil
 import subprocess
@@ -21,11 +22,13 @@ from models.schemas import (
     SilenceScanInfo,
     SilentTrack,
 )
-from services import date_service, favorite_service, playlist_service
+from services import track_records
 from services.audio_fingerprint import splice_audio
 from services.config import OUTPUT_DIR, get_ffmpeg_path
-from services.mp3_service import invalidate_library_cache, list_mp3_infos
+from services.mp3_service import IN_USE, invalidate_library_cache, list_mp3_infos
 from services.spotify_service import default_filename, format_title
+from services.errors import AppError
+from services.filenames import is_track_name
 
 ScanStatusName = Literal["scanning", "done", "failed"]
 
@@ -43,12 +46,6 @@ VALID_NAME = re.compile(r"[a-z0-9]+(?: [a-z0-9]+)*\.mp3")
 ARTIST_SPLIT = re.compile(r"\s*,\s*|\s+&\s+")
 FEATURED = re.compile(r"[(\[](?:feat\.?|ft\.?|featuring|with)\s([^)\]]*)[)\]]", re.I)
 
-
-class HealthError(Exception):
-    def __init__(self, status_code: int, detail: str) -> None:
-        super().__init__(detail)
-        self.status_code = status_code
-        self.detail = detail
 
 
 @dataclass
@@ -75,15 +72,10 @@ _tails: dict[str, tuple[int, int, Optional[float]]] = {}
 
 
 def _ffmpeg() -> str:
-    configured = get_ffmpeg_path()
-    if configured is not None:
-        if Path(configured).is_file():
-            return configured
-    else:
-        found = shutil.which("ffmpeg")
-        if found:
-            return found
-    raise HealthError(500, "ffmpeg isn't installed")
+    found = get_ffmpeg_path() or shutil.which("ffmpeg")
+    if found is None:
+        raise AppError(500, "ffmpeg isn't installed")
+    return found
 
 
 def _run(args: list[str], capture: bool = True) -> subprocess.CompletedProcess:
@@ -180,7 +172,7 @@ def start_scan() -> SilenceScanInfo:
     _ffmpeg()
     with _lock:
         if _scan is not None and _scan.status == "scanning":
-            raise HealthError(409, "A scan is already running")
+            raise AppError(409, "A scan is already running")
         job = _ScanJob(status="scanning")
         _scan = job
     threading.Thread(target=_run_scan, args=(job,), daemon=True).start()
@@ -204,10 +196,6 @@ def _stream_length(path: Path) -> float:
     if not length:
         raise OSError("ffmpeg couldn't read the song length")
     return length
-
-
-def _is_safe_filename(name: str) -> bool:
-    return Path(name).name == name and not name.startswith(".") and name.lower().endswith(".mp3")
 
 
 def _trim_one(path: Path) -> None:
@@ -234,7 +222,7 @@ def _trim_one(path: Path) -> None:
         if result.returncode != 0:
             raise OSError("ffmpeg couldn't cut the song")
         splice_audio(path, audio_part, joined_part)
-        shutil.copyfile(joined_part, path)
+        os.replace(joined_part, path)
     finally:
         audio_part.unlink(missing_ok=True)
         joined_part.unlink(missing_ok=True)
@@ -243,7 +231,7 @@ def _trim_one(path: Path) -> None:
 def _ensure_idle() -> None:
     with _lock:
         if _scan is not None and _scan.status == "scanning":
-            raise HealthError(409, "Wait for the scan to finish")
+            raise AppError(409, "Wait for the scan to finish")
 
 
 def trim(filenames: list[str]) -> BulkResult:
@@ -254,13 +242,16 @@ def trim(filenames: list[str]) -> BulkResult:
     failed: list[BulkFailure] = []
     for filename in dict.fromkeys(filenames):
         path = OUTPUT_DIR / filename
-        if not _is_safe_filename(filename) or not path.is_file():
+        if not is_track_name(filename) or not path.is_file():
             failed.append(BulkFailure(filename=filename, detail="MP3 file not found"))
             continue
         try:
             _trim_one(path)
         except subprocess.TimeoutExpired:
             failed.append(BulkFailure(filename=filename, detail="ffmpeg took too long"))
+            continue
+        except PermissionError:
+            failed.append(BulkFailure(filename=filename, detail=IN_USE))
             continue
         except (OSError, ValueError, subprocess.SubprocessError) as exc:
             failed.append(BulkFailure(filename=filename, detail=str(exc) or "Couldn't trim the song"))
@@ -279,7 +270,7 @@ def trim(filenames: list[str]) -> BulkResult:
 
 def _track_path(filename: str) -> Path:
     path = OUTPUT_DIR / filename
-    if not _is_safe_filename(filename) or not path.is_file():
+    if not is_track_name(filename) or not path.is_file():
         raise ValueError("MP3 file not found")
     return path
 
@@ -307,9 +298,7 @@ def _rename_one(item: RenameItem) -> None:
     if target.exists() and not target.samefile(path):
         raise ValueError("A file with that name already exists")
     path.rename(target)
-    playlist_service.rename_track(item.filename, name)
-    favorite_service.rename_track(item.filename, name)
-    date_service.rename_track(item.filename, name)
+    track_records.rename(item.filename, name)
 
 
 def rename(items: list[RenameItem]) -> BulkResult:

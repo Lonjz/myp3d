@@ -1,11 +1,14 @@
 import hashlib
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Literal, Optional, Union
 
 from models.schemas import SyncDatabase, SyncDiffRecord, SyncFavoriteRecord, SyncPlaylistRecord, SyncQueueRecord
 from services import favorite_service, playlist_service, queue_service
+from services.db import connect
+
+TOMBSTONE_DAYS = 180
 
 RecordKind = Literal["playlist", "download", "favorite"]
 Record = Union[SyncPlaylistRecord, SyncQueueRecord, SyncFavoriteRecord]
@@ -67,10 +70,6 @@ def translate(database: SyncDatabase, filenames: dict[str, str]) -> SyncDatabase
     )
 
 
-def busy_downloads() -> set[str]:
-    return queue_service.active_uids()
-
-
 def plan_pulls(
     local: SyncDatabase,
     remote: SyncDatabase,
@@ -90,6 +89,18 @@ def plan_pulls(
         if theirs > ours or (theirs == ours and prefer_remote):
             pulls.append(RecordPull(kind, record, True))
     return pulls
+
+
+def purge_tombstones() -> None:
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=TOMBSTONE_DAYS)).isoformat()
+    with connect() as conn:
+        conn.execute(
+            "DELETE FROM playlist_tracks WHERE playlist_id IN "
+            "(SELECT id FROM playlists WHERE deleted_at IS NOT NULL AND deleted_at < ?)",
+            (cutoff,),
+        )
+        for table in ("playlists", "queue_items", "favorites"):
+            conn.execute(f"DELETE FROM {table} WHERE deleted_at IS NOT NULL AND deleted_at < ?", (cutoff,))
 
 
 def record_name(record: Record) -> str:

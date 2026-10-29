@@ -1,14 +1,13 @@
 from fastapi import APIRouter, HTTPException
 
 from models.schemas import DownloadRequest, DownloadResponse
-from services.mp3_service import download_as_mp3, validate_trim_range
+from services.youtube_service import download_as_mp3, validate_trim_range
 
 router = APIRouter(tags=["Download"])
 
 
 @router.post("/download", response_model=DownloadResponse)
 def download_mp3(request: DownloadRequest):
-    """Download a YouTube video as MP3 at 320kbps."""
     try:
         validate_trim_range(request.start_time, request.end_time)
 
@@ -24,6 +23,7 @@ def download_mp3(request: DownloadRequest):
             request.custom_filename,
             request.start_time,
             request.end_time,
+            overwrite=request.overwrite,
         )
         return DownloadResponse(
             success=True,

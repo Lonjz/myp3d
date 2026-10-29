@@ -1,9 +1,10 @@
 venv/
 downloads/
-cover_arts/
 
 .env
 ffmpeg.exe
+ffprobe.exe
+.*.part
 *.mp3
 
 __pycache__/
@@ -24,5 +25,10 @@ dist/
 *.log
 *.sqlite3 
 *.db
+*.db-wal
+*.db-shm
+*.db-journal
 *.pid
 *.sock
+
+tests/.sandbox/

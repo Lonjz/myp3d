@@ -3,14 +3,18 @@ import hashlib
 import threading
 import urllib.request
 import uuid
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from yt_dlp.utils import DownloadCancelled
+
 from models.schemas import QueueItem, QueueItemCreate, QueueItemUpdate, SyncQueueRecord
-from services.config import OUTPUT_DIR
 from services.db import connect as _connect
-from services.mp3_service import download_as_mp3, make_square_cover, square_cover_from_base64, validate_trim_range
+from services.db import now as _now
+from services.cover_service import make_square_cover, square_cover_from_base64
+from services.filenames import clean_custom_name
+from services.youtube_service import download_as_mp3, validate_trim_range
+from services.errors import AppError
 
 COVER_FETCH_TIMEOUT_S = 15
 EDITABLE_STATUSES = ("pending", "failed")
@@ -51,34 +55,17 @@ ITEM_COLUMNS = (
 )
 
 
-class QueueError(Exception):
-    def __init__(self, status_code: int, detail: str) -> None:
-        super().__init__(detail)
-        self.status_code = status_code
-        self.detail = detail
-
 
 _lock = threading.Lock()
 _progress: dict[int, float] = {}
+_cancelled: set[int] = set()
 _worker: Optional[threading.Thread] = None
 
 
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 def _clean(value: Optional[str]) -> Optional[str]:
     return value.strip() or None if value else None
-
-
-def _clean_filename(value: Optional[str]) -> Optional[str]:
-    name = _clean(value)
-    if name is None:
-        return None
-    name = name.lower()
-    if Path(name).name != name:
-        raise ValueError("Invalid file name")
-    return name
 
 
 def _square_cover(image_base64: Optional[str]) -> Optional[bytes]:
@@ -114,7 +101,7 @@ def _select(conn: sqlite3.Connection, where: str = "1", params: tuple = ()) -> l
 def _require(conn: sqlite3.Connection, item_id: int) -> sqlite3.Row:
     rows = _select(conn, "id = ?", (item_id,))
     if not rows:
-        raise QueueError(404, "Download not found")
+        raise AppError(404, "Download not found")
     return rows[0]
 
 
@@ -152,7 +139,7 @@ def add_items(items: list[QueueItemCreate]) -> list[QueueItem]:
         prepared.append(
             (
                 url,
-                _clean_filename(item.custom_filename),
+                clean_custom_name(item.custom_filename),
                 _clean(item.title),
                 _clean(item.artist),
                 _clean(item.album),
@@ -188,7 +175,7 @@ def update_item(item_id: int, update: QueueItemUpdate) -> QueueItem:
             raise ValueError("URL is required")
         values["url"] = url
     if "custom_filename" in fields:
-        values["custom_filename"] = _clean_filename(update.custom_filename)
+        values["custom_filename"] = clean_custom_name(update.custom_filename)
     for name in ("title", "artist", "album"):
         if name in fields:
             values[name] = _clean(getattr(update, name))
@@ -199,7 +186,7 @@ def update_item(item_id: int, update: QueueItemUpdate) -> QueueItem:
 
     with _lock, _connect() as conn:
         if _require(conn, item_id)["status"] not in EDITABLE_STATUSES:
-            raise QueueError(409, "This download is already queued")
+            raise AppError(409, "This download is already queued")
         values.update(status="pending", error=None, updated_at=_now())
         assignments = ", ".join(f"{name} = ?" for name in values)
         conn.execute(f"UPDATE queue_items SET {assignments} WHERE id = ?", (*values.values(), item_id))
@@ -209,7 +196,7 @@ def update_item(item_id: int, update: QueueItemUpdate) -> QueueItem:
 def delete_item(item_id: int) -> None:
     with _lock, _connect() as conn:
         if _require(conn, item_id)["status"] == "running":
-            raise QueueError(409, "This download is running")
+            raise AppError(409, "This download is running")
         now = _now()
         conn.execute(
             "UPDATE queue_items SET cover = NULL, updated_at = ?, deleted_at = ? WHERE id = ?",
@@ -221,7 +208,7 @@ def get_cover(item_id: int) -> Optional[bytes]:
     with _connect() as conn:
         row = conn.execute("SELECT cover FROM queue_items WHERE id = ? AND deleted_at IS NULL", (item_id,)).fetchone()
     if row is None:
-        raise QueueError(404, "Download not found")
+        raise AppError(404, "Download not found")
     return row["cover"]
 
 
@@ -251,6 +238,14 @@ def stop() -> list[QueueItem]:
             "UPDATE queue_items SET status = 'pending', updated_at = ? WHERE status = 'queued' AND deleted_at IS NULL",
             (_now(),),
         )
+    return list_items()
+
+
+def cancel(item_id: int) -> list[QueueItem]:
+    with _lock, _connect() as conn:
+        if _require(conn, item_id)["status"] != "running":
+            raise AppError(409, "This download isn't running")
+        _cancelled.add(item_id)
     return list_items()
 
 
@@ -292,6 +287,7 @@ def _finish(item_id: int, status: str, error: Optional[str] = None, filename: Op
     now = _now()
     with _lock, _connect() as conn:
         _progress.pop(item_id, None)
+        _cancelled.discard(item_id)
         conn.execute(
             "UPDATE queue_items SET status = ?, error = ?, filename = ?, updated_at = ?, finished_at = ? WHERE id = ?",
             (status, error, filename, now, now, item_id),
@@ -301,7 +297,13 @@ def _finish(item_id: int, status: str, error: Optional[str] = None, filename: Op
 def _run_item(row: sqlite3.Row) -> None:
     item_id = row["id"]
 
+    partials: set[Path] = set()
+
     def on_progress(status: dict) -> None:
+        partials.update(Path(status[key]) for key in ("tmpfilename", "filename") if status.get(key))
+        with _lock:
+            if item_id in _cancelled:
+                raise DownloadCancelled("Cancelled")
         if status.get("status") != "downloading":
             return
         total = status.get("total_bytes") or status.get("total_bytes_estimate")
@@ -309,14 +311,17 @@ def _run_item(row: sqlite3.Row) -> None:
             with _lock:
                 _progress[item_id] = min(1.0, (status.get("downloaded_bytes") or 0) / total)
 
-    custom_filename = row["custom_filename"]
     try:
-        if custom_filename and not row["overwrite"] and (OUTPUT_DIR / f"{custom_filename}.mp3").exists():
-            raise ValueError("Already in library")
         metadata = {"title": row["title"], "artist": row["artist"], "album": row["album"], "cover_image": row["cover"]}
         filename = download_as_mp3(
-            row["url"], metadata, custom_filename, row["start_time"], row["end_time"], on_progress
+            row["url"], metadata, row["custom_filename"], row["start_time"], row["end_time"], on_progress, bool(row["overwrite"])
         )
+    except DownloadCancelled:
+        for path in partials:
+            if path.suffix.lower() != ".mp3":
+                path.unlink(missing_ok=True)
+        _finish(item_id, "pending")
+        return
     except Exception as exc:
         _finish(item_id, "failed", error=str(exc) or "Download failed")
         return
@@ -329,6 +334,11 @@ def _run_worker() -> None:
         if row is None:
             return
         _run_item(row)
+
+
+def rename_track(old: str, new: str) -> None:
+    with _lock, _connect() as conn:
+        conn.execute("UPDATE queue_items SET filename = ? WHERE filename = ?", (new, old))
 
 
 def _cover_hash(cover: Optional[bytes]) -> Optional[str]:
@@ -363,8 +373,23 @@ def cover_by_uid(uid: str) -> Optional[bytes]:
     return row["cover"] if row is not None else None
 
 
+def _settle_twin(conn: sqlite3.Connection, record: SyncQueueRecord, values: dict) -> None:
+    twin = conn.execute(
+        "SELECT id, uid, status, created_at FROM queue_items WHERE deleted_at IS NULL AND url = ? "
+        "AND start_time IS ? AND end_time IS ? AND custom_filename IS ? ORDER BY created_at, uid LIMIT 1",
+        (record.url, record.start_time, record.end_time, record.custom_filename),
+    ).fetchone()
+    if twin is None:
+        return
+    now = _now()
+    if twin["status"] in ACTIVE_STATUSES or (twin["created_at"], twin["uid"]) <= (record.created_at, record.uid):
+        values.update(cover=None, updated_at=now, deleted_at=now)
+        return
+    conn.execute("UPDATE queue_items SET cover = NULL, updated_at = ?, deleted_at = ? WHERE id = ?", (now, now, twin["id"]))
+
+
 def apply_record(record: SyncQueueRecord, cover: Optional[bytes]) -> bool:
-    if record.custom_filename is not None and Path(record.custom_filename).name != record.custom_filename:
+    if record.custom_filename is not None and clean_custom_name(record.custom_filename) != record.custom_filename:
         raise ValueError("Invalid file name")
     values = {
         "url": record.url,
@@ -388,6 +413,8 @@ def apply_record(record: SyncQueueRecord, cover: Optional[bytes]) -> bool:
         row = conn.execute("SELECT id, status, deleted_at FROM queue_items WHERE uid = ?", (record.uid,)).fetchone()
         if row is not None and row["deleted_at"] is None and row["status"] in ACTIVE_STATUSES:
             return False
+        if row is None and record.deleted_at is None:
+            _settle_twin(conn, record, values)
         if row is None:
             position = conn.execute("SELECT COALESCE(MAX(position), 0) FROM queue_items").fetchone()[0] + 1
             names = ["uid", "position", *values]

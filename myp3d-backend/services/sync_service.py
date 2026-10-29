@@ -1,4 +1,5 @@
 import hashlib
+import http.client
 import json
 import os
 import shutil
@@ -25,13 +26,15 @@ from models.schemas import (
     SyncProgress,
     SyncSessionInfo,
 )
-from services import database_sync, date_service, favorite_playlist, favorite_service, playlist_service
+from services import database_sync, date_service, favorite_playlist, queue_service, track_records
 from services.audio_fingerprint import audio_bounds, audio_fingerprint, id3_tag_length, splice_audio
 from services.database_sync import RecordKind, RecordPull
-from services.config import API_PORT, OUTPUT_DIR
+from services.config import API_PORT, OUTPUT_DIR, VERSION
 from services.device_service import get_device
 from services.discovery_service import discovery
 from services.mp3_service import invalidate_library_cache, list_mp3_filepaths, list_mp3_infos
+from services.errors import AppError
+from services.filenames import is_track_name
 
 SyncStatusName = Literal["requested", "incoming", "paired", "syncing", "done", "declined", "failed", "cancelled"]
 PullKind = Literal["new", "update"]
@@ -41,17 +44,12 @@ ACTIVE_STATUSES = {"requested", "incoming", "paired", "syncing"}
 PEER_STATUSES = {"paired", "syncing"}
 REQUEST_TIMEOUT_S = 120.0
 STALL_TIMEOUT_S = 120.0
+PAIRED_TIMEOUT_S = 1800.0
 HTTP_TIMEOUT_S = 5.0
 TRANSFER_TIMEOUT_S = 60.0
 COPY_CHUNK_BYTES = 1024 * 1024
 FINGERPRINT_SAMPLE_BYTES = 64 * 1024
 
-
-class SyncError(Exception):
-    def __init__(self, status_code: int, detail: str) -> None:
-        super().__init__(detail)
-        self.status_code = status_code
-        self.detail = detail
 
 
 @dataclass
@@ -138,16 +136,16 @@ def _request_json(
             detail = json.loads(exc.read().decode("utf-8")).get("detail")
         except (ValueError, AttributeError):
             detail = None
-        raise SyncError(exc.code, str(detail or f"{session.peer.name} refused the request")) from exc
+        raise AppError(exc.code, str(detail or f"{session.peer.name} refused the request")) from exc
     except (urllib.error.URLError, OSError) as exc:
-        raise SyncError(502, f"Couldn't reach {session.peer.name}") from exc
+        raise AppError(502, f"Couldn't reach {session.peer.name}") from exc
     return json.loads(body.decode("utf-8")) if body else None
 
 
 def _notify(session: _Session, path: str, payload: Optional[dict] = None) -> None:
     try:
         _request_json(session, "POST", path, payload or {})
-    except SyncError:
+    except AppError:
         pass
 
 
@@ -160,6 +158,9 @@ def _expire(session: _Session) -> None:
     if session.status in ("requested", "incoming") and now - session.created_at > REQUEST_TIMEOUT_S:
         session.status = "declined" if session.status == "requested" else "cancelled"
         session.error = "The request timed out"
+    elif session.status == "paired" and now - session.created_at > PAIRED_TIMEOUT_S:
+        session.status = "cancelled"
+        session.error = "The sync was never started"
     elif session.status == "syncing" and not session.remote.finished and now - session.remote_updated_at > STALL_TIMEOUT_S:
         session.status = "failed"
         session.error = f"Lost connection to {session.peer.name}"
@@ -167,9 +168,9 @@ def _expire(session: _Session) -> None:
 
 def _require(session_id: str, statuses: set[str], host: str) -> _Session:
     if _session is None or _session.id != session_id or _session.peer.host != host:
-        raise SyncError(404, "Unknown sync session")
+        raise AppError(404, "Unknown sync session")
     if _session.status not in statuses:
-        raise SyncError(409, "The sync session is not in a state for that")
+        raise AppError(409, "The sync session is not in a state for that")
     return _session
 
 
@@ -190,11 +191,13 @@ def request_sync(peer_id: str) -> SyncSessionInfo:
     global _session
     peer = discovery.get_peer(peer_id)
     if peer is None:
-        raise SyncError(404, "That device is no longer available")
+        raise AppError(404, "That device is no longer available")
 
     with _lock:
+        if _session is not None:
+            _expire(_session)
         if _is_active(_session):
-            raise SyncError(409, "A sync is already in progress")
+            raise AppError(409, "A sync is already in progress")
         session = _Session(
             id=uuid.uuid4().hex,
             peer=SyncPeer(id=peer.id, name=peer.name, host=peer.host),
@@ -209,9 +212,9 @@ def request_sync(peer_id: str) -> SyncSessionInfo:
             session,
             "POST",
             "/peer/incoming",
-            {"session_id": session.id, "device": get_device(), "port": API_PORT},
+            {"session_id": session.id, "device": get_device(), "port": API_PORT, "version": VERSION},
         )
-    except SyncError:
+    except AppError:
         with _lock:
             if _session is session:
                 _session = None
@@ -220,14 +223,22 @@ def request_sync(peer_id: str) -> SyncSessionInfo:
     return session.info()
 
 
-def receive_request(session_id: str, device: dict, port: int, host: str) -> SyncSessionInfo:
+def _major(version: str) -> str:
+    return version.split(".", 1)[0]
+
+
+def receive_request(session_id: str, device: dict, port: int, host: str, version: str) -> SyncSessionInfo:
     global _session
     if not discovery.is_active():
-        raise SyncError(409, "Sync isn't open on that device")
+        raise AppError(409, "Sync isn't open on that device")
+    if _major(version) != _major(VERSION):
+        raise AppError(409, f"Update myp3d on both devices (this one runs {VERSION}, the other {version})")
 
     with _lock:
+        if _session is not None:
+            _expire(_session)
         if _is_active(_session):
-            raise SyncError(409, "That device is busy with another sync")
+            raise AppError(409, "That device is busy with another sync")
         _session = _Session(
             id=session_id,
             peer=SyncPeer(id=device["id"], name=device["name"], host=host),
@@ -247,13 +258,13 @@ def _start_syncing(session: _Session) -> None:
 def accept() -> SyncSessionInfo:
     with _lock:
         if _session is None or _session.status != "incoming":
-            raise SyncError(409, "There is no sync request to accept")
+            raise AppError(409, "There is no sync request to accept")
         session = _session
         session.status = "paired"
 
     try:
         _request_json(session, "POST", f"/peer/sessions/{session.id}/accepted", {})
-    except SyncError:
+    except AppError:
         with _lock:
             if _session is session and session.status == "paired":
                 session.status = "incoming"
@@ -271,7 +282,7 @@ def on_accepted(session_id: str, host: str) -> None:
 def start() -> SyncSessionInfo:
     with _lock:
         if _session is None or _session.status != "paired":
-            raise SyncError(409, "No device is paired")
+            raise AppError(409, "No device is paired")
         session = _session
 
     _request_json(session, "POST", f"/peer/sessions/{session.id}/start", {})
@@ -292,7 +303,7 @@ def on_start(session_id: str, host: str) -> None:
 def decline() -> None:
     with _lock:
         if _session is None or _session.status != "incoming":
-            raise SyncError(409, "There is no sync request to decline")
+            raise AppError(409, "There is no sync request to decline")
         session = _session
         session.status = "declined"
     _notify(session, f"/peer/sessions/{session.id}/declined")
@@ -306,7 +317,7 @@ def on_declined(session_id: str, host: str) -> None:
 def cancel() -> None:
     with _lock:
         if _session is None or _session.status not in ("requested", "paired", "syncing"):
-            raise SyncError(409, "There is no sync to cancel")
+            raise AppError(409, "There is no sync to cancel")
         session = _session
         session.status = "cancelled"
     _notify(session, f"/peer/sessions/{session.id}/cancelled")
@@ -331,7 +342,7 @@ def dismiss() -> None:
     global _session
     with _lock:
         if _is_active(_session):
-            raise SyncError(409, "The sync is still running")
+            raise AppError(409, "The sync is still running")
         _session = None
 
 
@@ -424,25 +435,16 @@ def record_cover(session_id: str, host: str, kind: str, key: str) -> bytes:
         _require(session_id, PEER_STATUSES, host)
     cover = database_sync.local_cover(kind, key) if kind in ("playlist", "download") else None
     if cover is None:
-        raise SyncError(404, "No cover image found")
+        raise AppError(404, "No cover image found")
     return cover
-
-
-def _is_safe_filename(name: Any) -> bool:
-    return (
-        isinstance(name, str)
-        and Path(name).name == name
-        and not name.startswith(".")
-        and name.lower().endswith(".mp3")
-    )
 
 
 def peer_file(session_id: str, host: str, filename: str) -> Path:
     with _lock:
         _require(session_id, PEER_STATUSES, host)
     path = OUTPUT_DIR / filename
-    if not _is_safe_filename(filename) or not path.is_file():
-        raise SyncError(404, "MP3 file not found")
+    if not is_track_name(filename) or not path.is_file():
+        raise AppError(404, "MP3 file not found")
     return path
 
 
@@ -457,7 +459,7 @@ def peer_tags(session_id: str, host: str, filename: str) -> tuple[bytes, bytes]:
             handle.seek(end)
             return head, handle.read()
     except OSError as exc:
-        raise SyncError(404, "MP3 file not found") from exc
+        raise AppError(404, "MP3 file not found") from exc
 
 
 def _remote_manifest(session: _Session) -> dict[str, dict]:
@@ -472,21 +474,21 @@ def _remote_manifest(session: _Session) -> dict[str, dict]:
     return {
         entry["filename"]: entry
         for entry in entries
-        if isinstance(entry, dict) and _is_safe_filename(entry.get("filename"))
+        if isinstance(entry, dict) and is_track_name(entry.get("filename"))
     }
 
 
 def _remote_database(session: _Session) -> SyncDatabase:
     try:
         payload = _request_json(session, "GET", f"/peer/sessions/{session.id}/database", timeout=TRANSFER_TIMEOUT_S)
-    except SyncError as exc:
+    except AppError as exc:
         if exc.status_code == 404:
-            raise SyncError(409, f"Update myp3d on {session.peer.name} to sync playlists and downloads") from exc
+            raise AppError(409, f"Update myp3d on {session.peer.name} to sync playlists and downloads") from exc
         raise
     try:
         return SyncDatabase.model_validate(payload)
     except ValidationError as exc:
-        raise SyncError(502, f"{session.peer.name} sent playlists or downloads that couldn't be read") from exc
+        raise AppError(502, f"{session.peer.name} sent playlists or downloads that couldn't be read") from exc
 
 
 def _fetch_record_cover(session: _Session, kind: RecordKind, key: str) -> bytes:
@@ -676,7 +678,7 @@ def _diff_sort_key(track: SyncDiffTrack) -> tuple[str, str]:
 def diff() -> SyncDiff:
     with _lock:
         if _session is None or _session.status != "paired":
-            raise SyncError(409, "No device is paired")
+            raise AppError(409, "No device is paired")
         session = _session
 
     remote = _remote_manifest(session)
@@ -689,7 +691,7 @@ def diff() -> SyncDiff:
     remote_database = _remote_database(session)
     local_database = database_sync.local_database()
     incoming_records = _record_pulls(
-        incoming, local_database, remote_database, session.direction == "outgoing", database_sync.busy_downloads()
+        incoming, local_database, remote_database, session.direction == "outgoing", queue_service.active_uids()
     )
     outgoing_records = _record_pulls(outgoing, remote_database, local_database, session.direction == "incoming")
     moving_records = {(pull.kind, pull.key) for pull in incoming_records + outgoing_records}
@@ -721,11 +723,11 @@ def diff() -> SyncDiff:
 
 
 def peer_cover(filename: str, size: Optional[str]) -> tuple[bytes, str]:
-    if not _is_safe_filename(filename):
-        raise SyncError(404, "No cover image found")
+    if not is_track_name(filename):
+        raise AppError(404, "No cover image found")
     with _lock:
         if not _is_active(_session):
-            raise SyncError(404, "No cover image found")
+            raise AppError(404, "No cover image found")
         session = _session
 
     query = f"?size={urllib.parse.quote(size)}" if size else ""
@@ -734,7 +736,7 @@ def peer_cover(filename: str, size: Optional[str]) -> tuple[bytes, str]:
         with _opener.open(url, timeout=HTTP_TIMEOUT_S) as response:
             return response.read(), response.headers.get_content_type()
     except (urllib.error.URLError, OSError) as exc:
-        raise SyncError(404, "No cover image found") from exc
+        raise AppError(404, "No cover image found") from exc
 
 
 def _still_syncing(session: _Session) -> bool:
@@ -755,13 +757,13 @@ def _report(session: _Session) -> bool:
         payload = session.local.model_dump()
     try:
         _request_json(session, "POST", f"/peer/sessions/{session.id}/progress", payload)
-    except SyncError as exc:
+    except AppError as exc:
         _fail(session, exc.detail)
         return False
     return True
 
 
-def _download(session: _Session, filename: str, target: str, overwrite: bool) -> bool:
+def _download(session: _Session, filename: str, target: str, overwrite: bool, size: Any) -> bool:
     destination = OUTPUT_DIR / target
     if destination.exists() and not overwrite:
         return True
@@ -770,12 +772,15 @@ def _download(session: _Session, filename: str, target: str, overwrite: bool) ->
     try:
         with _opener.open(url, timeout=TRANSFER_TIMEOUT_S) as response, open(partial, "wb") as handle:
             shutil.copyfileobj(response, handle, COPY_CHUNK_BYTES)
+        if partial.stat().st_size != size:
+            partial.unlink(missing_ok=True)
+            return False
         if destination.exists() and not overwrite:
             partial.unlink(missing_ok=True)
         else:
             os.replace(partial, destination)
         return True
-    except (urllib.error.URLError, OSError):
+    except (urllib.error.URLError, OSError, http.client.HTTPException):
         partial.unlink(missing_ok=True)
         return False
 
@@ -806,7 +811,7 @@ def _retag(session: _Session, pull: _Pull, source: str) -> bool:
         try:
             head, trailer = _fetch_tags(session, pull.entry["filename"])
         except ValueError:
-            return pull.same_audio and _download(session, pull.entry["filename"], source, True)
+            return pull.same_audio and _download(session, pull.entry["filename"], source, True, pull.entry.get("size"))
         with open(path, "rb") as original, open(partial, "wb") as handle:
             start, end = audio_bounds(original, os.fstat(original.fileno()).st_size)
             handle.write(head)
@@ -817,10 +822,10 @@ def _retag(session: _Session, pull: _Pull, source: str) -> bool:
             if _tag_fingerprint(partial) != pull.entry.get("tag_fingerprint"):
                 return False
         elif partial.stat().st_size != pull.entry.get("size") or _fingerprint(partial) != pull.entry.get("fingerprint"):
-            return _download(session, pull.entry["filename"], source, True)
-        shutil.copyfile(partial, path)
+            return _download(session, pull.entry["filename"], source, True, pull.entry.get("size"))
+        os.replace(partial, path)
         return True
-    except (urllib.error.URLError, OSError):
+    except (urllib.error.URLError, OSError, http.client.HTTPException):
         return False
     finally:
         partial.unlink(missing_ok=True)
@@ -838,11 +843,11 @@ def _swap_audio(session: _Session, pull: _Pull, source: str) -> bool:
             return False
         if pull.swap == "splice":
             splice_audio(path, download, joined)
-            shutil.copyfile(joined, path)
+            os.replace(joined, path)
         else:
-            shutil.copyfile(download, path)
+            os.replace(download, path)
         return True
-    except (urllib.error.URLError, OSError):
+    except (urllib.error.URLError, OSError, http.client.HTTPException):
         return False
     finally:
         download.unlink(missing_ok=True)
@@ -854,15 +859,13 @@ def _rename(source: str, target: str) -> bool:
         (OUTPUT_DIR / source).rename(OUTPUT_DIR / target)
     except OSError:
         return False
-    playlist_service.rename_track(source, target)
-    favorite_service.rename_track(source, target)
-    date_service.rename_track(source, target)
+    track_records.rename(source, target)
     return True
 
 
 def _apply_file(session: _Session, pull: _Pull) -> bool:
     if pull.kind == "new":
-        return _download(session, pull.entry["filename"], pull.target, False)
+        return _download(session, pull.entry["filename"], pull.target, False, pull.entry.get("size"))
     source = pull.source or pull.target
     if pull.swap is not None and not _swap_audio(session, pull, source):
         return False
@@ -886,17 +889,18 @@ def _apply_records(session: _Session, pulls: list[RecordPull]) -> bool:
         if not _still_syncing(session):
             return False
         try:
-            database_sync.apply_pull(pull, local_database, lambda kind, key: _fetch_record_cover(session, kind, key))
-            succeeded = True
+            outcome = "done" if database_sync.apply_pull(pull, local_database, lambda kind, key: _fetch_record_cover(session, kind, key)) else "skipped"
         except Exception:
-            succeeded = False
+            outcome = "failed"
         if not database_sync.is_visible(pull):
             continue
         with _lock:
-            if succeeded:
+            if outcome == "done":
                 session.local.done += 1
-            else:
+            elif outcome == "failed":
                 session.local.failed += 1
+            else:
+                session.local.total -= 1
         if not _report(session):
             return False
     return True
@@ -904,9 +908,16 @@ def _apply_records(session: _Session, pulls: list[RecordPull]) -> bool:
 
 def _pull_worker(session: _Session) -> None:
     try:
+        _pull(session)
+    except Exception as exc:
+        _fail(session, exc.detail if isinstance(exc, AppError) else "The sync stopped unexpectedly")
+
+
+def _pull(session: _Session) -> None:
+    try:
         remote = _remote_manifest(session)
         remote_database = _remote_database(session)
-    except SyncError as exc:
+    except AppError as exc:
         _fail(session, exc.detail)
         return
 
@@ -917,7 +928,7 @@ def _pull_worker(session: _Session) -> None:
         database_sync.local_database(),
         remote_database,
         session.direction == "outgoing",
-        database_sync.busy_downloads(),
+        queue_service.active_uids(),
     )
 
     with _lock:

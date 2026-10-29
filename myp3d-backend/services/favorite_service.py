@@ -1,12 +1,13 @@
 import json
 import sqlite3
 import threading
-from datetime import datetime, timezone
-from pathlib import Path
 from typing import Iterable, Optional
 
 from models.schemas import SyncFavoriteRecord
 from services.db import connect as _connect
+from services.db import now as _now
+from services.errors import AppError
+from services.filenames import is_track_name
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS favorites (
@@ -23,23 +24,15 @@ CREATE TABLE IF NOT EXISTS apple_favorite_snapshot (
 """
 
 
-class FavoriteError(Exception):
-    def __init__(self, status_code: int, detail: str) -> None:
-        super().__init__(detail)
-        self.status_code = status_code
-        self.detail = detail
-
 
 _lock = threading.Lock()
 
 
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 def _clean_filename(filename: str) -> str:
-    if Path(filename).name != filename or not filename.lower().endswith(".mp3"):
-        raise FavoriteError(400, f"Invalid file name: {filename}")
+    if not is_track_name(filename):
+        raise AppError(400, f"Invalid file name: {filename}")
     return filename
 
 
@@ -121,11 +114,16 @@ def rename_track(old: str, new: str) -> None:
         snapshot = _read_snapshot(conn)
         if snapshot is not None and old in snapshot:
             _write_snapshot(conn, [new if filename == old else filename for filename in snapshot])
-        row = conn.execute("SELECT 1 FROM favorites WHERE filename = ? AND deleted_at IS NULL", (old,)).fetchone()
+        row = conn.execute("SELECT created_at FROM favorites WHERE filename = ? AND deleted_at IS NULL", (old,)).fetchone()
         if row is None:
             return
         _unstar(conn, old, now)
-        _star(conn, new, now)
+        conn.execute(
+            "INSERT INTO favorites (filename, created_at, updated_at) VALUES (?, ?, ?) "
+            "ON CONFLICT(filename) DO UPDATE SET created_at = excluded.created_at, "
+            "updated_at = excluded.updated_at, deleted_at = NULL",
+            (new, row["created_at"], now),
+        )
 
 
 def remove_tracks(filenames: list[str]) -> None:

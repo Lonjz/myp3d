@@ -9,23 +9,18 @@ from models.schemas import (
     PaginatedAlbumResponse,
     PaginationMeta,
 )
-from services.cover_service import CoverSize, get_cover_variant
+from routers.common import cache_headers, read_cover
+from services.cover_service import CoverSize, get_album_cover, get_cover_variant
 from services.mp3_service import (
-    get_album_cover,
+    NO_ALBUM_LABEL,
     get_album_group,
     make_album_key,
-    make_square_cover,
     query_albums,
     set_album_cover,
     set_track_tags,
 )
 
-
 router = APIRouter(prefix="/albums", tags=["Albums"])
-
-
-CACHE_CONTROL_HEADER = {"Cache-Control": "public, max-age=300"}
-IMMUTABLE_CACHE_HEADER = {"Cache-Control": "public, max-age=31536000, immutable"}
 
 
 def _get_album_group_or_404(album_key: str):
@@ -43,7 +38,6 @@ def list_album_groups_paged(
     sort_by: Literal["album_name", "track_count", "total_size", "date_added"] = Query("album_name"),
     sort_direction: Literal["asc", "desc"] = Query("asc"),
 ):
-    """List albums using server-side pagination, filtering, and sorting."""
     items, total = query_albums(
         page=page,
         limit=limit,
@@ -51,22 +45,11 @@ def list_album_groups_paged(
         sort_by=sort_by,
         sort_direction=sort_direction,
     )
-    total_pages = max(1, (total + limit - 1) // limit)
-    return PaginatedAlbumResponse(
-        items=items,
-        meta=PaginationMeta(
-            total=total,
-            page=page,
-            limit=limit,
-            total_pages=total_pages,
-            returned=len(items),
-        ),
-    )
+    return PaginatedAlbumResponse(items=items, meta=PaginationMeta.of(total, page, limit, len(items)))
 
 
 @router.get("/{album_key}", response_model=AlbumDetail)
 def get_album(album_key: str):
-    """Get album summary and all tracks in that album."""
     album_group = _get_album_group_or_404(album_key)
     tracks = sorted(
         album_group.tracks,
@@ -77,16 +60,12 @@ def get_album(album_key: str):
 
 @router.put("/{album_key}", response_model=AlbumUpdateResponse)
 def update_album(album_key: str, payload: AlbumUpdate):
-    """Update album name for every track in the selected album."""
     album_group = _get_album_group_or_404(album_key)
     set_track_tags(album_group.filepaths, artist=payload.artist, album=payload.album_name)
-
-    new_album_key = make_album_key(payload.album_name)
-    normalized_name = payload.album_name.strip() or "(No Album)"
     return AlbumUpdateResponse(
         success=True,
-        album_key=new_album_key,
-        album_name=normalized_name,
+        album_key=make_album_key(payload.album_name),
+        album_name=payload.album_name.strip() or NO_ALBUM_LABEL,
         updated_tracks=len(album_group.filepaths),
         message="Album metadata updated successfully",
     )
@@ -94,19 +73,8 @@ def update_album(album_key: str, payload: AlbumUpdate):
 
 @router.post("/{album_key}/cover")
 def update_album_cover(album_key: str, cover: UploadFile = File(...)):
-    """Set the same cover image on every track in the album."""
     album_group = _get_album_group_or_404(album_key)
-
-    content_type = cover.content_type or ""
-    if not content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="File must be an image")
-
-    image_data = cover.file.read()
-    try:
-        processed_cover, mime_type = make_square_cover(image_data)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
+    processed_cover, mime_type = read_cover(cover)
     set_album_cover(album_group.filepaths, processed_cover, mime_type)
     return {
         "success": True,
@@ -121,12 +89,8 @@ def get_album_cover_image(
     size: Optional[CoverSize] = Query(None),
     v: Optional[str] = Query(None, max_length=64),
 ):
-    """Get the first embedded cover image found in this album."""
     album_group = _get_album_group_or_404(album_key)
     cover = get_cover_variant(album_group.filepaths, size) if size else get_album_cover(album_group.filepaths)
     if cover is None:
         raise HTTPException(status_code=404, detail="No cover image found")
-
-    image_data, mime_type = cover
-    headers = IMMUTABLE_CACHE_HEADER if v else CACHE_CONTROL_HEADER
-    return Response(content=image_data, media_type=mime_type, headers=headers)
+    return Response(content=cover[0], media_type=cover[1], headers=cache_headers(v))

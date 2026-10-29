@@ -1,16 +1,12 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 from services import favorite_playlist, favorite_service
-from services.favorite_service import FavoriteError
 
 router = APIRouter(prefix="/favorites", tags=["Favorites"])
 
 
 def _set(filename: str, on: bool) -> dict:
-    try:
-        favorite_playlist.set_favorite(filename, on)
-    except FavoriteError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    favorite_playlist.set_favorite(filename, on)
     return {"success": True}
 
 

@@ -21,6 +21,7 @@ from models.schemas import (
 )
 from services.mp3_service import list_mp3_infos
 from services.youtube_service import search_youtube
+from services.errors import AppError
 
 USER_AGENT = "Mozilla/5.0"
 FETCH_TIMEOUT_S = 15
@@ -54,12 +55,6 @@ VARIANT_PHRASES = (
 CLEAN_PHRASES = ("clean", "radio edit", "censored")
 
 
-class SpotifyError(Exception):
-    def __init__(self, status_code: int, detail: str) -> None:
-        super().__init__(detail)
-        self.status_code = status_code
-        self.detail = detail
-
 
 _ytmusic = threading.local()
 
@@ -86,29 +81,29 @@ def _fetch(url: str) -> str:
                 return response.read().decode("utf-8", errors="replace")
         except urllib.error.HTTPError as exc:
             if exc.code == 404:
-                raise SpotifyError(404, "Spotify link not found") from exc
+                raise AppError(404, "Spotify link not found") from exc
             if exc.code in RETRY_STATUSES and attempt < FETCH_RETRIES:
                 time.sleep(_retry_wait(exc, attempt))
                 continue
-            raise SpotifyError(502, "Couldn't reach Spotify") from exc
+            raise AppError(502, "Couldn't reach Spotify") from exc
         except OSError as exc:
-            raise SpotifyError(502, "Couldn't reach Spotify") from exc
-    raise SpotifyError(502, "Couldn't reach Spotify")
+            raise AppError(502, "Couldn't reach Spotify") from exc
+    raise AppError(502, "Couldn't reach Spotify")
 
 
 def _embed_entity(kind: str, spotify_id: str) -> dict:
     match = NEXT_DATA_PATTERN.search(_fetch(f"https://open.spotify.com/embed/{kind}/{spotify_id}"))
     if not match:
-        raise SpotifyError(502, "Couldn't read the Spotify page")
+        raise AppError(502, "Couldn't read the Spotify page")
     try:
         page_props = json.loads(match.group(1))["props"]["pageProps"]
         if page_props.get("status") == 404:
-            raise SpotifyError(404, NOT_FOUND_DETAILS[kind])
+            raise AppError(404, NOT_FOUND_DETAILS[kind])
         entity = page_props["state"]["data"]["entity"]
     except (ValueError, KeyError, TypeError, AttributeError) as exc:
-        raise SpotifyError(502, "Couldn't read the Spotify page") from exc
+        raise AppError(502, "Couldn't read the Spotify page") from exc
     if not isinstance(entity, dict):
-        raise SpotifyError(404, NOT_FOUND_DETAILS[kind])
+        raise AppError(404, NOT_FOUND_DETAILS[kind])
     return entity
 
 
@@ -155,19 +150,19 @@ def default_filename(name: str) -> Optional[str]:
 def resolve(text: str) -> SpotifyResolveResult:
     links = list(dict.fromkeys(LINK_PATTERN.findall(text)))
     if not links:
-        raise SpotifyError(400, "No Spotify links found")
+        raise AppError(400, "No Spotify links found")
 
     tracks: list[SpotifyTrackRef] = []
     seen: set[str] = set()
     truncated = False
-    failures: list[SpotifyError] = []
+    failures: list[AppError] = []
     for kind, spotify_id in links:
         if kind == "track":
             refs = [SpotifyTrackRef(id=spotify_id, name="")]
         else:
             try:
                 entity = _embed_entity(kind, spotify_id)
-            except SpotifyError as exc:
+            except AppError as exc:
                 if len(links) == 1:
                     raise
                 failures.append(exc)
@@ -203,7 +198,7 @@ def resolve(text: str) -> SpotifyResolveResult:
 def _album_from_page(spotify_id: str) -> Optional[str]:
     try:
         page = _fetch(f"https://open.spotify.com/track/{spotify_id}")
-    except SpotifyError:
+    except AppError:
         return None
     match = DESCRIPTION_PATTERN.search(page)
     if not match:
@@ -340,7 +335,10 @@ def _candidates(track: SpotifyTrack) -> list[SpotifyCandidate]:
         if not results or max(_score(track, result) for result in results) < GOOD_SCORE:
             results += _ytmusic_results(query, "videos")
     except Exception:
-        results = _youtube_results(query)
+        try:
+            results = _youtube_results(query)
+        except Exception as exc:
+            raise AppError(502, "Couldn't search YouTube") from exc
 
     unique: dict[str, dict] = {}
     for result in results:
@@ -364,7 +362,7 @@ def _in_library(title: str, artist: Optional[str], filename: Optional[str]) -> b
 
 def match_track(spotify_id: str, album_hint: Optional[str] = None) -> SpotifyTrackMatch:
     if not re.fullmatch(r"[A-Za-z0-9]{22}", spotify_id):
-        raise SpotifyError(400, "Invalid Spotify track")
+        raise AppError(400, "Invalid Spotify track")
     track = _track_details(spotify_id, album_hint or None)
     artist = track.artists[0] if track.artists else None
     filename = default_filename(track.name)

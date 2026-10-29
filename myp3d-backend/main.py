@@ -8,11 +8,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from routers import albums, cache, download, export, favorites, health, mp3s, music, peer, playlists, queue, search, spotify, stats, sync, youtube
-from services import date_service, favorite_playlist, favorite_service, music_playlist_service, playlist_service, queue_service
-from services.config import API_PORT
+from services import database_sync, db, date_service, favorite_playlist, favorite_service, music_playlist_service, playlist_service, queue_service
+from services.config import API_PORT, API_RELOAD, VERSION
+from services.mp3_service import sweep_partial_files
 from services.discovery_service import discovery
+from services.errors import AppError
 
 PEER_PREFIX = "/peer/"
+ALLOWED_ORIGINS = [f"http://{host}:{port}" for host in ("localhost", "127.0.0.1") for port in (5173, 5174, 4173)]
 
 
 def _is_loopback(host: Optional[str]) -> bool:
@@ -26,30 +29,32 @@ def _is_loopback(host: Optional[str]) -> bool:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    db.enable_wal()
+    sweep_partial_files()
     queue_service.init()
     playlist_service.init()
     favorite_service.init()
     date_service.init()
     music_playlist_service.init()
+    database_sync.purge_tombstones()
     favorite_playlist.ensure()
     yield
     discovery.stop()
 
 
-app = FastAPI(
-    title="MP3 Download API",
-    description="YouTube to MP3 converter and metadata editor",
-    lifespan=lifespan,
-)
+app = FastAPI(title="myp3d", version=VERSION, lifespan=lifespan)
 
-# CORS for React frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
-    allow_credentials=True,
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(AppError)
+async def app_error(_: Request, exc: AppError):
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
 @app.middleware("http")
@@ -58,12 +63,12 @@ async def local_only(request: Request, call_next):
         return await call_next(request)
     client = request.client.host if request.client else None
     host_header = urlsplit(f"//{request.headers.get('host', '')}").hostname
-    if _is_loopback(client) and _is_loopback(host_header):
+    origin = request.headers.get("origin")
+    if _is_loopback(client) and _is_loopback(host_header) and (origin is None or origin in ALLOWED_ORIGINS):
         return await call_next(request)
     return JSONResponse(status_code=403, content={"detail": "Only this device can use the app"})
 
 
-# Include routers
 app.include_router(download.router)
 app.include_router(albums.router)
 app.include_router(mp3s.router)
@@ -84,11 +89,9 @@ app.include_router(favorites.router)
 
 @app.get("/")
 async def root():
-    """Health check endpoint."""
-    return {"status": "running", "message": "MP3 Download API is active"}
+    return {"name": "myp3d", "version": VERSION}
 
 
-# Run with: uvicorn main:app --reload
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=API_PORT, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=API_PORT, reload=API_RELOAD)

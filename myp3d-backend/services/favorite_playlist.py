@@ -2,26 +2,18 @@ from typing import Iterable, Optional
 
 from models.schemas import PlaylistDetail, PlaylistInfo
 from services import favorite_service, playlist_service
-from services.mp3_service import list_mp3_filepaths
+from services.mp3_service import library_names
 
 PLAYLIST_NAME = "faves"
 
 
-def _library_names() -> set[str]:
-    return {path.name for path in list_mp3_filepaths()}
-
-
-def playlist_id() -> Optional[str]:
-    return playlist_service.favorites_id()
-
-
 def reconcile() -> None:
-    target = playlist_id()
+    target = playlist_service.favorites_id()
     if target is None:
         return
     starred = favorite_service.list_ordered()
     starred_set = set(starred)
-    library = _library_names()
+    library = library_names()
     current = playlist_service.stored_filenames(target)
     kept = [filename for filename in current if filename in starred_set or filename not in library]
     added = [filename for filename in reversed(starred) if filename not in current and filename in library]
@@ -29,7 +21,10 @@ def reconcile() -> None:
 
 
 def ensure() -> None:
-    if playlist_id() is None:
+    playlist_service.merge_favorites()
+    if playlist_service.favorites_id() is None:
+        if playlist_service.had_favorites():
+            return
         found = playlist_service.find_by_name(PLAYLIST_NAME)
         if found is None:
             return
@@ -38,12 +33,12 @@ def ensure() -> None:
 
 
 def _follow_stars(add: Iterable[str], remove: Iterable[str]) -> None:
-    target = playlist_id()
+    target = playlist_service.favorites_id()
     if target is None:
         return
     removed = set(remove)
     current = [filename for filename in playlist_service.stored_filenames(target) if filename not in removed]
-    library = _library_names()
+    library = library_names()
     added = [filename for filename in dict.fromkeys(add) if filename not in current and filename in library]
     playlist_service.replace_tracks(target, added + current)
 
@@ -59,7 +54,7 @@ def set_favorite(filename: str, on: bool) -> None:
 
 
 def _follow_playlist(target: str, before: list[str]) -> None:
-    if target != playlist_id():
+    if target != playlist_service.favorites_id():
         return
     after = playlist_service.stored_filenames(target)
     favorite_service.set_many(set(after) - set(before), set(before) - set(after))

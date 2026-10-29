@@ -7,7 +7,7 @@ from typing import Optional
 
 from PIL import Image
 
-from services.mp3_service import get_album_cover
+from services.cover_service import get_album_cover
 
 SAMPLE_BYTES = 64 * 1024
 ID3V1_LENGTH = 128

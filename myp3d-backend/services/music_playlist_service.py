@@ -2,22 +2,22 @@ import json
 import os
 import tempfile
 import threading
-import unicodedata
 from collections import Counter
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal, Optional
 
 from models.schemas import BulkFailure, MusicPlaylistDiff, MusicPlaylistEntry, MusicPlaylistSyncInfo
 from services import favorite_playlist, playlist_service
 from services.db import connect as _connect
-from services.mp3_service import list_mp3_filepaths, make_square_cover
+from services.db import now as _now
+from services.cover_service import make_square_cover
+from services.mp3_service import library_names
 from services.music_service import (
+    normalize_text,
     FIELD_SEP,
     RECORD_SEP,
     TRACK_TIMEOUT_S,
-    MusicError,
     is_available,
     song_links,
     parse_art_state,
@@ -25,6 +25,7 @@ from services.music_service import (
     run_script,
 )
 from services.playlist_service import PlaylistState
+from services.errors import AppError
 
 ActionName = Literal["import", "export", "pull", "push", "link", "delete_local", "delete_music", "in_sync"]
 SyncStatusName = Literal["syncing", "done", "failed"]
@@ -113,12 +114,8 @@ def init() -> None:
         conn.execute(SCHEMA)
 
 
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
-def _normalize(value: str) -> str:
-    return " ".join(unicodedata.normalize("NFC", value).casefold().split())
 
 
 def _read_links() -> dict[str, tuple[str, Snapshot]]:
@@ -136,6 +133,13 @@ def _save_link(playlist_id: str, persistent_id: str, snapshot: Snapshot) -> None
             "snapshot = excluded.snapshot, synced_at = excluded.synced_at",
             (playlist_id, persistent_id, json.dumps(asdict(snapshot)), _now()),
         )
+
+
+def rename_track(old: str, new: str) -> None:
+    for playlist_id, (persistent_id, snapshot) in _read_links().items():
+        if old in snapshot.local:
+            snapshot.local = [new if filename == old else filename for filename in snapshot.local]
+            _save_link(playlist_id, persistent_id, snapshot)
 
 
 def _drop_link(playlist_id: str) -> None:
@@ -221,7 +225,7 @@ def plan_sync(
     unlinked_apple: dict[str, list[ApplePlaylist]] = {}
     for playlist in apple_playlists:
         if playlist.persistent_id not in linked_ids:
-            unlinked_apple.setdefault(_normalize(playlist.name), []).append(playlist)
+            unlinked_apple.setdefault(normalize_text(playlist.name), []).append(playlist)
 
     plans: list[Plan] = []
 
@@ -320,7 +324,7 @@ def plan_sync(
 
         if state.deleted_at is not None:
             continue
-        candidates = unlinked_apple.get(_normalize(state.name))
+        candidates = unlinked_apple.get(normalize_text(state.name))
         if candidates:
             plans.append(paired_plan(state, candidates.pop(0), None))
             continue
@@ -360,11 +364,9 @@ def plan_sync(
                 )
             )
 
-    return sorted(plans, key=lambda plan: (_normalize(plan.name), plan.key))
+    return sorted(plans, key=lambda plan: (normalize_text(plan.name), plan.key))
 
 
-def _library_names() -> set[str]:
-    return {path.name for path in list_mp3_filepaths()}
 
 
 def _refresh_snapshots(plans: list[Plan]) -> None:
@@ -388,7 +390,7 @@ def _to_entry(plan: Plan) -> MusicPlaylistEntry:
 
 def diff(folder: str) -> MusicPlaylistDiff:
     file_of, songs_pending = song_links(require_folder(folder))
-    plans = plan_sync(_read_playlists(), playlist_service.list_states(), _read_links(), file_of, _library_names())
+    plans = plan_sync(_read_playlists(), playlist_service.list_states(), _read_links(), file_of, library_names())
     _refresh_snapshots(plans)
     return MusicPlaylistDiff(
         songs_pending=songs_pending,
@@ -506,9 +508,9 @@ def _run_sync(job: _SyncJob, root: Path) -> None:
         if songs_pending:
             _finish(job, "failed", "Sync the songs with Apple Music first")
             return
-        plans = plan_sync(_read_playlists(), playlist_service.list_states(), _read_links(), file_of, _library_names())
+        plans = plan_sync(_read_playlists(), playlist_service.list_states(), _read_links(), file_of, library_names())
     except Exception as exc:
-        _finish(job, "failed", exc.detail if isinstance(exc, MusicError) else "Couldn't read Apple Music playlists")
+        _finish(job, "failed", exc.detail if isinstance(exc, AppError) else "Couldn't read Apple Music playlists")
         return
 
     pid_of: dict[str, str] = {}
@@ -524,7 +526,7 @@ def _run_sync(job: _SyncJob, root: Path) -> None:
         try:
             outcome, art_problem = _apply(plan, pid_of)
         except Exception as exc:
-            detail = exc.detail if isinstance(exc, MusicError) else str(exc) or "Couldn't sync the playlist"
+            detail = exc.detail if isinstance(exc, AppError) else str(exc) or "Couldn't sync the playlist"
             with _sync_lock:
                 job.failed.append(BulkFailure(filename=plan.name, detail=detail))
             continue
@@ -542,17 +544,24 @@ def _run_sync(job: _SyncJob, root: Path) -> None:
     _finish(job, "done")
 
 
+def _run_guarded(job: _SyncJob, root: Path) -> None:
+    try:
+        _run_sync(job, root)
+    except Exception as exc:
+        _finish(job, "failed", exc.detail if isinstance(exc, AppError) else "The sync stopped unexpectedly")
+
+
 def start_sync(folder: str) -> MusicPlaylistSyncInfo:
     global _sync
     if not is_available():
-        raise MusicError(501, "Apple Music sync needs macOS")
+        raise AppError(501, "Apple Music sync needs macOS")
     root = require_folder(folder)
     with _sync_lock:
         if _sync is not None and _sync.status == "syncing":
-            raise MusicError(409, "A playlist sync with Apple Music is already running")
+            raise AppError(409, "A playlist sync with Apple Music is already running")
         job = _SyncJob(status="syncing", total=0)
         _sync = job
-    threading.Thread(target=_run_sync, args=(job, root), daemon=True).start()
+    threading.Thread(target=_run_guarded, args=(job, root), daemon=True).start()
     return job.info()
 
 
@@ -565,5 +574,5 @@ def dismiss_sync() -> None:
     global _sync
     with _sync_lock:
         if _sync is not None and _sync.status == "syncing":
-            raise MusicError(409, "The playlist sync with Apple Music is still running")
+            raise AppError(409, "The playlist sync with Apple Music is still running")
         _sync = None

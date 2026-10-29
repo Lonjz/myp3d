@@ -23,7 +23,10 @@ from models.schemas import (
 from services import favorite_playlist, favorite_service
 from services.audio_fingerprint import audio_fingerprint, cover_hash, covers_match
 from services.config import BASE_DIR, OUTPUT_DIR
-from services.mp3_service import get_album_cover, list_mp3_infos, make_square_cover, safe_path_part
+from services.cover_service import get_album_cover, make_square_cover
+from services.filenames import safe_path_part
+from services.mp3_service import list_mp3_infos
+from services.errors import AppError
 
 SyncStatusName = Literal["syncing", "done", "failed"]
 ChangeName = Literal[
@@ -41,12 +44,6 @@ NOT_AUTHORIZED_CODE = "-1743"
 PUSH_CHANGES = ("title", "artist", "album", "art", "audio")
 FAVORITE_PUSHES = {"favorite_music": True, "unfavorite_music": False}
 
-
-class MusicError(Exception):
-    def __init__(self, status_code: int, detail: str) -> None:
-        super().__init__(detail)
-        self.status_code = status_code
-        self.detail = detail
 
 
 @dataclass
@@ -103,7 +100,7 @@ def is_available() -> bool:
 
 def run_script(name: str, *args: str, timeout: float = EXPORT_TIMEOUT_S) -> str:
     if not is_available():
-        raise MusicError(501, "Apple Music sync needs macOS")
+        raise AppError(501, "Apple Music sync needs macOS")
     try:
         result = subprocess.run(
             ["osascript", str(SCRIPTS_DIR / f"{name}.applescript"), *args],
@@ -113,26 +110,26 @@ def run_script(name: str, *args: str, timeout: float = EXPORT_TIMEOUT_S) -> str:
             timeout=timeout,
         )
     except subprocess.TimeoutExpired as exc:
-        raise MusicError(504, "Music took too long to respond") from exc
+        raise AppError(504, "Music took too long to respond") from exc
     except OSError as exc:
-        raise MusicError(502, "Couldn't run osascript") from exc
+        raise AppError(502, "Couldn't run osascript") from exc
     if result.returncode != 0:
         stderr = result.stderr.strip()
         if NOT_AUTHORIZED_CODE in stderr:
-            raise MusicError(
+            raise AppError(
                 403,
                 "Allow myp3d to control Music in System Settings → Privacy & Security → Automation",
             )
-        raise MusicError(502, stderr or "Music returned an error")
+        raise AppError(502, stderr or "Music returned an error")
     return result.stdout.rstrip("\n")
 
 
-def _normalize(value: Optional[str]) -> str:
+def normalize_text(value: Optional[str]) -> str:
     return " ".join(unicodedata.normalize("NFC", value or "").casefold().split())
 
 
 def _match_key(title: Optional[str], artist: Optional[str]) -> MatchKey:
-    return _normalize(title), _normalize(artist)
+    return normalize_text(title), normalize_text(artist)
 
 
 def _local_key(track: MP3Info) -> MatchKey:
@@ -192,11 +189,11 @@ def _is_within(path: Path, ancestor: Path) -> bool:
 def require_folder(folder: str) -> Path:
     path = Path(folder.strip()).expanduser()
     if not path.is_absolute() or not path.is_dir():
-        raise MusicError(400, "That folder doesn't exist")
+        raise AppError(400, "That folder doesn't exist")
     resolved = path.resolve()
     downloads = OUTPUT_DIR.resolve()
     if _is_within(resolved, downloads) or _is_within(downloads, resolved):
-        raise MusicError(400, "The Apple Music folder can't overlap the myp3d library")
+        raise AppError(400, "The Apple Music folder can't overlap the myp3d library")
     return resolved
 
 
@@ -348,7 +345,7 @@ def _push_favorites(pairs: list[_Pair]) -> dict[str, str]:
                 *(pair.music.info.persistent_id for pair in batch),
                 timeout=EXPORT_TIMEOUT_S,
             )
-        except MusicError as exc:
+        except AppError as exc:
             problems.update({pair.track.filename: exc.detail for pair in batch})
             continue
         missing = set(output.split(FIELD_SEP)) if output else set()
@@ -378,7 +375,7 @@ def song_links(root: Path) -> tuple[dict[str, str], int]:
 
 
 def _track_sort_key(track: MP3Info) -> tuple[str, str]:
-    return _normalize(track.artist), _normalize(track.title or track.filename)
+    return normalize_text(track.artist), normalize_text(track.title or track.filename)
 
 
 def diff(folder: str) -> MusicDiff:
@@ -387,7 +384,7 @@ def diff(folder: str) -> MusicDiff:
     return MusicDiff(
         only_in_music=sorted(
             (music.info for music in matched.only_in_music),
-            key=lambda track: (_normalize(track.artist), _normalize(track.name)),
+            key=lambda track: (normalize_text(track.artist), normalize_text(track.name)),
         ),
         both=sorted(
             (MusicPair(track=pair.track, music=pair.music.info, changes=pair.changes) for pair in matched.pairs),
@@ -401,7 +398,7 @@ def _album_artist_tracks() -> dict[str, list[MusicTrack]]:
     albums: dict[str, list[MusicTrack]] = {}
     for track in _read_library():
         if track.info.album_artist:
-            albums.setdefault(_normalize(track.info.album), []).append(track.info)
+            albums.setdefault(normalize_text(track.info.album), []).append(track.info)
     return albums
 
 
@@ -427,7 +424,7 @@ def clear_album_artists(keys: list[str]) -> BulkResult:
         return BulkResult(success=True, updated=[], failed=[])
     try:
         output = run_script("clear_album_artist", *ids, timeout=EXPORT_TIMEOUT_S)
-    except MusicError as exc:
+    except AppError as exc:
         return BulkResult(success=False, updated=[], failed=[BulkFailure(filename=key, detail=exc.detail) for key in wanted])
     missing = set(output.split(FIELD_SEP)) if output else set()
     failed = [
@@ -487,7 +484,7 @@ def _add_one(root: Path, source: Path, track: MP3Info, existing: Optional[Path])
         args = [str(target)] + ([art_path] if art_path else [])
         try:
             result = run_script("add_track", *args, timeout=TRACK_TIMEOUT_S)
-        except MusicError as exc:
+        except AppError as exc:
             if existing is None and exc.status_code != 504:
                 target.unlink(missing_ok=True)
             raise
@@ -510,7 +507,7 @@ def _readd_one(root: Path, source: Path, pair: _Pair) -> Optional[str]:
         return art_problem
     try:
         run_script("relocate_track", persistent_id, str(old_file), timeout=TRACK_TIMEOUT_S)
-    except MusicError:
+    except AppError:
         try:
             old_file.replace(target)
         except OSError:
@@ -543,7 +540,7 @@ def _finish(job: _SyncJob, status: SyncStatusName, error: Optional[str] = None) 
 
 
 def _record_failure(job: _SyncJob, filename: str, exc: Exception) -> None:
-    detail = exc.detail if isinstance(exc, MusicError) else str(exc) or "Couldn't sync the song"
+    detail = exc.detail if isinstance(exc, AppError) else str(exc) or "Couldn't sync the song"
     with _sync_lock:
         job.failed.append(BulkFailure(filename=filename, detail=detail))
 
@@ -552,7 +549,7 @@ def _run_sync(job: _SyncJob, root: Path) -> None:
     try:
         matched = _compare(root)
     except Exception as exc:
-        _finish(job, "failed", exc.detail if isinstance(exc, MusicError) else "Couldn't read the Apple Music library")
+        _finish(job, "failed", exc.detail if isinstance(exc, AppError) else "Couldn't read the Apple Music library")
         return
 
     pushing = [pair for pair in matched.pairs if _favorite_push(pair) is not None]
@@ -621,19 +618,26 @@ def _run_sync(job: _SyncJob, root: Path) -> None:
     _finish(job, "done")
 
 
+def _run_guarded(job: _SyncJob, root: Path) -> None:
+    try:
+        _run_sync(job, root)
+    except Exception as exc:
+        _finish(job, "failed", exc.detail if isinstance(exc, AppError) else "The sync stopped unexpectedly")
+
+
 def start_sync(folder: str) -> MusicSyncInfo:
     global _sync
     if not is_available():
-        raise MusicError(501, "Apple Music sync needs macOS")
+        raise AppError(501, "Apple Music sync needs macOS")
     root = require_folder(folder)
 
     with _sync_lock:
         if _sync is not None and _sync.status == "syncing":
-            raise MusicError(409, "A sync with Apple Music is already running")
+            raise AppError(409, "A sync with Apple Music is already running")
         job = _SyncJob(status="syncing", total=0)
         _sync = job
 
-    threading.Thread(target=_run_sync, args=(job, root), daemon=True).start()
+    threading.Thread(target=_run_guarded, args=(job, root), daemon=True).start()
     return job.info()
 
 
@@ -646,5 +650,5 @@ def dismiss_sync() -> None:
     global _sync
     with _sync_lock:
         if _sync is not None and _sync.status == "syncing":
-            raise MusicError(409, "The sync with Apple Music is still running")
+            raise AppError(409, "The sync with Apple Music is still running")
         _sync = None

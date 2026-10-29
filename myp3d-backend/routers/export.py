@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from services import export_service
+from services.mp3_service import list_mp3_filepaths
 
 router = APIRouter(prefix="/export", tags=["Export"])
 
@@ -20,7 +21,7 @@ def _zip_response(chunks: Iterator[bytes], name: str) -> StreamingResponse:
 
 @router.get("/tracks.zip")
 def export_tracks():
-    paths = export_service.track_paths()
+    paths = list_mp3_filepaths()
     if not paths:
         raise HTTPException(status_code=404, detail="The library is empty")
     return _zip_response(export_service.stream_tracks(paths), "tracks")

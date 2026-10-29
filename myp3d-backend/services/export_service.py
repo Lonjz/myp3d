@@ -6,14 +6,9 @@ from typing import Iterator
 
 from PIL import Image
 
-from services.mp3_service import (
-    COVER_SIZE,
-    build_album_groups,
-    get_album_cover,
-    list_mp3_filepaths,
-    make_square_cover,
-    safe_path_part,
-)
+from services.cover_service import COVER_SIZE, get_album_cover, make_square_cover
+from services.filenames import safe_path_part
+from services.mp3_service import build_album_groups
 
 CHUNK_SIZE = 1024 * 1024
 JPEG_MIME_TYPES = {"image/jpeg", "image/jpg"}
@@ -35,10 +30,6 @@ class _ZipBuffer(io.RawIOBase):
         data = b"".join(self._chunks)
         self._chunks.clear()
         return data
-
-
-def track_paths() -> list[Path]:
-    return list_mp3_filepaths()
 
 
 def albums_with_covers() -> list[tuple[str, list[Path]]]:

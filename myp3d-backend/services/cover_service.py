@@ -1,14 +1,19 @@
+import base64
+import binascii
 import threading
 from collections import OrderedDict
 from io import BytesIO
 from pathlib import Path
 from typing import Literal, Optional
 
+import eyed3
+from eyed3.id3 import frames as id3_frames
 from PIL import Image, ImageOps
 
-from services.mp3_service import get_album_cover
 
 CoverSize = Literal["thumb", "medium", "full"]
+
+COVER_SIZE = (500, 500)
 
 COVER_VARIANTS: dict[str, tuple[int, int]] = {
     "thumb": (96, 80),
@@ -70,7 +75,10 @@ def get_cover_variant(filepaths: list[Path], size: CoverSize) -> Optional[tuple[
         if cover is None:
             continue
 
-        variant = _render_variant(cover[0], size)
+        try:
+            variant = _render_variant(cover[0], size)
+        except (OSError, ValueError, Image.DecompressionBombError):
+            continue
         _remember_variant(key, variant)
         return variant, WEBP_MIME_TYPE
 
@@ -85,3 +93,54 @@ def get_image_variant(cache_key: str, image_data: bytes, size: CoverSize) -> tup
     variant = _render_variant(image_data, size)
     _remember_variant(key, variant)
     return variant, WEBP_MIME_TYPE
+
+
+def get_album_cover(filepaths: list[Path]) -> Optional[tuple[bytes, str]]:
+    for filepath in filepaths:
+        audio = eyed3.load(str(filepath))
+        if not audio or not audio.tag or not audio.tag.images:
+            continue
+        image = audio.tag.images[0]
+        return image.image_data, image.mime_type or "image/jpeg"
+    return None
+
+
+def _decode_base64_image(image_base64: str) -> bytes:
+    if not image_base64:
+        raise ValueError("Cover image data is empty")
+
+    payload = image_base64
+    if image_base64.startswith("data:"):
+        parts = image_base64.split(",", 1)
+        if len(parts) != 2:
+            raise ValueError("Invalid cover image data URL")
+        payload = parts[1]
+
+    try:
+        return base64.b64decode(payload, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError("Invalid base64 cover image data") from exc
+
+
+def make_square_cover(image_data: bytes) -> tuple[bytes, str]:
+    try:
+        with Image.open(BytesIO(image_data)) as image:
+            square = ImageOps.fit(image.convert("RGB"), COVER_SIZE, method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
+    except (OSError, ValueError, Image.DecompressionBombError) as exc:
+        raise ValueError("Uploaded cover is not a valid image") from exc
+    output = BytesIO()
+    square.save(output, format="JPEG", quality=92)
+    return output.getvalue(), "image/jpeg"
+
+
+def square_cover_from_base64(image_base64: str) -> tuple[bytes, str]:
+    return make_square_cover(_decode_base64_image(image_base64))
+
+
+def set_cover_images(tag: eyed3.id3.tag.Tag, image_data: bytes, mime_type: str) -> None:
+    existing_descriptions = [img.description for img in list(tag.images)]
+    for description in existing_descriptions:
+        while tag.images.remove(description) is not None:
+            pass
+
+    tag.images.set(id3_frames.ImageFrame.OTHER, image_data, mime_type, description="")
