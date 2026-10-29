@@ -17,3 +17,14 @@ export function usePresence(open: boolean, exitMs = EXIT_DURATION_MS) {
 
   return { mounted, closing: mounted && !open };
 }
+
+export function useLingering<T>(value: T | null, exitMs = EXIT_DURATION_MS) {
+  const [shown, setShown] = useState(value);
+  const { mounted, closing } = usePresence(value !== null, exitMs);
+
+  if (value !== null && value !== shown) {
+    setShown(value);
+  }
+
+  return { value: mounted ? (value ?? shown) : null, closing };
+}

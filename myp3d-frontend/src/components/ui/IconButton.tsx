@@ -1,7 +1,7 @@
-import type { ButtonHTMLAttributes } from 'react';
+import type { ComponentProps } from 'react';
 import type { LucideIcon } from 'lucide-react';
 
-interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface IconButtonProps extends ComponentProps<'button'> {
   icon: LucideIcon;
   label: string;
   variant?: 'default' | 'primary' | 'danger' | 'ghost';
