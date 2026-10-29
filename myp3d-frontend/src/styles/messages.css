@@ -37,7 +37,7 @@
   color: var(--color-text);
   font-size: var(--text-sm);
   pointer-events: auto;
-  animation: drop-message-enter var(--duration-base) ease-out;
+  --pop-y: -14px;
 }
 
 .drop-message--success {
@@ -86,18 +86,6 @@
 .drop-message__close:focus-visible {
   opacity: 1;
   background: var(--color-surface-hover);
-}
-
-@keyframes drop-message-enter {
-  from {
-    opacity: 0;
-    transform: translateY(-14px) scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
 }
 
 @media (max-width: 640px) {

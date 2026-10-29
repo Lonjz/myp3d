@@ -11,7 +11,7 @@
   min-height: 320px;
   padding: var(--space-7) var(--space-5);
   border-radius: var(--radius-xl);
-  animation: panel-rise 460ms var(--ease-spring) 60ms backwards;
+  animation: panel-rise var(--duration-rise) var(--ease-spring) 60ms backwards;
 }
 
 .empty-state--compact {
@@ -63,29 +63,9 @@
   inset: 0;
   border: 1px solid color-mix(in srgb, var(--color-lavender) 60%, transparent);
   border-radius: inherit;
-  animation: radar-pulse 2.4s ease-out infinite;
+  animation: pulse-ring 2.4s var(--ease-out) infinite;
 }
 
 .empty-state__icon.is-on::after {
   animation-delay: 1.2s;
-}
-
-@keyframes radar-pulse {
-  from {
-    opacity: 0.9;
-    transform: scale(1);
-  }
-
-  to {
-    opacity: 0;
-    transform: scale(1.9);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .empty-state.glass,
-  .empty-state__icon.is-on::before,
-  .empty-state__icon.is-on::after {
-    animation: none;
-  }
 }

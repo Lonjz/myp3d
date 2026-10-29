@@ -52,7 +52,7 @@ export function FeedbackToast({
     <div className="drop-message-layer" aria-live={message.type === 'error' ? 'assertive' : 'polite'}>
       <div
         key={`${message.type}:${message.text}`}
-        className={`drop-message drop-message--${message.type} glass`}
+        className={`drop-message drop-message--${message.type} glass motion-pop`}
         role={message.type === 'error' ? 'alert' : 'status'}
       >
         <StatusIcon className="drop-message__icon" aria-label={label} />

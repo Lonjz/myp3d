@@ -156,7 +156,7 @@
   transform: scale(0.55);
   transition:
     opacity var(--duration-base) var(--ease-standard),
-    transform 260ms var(--ease-spring);
+    transform var(--duration-enter) var(--ease-spring);
 }
 
 .checkbox input {
@@ -206,7 +206,7 @@
   pointer-events: none;
   transition:
     opacity var(--duration-fast) var(--ease-standard),
-    transform 260ms var(--ease-spring);
+    transform var(--duration-enter) var(--ease-spring);
 }
 
 .checkbox:has(input:checked)::before,
@@ -642,7 +642,6 @@
   -webkit-backdrop-filter: var(--glass-blur-heavy);
   backdrop-filter: var(--glass-blur-heavy);
   visibility: hidden;
-  animation: confirm-panel-in 200ms var(--ease-spring) both;
 }
 
 .icon-select__option {
@@ -694,7 +693,6 @@
   backdrop-filter: var(--glass-blur-heavy);
   visibility: hidden;
   transform-origin: top left;
-  animation: confirm-panel-in 200ms var(--ease-spring) both;
 }
 
 .context-menu__item {
@@ -746,11 +744,4 @@
   height: 1px;
   margin: var(--space-1) var(--space-2);
   background: var(--color-border);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .icon-select__menu.glass,
-  .context-menu.glass {
-    animation-name: confirm-fade-in;
-  }
 }

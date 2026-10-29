@@ -86,7 +86,7 @@ export function ContextMenu({ x, y, label, actions, onClose }: ContextMenuProps)
   return createPortal(
     <div
       ref={menuRef}
-      className="context-menu glass"
+      className="context-menu glass motion-pop"
       role="menu"
       aria-label={label}
       onKeyDown={moveFocus}

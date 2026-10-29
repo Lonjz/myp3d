@@ -115,9 +115,9 @@ export function BulkEditDialog({ tracks: selectedTracks, closing, onClose, onSav
       />
     ) : (
       <div className="confirm-layer" data-state={closing ? 'closed' : 'open'}>
-        <div className="confirm-scrim" onMouseDown={saving ? undefined : onClose} />
+        <div className="confirm-scrim motion-fade" onMouseDown={saving ? undefined : onClose} />
         <div
-          className="bulk-edit-dialog glass"
+          className="bulk-edit-dialog glass motion-pop"
           role="dialog"
           aria-modal="true"
           aria-label={`Edit ${tracks.length} tracks`}

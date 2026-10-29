@@ -14,16 +14,11 @@
   min-height: 0;
   padding: var(--space-2);
   border-radius: var(--radius-xl);
-  animation: panel-rise 460ms var(--ease-spring) 60ms backwards;
+  animation: panel-rise var(--duration-rise) var(--ease-spring) 60ms backwards;
 }
 
 .downloads-list .music-rows {
   margin-top: 0;
-}
-
-.downloads-row {
-  animation: row-rise 380ms var(--ease-standard) backwards;
-  animation-delay: calc(min(var(--row, 0), 14) * 40ms + 80ms);
 }
 
 .downloads-row__thumb img {
@@ -101,7 +96,6 @@
   background: var(--glass-sheen), var(--glass-tint-overlay);
   -webkit-backdrop-filter: var(--glass-blur-heavy);
   backdrop-filter: var(--glass-blur-heavy);
-  animation: confirm-panel-in 240ms var(--ease-spring) both;
 }
 
 .downloads-dialog__actions {
@@ -118,10 +112,6 @@
 
 .downloads-dialog__save {
   min-height: 2.75rem;
-}
-
-.confirm-layer[data-state='closed'] .downloads-dialog.glass {
-  animation: confirm-panel-out 180ms ease-in both;
 }
 
 .sidebar-link__activity {
@@ -150,17 +140,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .downloads-list,
-  .downloads-row,
   .sidebar-link__activity {
     animation: none;
-  }
-
-  .downloads-dialog.glass {
-    animation-name: confirm-fade-in;
-  }
-
-  .confirm-layer[data-state='closed'] .downloads-dialog.glass {
-    animation-name: confirm-fade-out;
   }
 }

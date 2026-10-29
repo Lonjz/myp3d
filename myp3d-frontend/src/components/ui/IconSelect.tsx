@@ -106,7 +106,7 @@ export function IconSelect<T extends string>({ label, value, options, onChange, 
       </button>
       {open &&
         createPortal(
-          <div ref={menuRef} className="icon-select__menu glass" role="group" aria-label={label} onKeyDown={moveFocus}>
+          <div ref={menuRef} className="icon-select__menu glass motion-pop" role="group" aria-label={label} onKeyDown={moveFocus}>
             {options.map((option) => (
               <button
                 key={option.value}

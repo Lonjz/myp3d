@@ -190,7 +190,7 @@
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, var(--color-lavender), var(--color-rose));
-  transition: width 400ms var(--ease-standard);
+  transition: width var(--duration-rise) var(--ease-out);
 }
 
 .sync-progress__count {
@@ -224,16 +224,11 @@
 
 .sync-toolbar,
 .sync-panel {
-  animation: panel-rise 460ms var(--ease-spring) backwards;
+  animation: panel-rise var(--duration-rise) var(--ease-spring) backwards;
 }
 
 .sync-panel {
   animation-delay: 60ms;
-}
-
-.sync-peer {
-  animation: row-rise 380ms var(--ease-standard) backwards;
-  animation-delay: calc(min(var(--row, 0), 14) * 40ms + 80ms);
 }
 
 @media (max-width: 560px) {
@@ -257,13 +252,5 @@
 
   .sync-toolbar.is-paired .sync-toolbar__push {
     margin-left: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .sync-toolbar,
-  .sync-panel,
-  .sync-peer {
-    animation: none;
   }
 }

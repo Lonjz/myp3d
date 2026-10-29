@@ -15,7 +15,7 @@
   min-height: 280px;
   padding: var(--space-7) var(--space-5);
   border-radius: var(--radius-xl);
-  animation: panel-rise 460ms var(--ease-spring) backwards;
+  animation: panel-rise var(--duration-rise) var(--ease-spring) backwards;
 }
 
 .export-tile:nth-child(2) {
@@ -51,11 +51,5 @@
 @media (max-width: 640px) {
   .export-tiles {
     grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .export-tile {
-    animation: none;
   }
 }

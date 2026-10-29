@@ -8,15 +8,10 @@
   padding: 18vh var(--space-4) var(--space-4);
 }
 
-.spotlight-layer[data-state='closing'] {
-  pointer-events: none;
-}
-
 .spotlight-scrim {
   position: absolute;
   inset: 0;
   background: rgba(12, 8, 26, 0.28);
-  animation: spotlight-fade-in 160ms ease-out both;
 }
 
 .spotlight.glass {
@@ -29,15 +24,7 @@
   -webkit-backdrop-filter: var(--glass-blur-heavy);
   backdrop-filter: var(--glass-blur-heavy);
   transform-origin: 50% 0;
-  animation: spotlight-panel-in 240ms var(--ease-spring) both;
-}
-
-.spotlight-layer[data-state='closing'] .spotlight-scrim {
-  animation: spotlight-fade-out 160ms ease-in both;
-}
-
-.spotlight-layer[data-state='closing'] .spotlight {
-  animation: spotlight-panel-out 160ms ease-in both;
+  --pop-y: -10px;
 }
 
 .spotlight-bar {
@@ -82,7 +69,7 @@
 .spotlight-body {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows 260ms var(--ease-spring);
+  transition: grid-template-rows var(--duration-enter) var(--ease-spring);
 }
 
 .spotlight-body.is-open {
@@ -339,7 +326,6 @@
   align-items: center;
   gap: var(--space-2);
   text-align: center;
-  animation: spotlight-fade-in 180ms ease-out both;
 }
 
 .spotlight-preview__art {
@@ -428,47 +414,9 @@
   -webkit-box-orient: vertical;
 }
 
-@keyframes spotlight-fade-in {
-  from {
-    opacity: 0;
-  }
-}
-
-@keyframes spotlight-fade-out {
-  to {
-    opacity: 0;
-  }
-}
-
-@keyframes spotlight-panel-in {
-  from {
-    opacity: 0;
-    transform: translateY(-10px) scale(0.96);
-  }
-}
-
-@keyframes spotlight-panel-out {
-  to {
-    opacity: 0;
-    transform: translateY(-6px) scale(0.97);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .spotlight.glass {
-    animation-name: spotlight-fade-in;
-  }
-
-  .spotlight-layer[data-state='closing'] .spotlight {
-    animation-name: spotlight-fade-out;
-  }
-
   .spotlight-body {
     transition: none;
-  }
-
-  .spotlight-preview__content {
-    animation: none;
   }
 }
 

@@ -42,7 +42,7 @@
   min-height: 0;
   padding: var(--space-2);
   border-radius: var(--radius-xl);
-  animation: panel-rise 460ms var(--ease-spring) backwards;
+  animation: panel-rise var(--duration-rise) var(--ease-spring) backwards;
 }
 
 .music-column:nth-child(2) {
@@ -243,11 +243,5 @@
   .music-folder {
     flex-basis: 100%;
     max-width: none;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .music-column {
-    animation: none;
   }
 }

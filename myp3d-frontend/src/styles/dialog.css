@@ -12,7 +12,6 @@
   position: absolute;
   inset: 0;
   background: var(--color-scrim);
-  animation: confirm-fade-in 160ms ease-out both;
 }
 
 .confirm-dialog.glass {
@@ -28,7 +27,6 @@
   -webkit-backdrop-filter: var(--glass-blur-heavy);
   backdrop-filter: var(--glass-blur-heavy);
   text-align: center;
-  animation: confirm-panel-in 240ms var(--ease-spring) both;
 }
 
 .confirm-dialog__icon {
@@ -121,7 +119,6 @@
   background: var(--glass-sheen), var(--glass-tint-overlay);
   -webkit-backdrop-filter: var(--glass-blur-heavy);
   backdrop-filter: var(--glass-blur-heavy);
-  animation: confirm-panel-in 240ms var(--ease-spring) both;
 }
 
 .bulk-edit-dialog__body {
@@ -172,56 +169,5 @@
 
   .bulk-edit-dialog__count {
     align-self: center;
-  }
-}
-
-.confirm-layer[data-state='closed'] {
-  pointer-events: none;
-}
-
-.confirm-layer[data-state='closed'] .confirm-scrim {
-  animation: confirm-fade-out 180ms ease-in both;
-}
-
-.confirm-layer[data-state='closed'] .confirm-dialog.glass,
-.confirm-layer[data-state='closed'] .bulk-edit-dialog.glass {
-  animation: confirm-panel-out 180ms ease-in both;
-}
-
-@keyframes confirm-fade-out {
-  to {
-    opacity: 0;
-  }
-}
-
-@keyframes confirm-panel-out {
-  to {
-    opacity: 0;
-    transform: translateY(6px) scale(0.96);
-  }
-}
-
-@keyframes confirm-fade-in {
-  from {
-    opacity: 0;
-  }
-}
-
-@keyframes confirm-panel-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.95);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .confirm-dialog.glass,
-  .bulk-edit-dialog.glass {
-    animation-name: confirm-fade-in;
-  }
-
-  .confirm-layer[data-state='closed'] .confirm-dialog.glass,
-  .confirm-layer[data-state='closed'] .bulk-edit-dialog.glass {
-    animation-name: confirm-fade-out;
   }
 }

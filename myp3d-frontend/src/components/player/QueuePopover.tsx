@@ -42,7 +42,7 @@ export function QueuePopover({ anchorRef, onClose }: QueuePopoverProps) {
   }, [anchorRef, onClose]);
 
   return (
-    <div ref={panelRef} className="queue-popover glass" role="dialog" aria-label="Queue">
+    <div ref={panelRef} className="queue-popover glass motion-pop" role="dialog" aria-label="Queue">
       <div className="queue-popover__header">
         <span className="queue-popover__title">
           <ListOrdered aria-hidden="true" />

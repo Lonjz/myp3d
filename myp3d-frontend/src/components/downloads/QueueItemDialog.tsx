@@ -110,9 +110,9 @@ export function QueueItemDialog({ item, closing, onClose, onSaved }: QueueItemDi
           <CoverCropModal {...cropModalProps} />
         ) : (
           <div className="confirm-layer" data-state={closing ? 'closed' : 'open'}>
-            <div className="confirm-scrim" onMouseDown={saving ? undefined : onClose} />
+            <div className="confirm-scrim motion-fade" onMouseDown={saving ? undefined : onClose} />
             <form
-              className="downloads-dialog glass"
+              className="downloads-dialog glass motion-pop"
               role="dialog"
               aria-modal="true"
               aria-label="Edit download"

@@ -70,7 +70,7 @@ export function MatchPicker({ anchorRef, candidates, choice, onChoose, onChooseU
   };
 
   return createPortal(
-    <div ref={panelRef} className="match-picker glass" role="dialog" aria-label="Choose a YouTube match">
+    <div ref={panelRef} className="match-picker glass motion-pop" role="dialog" aria-label="Choose a YouTube match">
       {candidates.length > 0 ? (
         <ul className="match-picker__list">
           {candidates.map((candidate) => {

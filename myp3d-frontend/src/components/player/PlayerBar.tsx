@@ -40,7 +40,7 @@ export function PlayerBar() {
   return (
     <div className="player-dock">
       <div className="player-dock__inner">
-        <div className="player-bar glass" role="region" aria-label="Player">
+        <div className="player-bar glass motion-pop" role="region" aria-label="Player">
           <SeekBar compact />
 
           <div className="player-bar__track">
@@ -51,7 +51,7 @@ export function PlayerBar() {
                 <Music aria-hidden="true" />
               )}
             </Link>
-            <div key={currentTrack.filename} className="player-bar__text">
+            <div key={currentTrack.filename} className="player-bar__text motion-fade">
               <Link to={detailsPath} className="player-bar__title" title={currentTrack.title || currentTrack.filename}>
                 {currentTrack.title || currentTrack.filename}
               </Link>

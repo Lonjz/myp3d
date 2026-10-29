@@ -65,9 +65,9 @@ export function AddToPlaylistDialog({ filenames: selectedFilenames, closing, onC
 
   return createPortal(
     <div className="confirm-layer" data-state={closing ? 'closed' : 'open'}>
-      <div className="confirm-scrim" onMouseDown={busy ? undefined : onClose} />
+      <div className="confirm-scrim motion-fade" onMouseDown={busy ? undefined : onClose} />
       <div
-        className="bulk-edit-dialog add-to-playlist glass"
+        className="bulk-edit-dialog add-to-playlist glass motion-pop"
         role="dialog"
         aria-modal="true"
         aria-label={`Add ${trackCount(filenames.length)} to a playlist`}

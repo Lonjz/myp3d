@@ -4,13 +4,13 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { ChevronDown, ChevronLeft, ChevronRight, CornerDownLeft, Search, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { usePresence } from '../../hooks/usePresence';
 import { IconButton } from '../ui/IconButton';
 import { Spinner } from '../ui/Spinner';
 import type { MenuAction } from '../ui/ContextMenu';
 import { useSpotlightResults } from './useSpotlightResults';
 import type { SpotlightItem, SpotlightSource } from './spotlightTypes';
 
-const CLOSE_DURATION_MS = 160;
 const LISTBOX_ID = 'spotlight-listbox';
 
 const optionId = (index: number) => `spotlight-option-${index}`;
@@ -24,22 +24,15 @@ interface SpotlightProps {
 
 export function Spotlight({ open, initialQuery, sources, onClose }: SpotlightProps) {
   const [previousOpen, setPreviousOpen] = useState(open);
-  const [closing, setClosing] = useState(false);
   const [session, setSession] = useState(0);
+  const { mounted, closing } = usePresence(open);
 
   if (open !== previousOpen) {
     setPreviousOpen(open);
-    setClosing(!open);
     if (open) setSession((value) => value + 1);
   }
 
-  useEffect(() => {
-    if (!closing) return undefined;
-    const timer = window.setTimeout(() => setClosing(false), CLOSE_DURATION_MS);
-    return () => window.clearTimeout(timer);
-  }, [closing]);
-
-  if (!open && !closing) return null;
+  if (!mounted) return null;
 
   return createPortal(
     <SpotlightPanel
@@ -206,9 +199,9 @@ function SpotlightPanel({ closing, initialQuery, sources, onClose }: SpotlightPa
   };
 
   return (
-    <div className="spotlight-layer" data-state={closing ? 'closing' : 'open'}>
-      <div className="spotlight-scrim" onMouseDown={onClose} />
-      <div className="spotlight glass" role="dialog" aria-modal="true" aria-label="Spotlight">
+    <div className="spotlight-layer" data-state={closing ? 'closed' : 'open'}>
+      <div className="spotlight-scrim motion-fade" onMouseDown={onClose} />
+      <div className="spotlight glass motion-pop" role="dialog" aria-modal="true" aria-label="Spotlight">
         <div className="spotlight-bar">
           <Search className="spotlight-bar__icon" aria-hidden="true" />
           <input
@@ -413,7 +406,7 @@ function SpotlightPreviewPane({ item }: { item: SpotlightItem }) {
   const meta = preview?.meta ?? [];
 
   return (
-    <div className="spotlight-preview__content">
+    <div className="spotlight-preview__content motion-fade">
       <SpotlightArt
         src={preview?.art}
         icon={item.icon}

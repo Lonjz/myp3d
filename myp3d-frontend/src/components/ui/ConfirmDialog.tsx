@@ -56,9 +56,9 @@ export function ConfirmDialog({
 
   return createPortal(
     <div className="confirm-layer" data-state={closing ? 'closed' : 'open'}>
-      <div className="confirm-scrim" onMouseDown={onCancel} />
+      <div className="confirm-scrim motion-fade" onMouseDown={onCancel} />
       <div
-        className={`confirm-dialog glass confirm-dialog--${tone}`}
+        className={`confirm-dialog glass motion-pop confirm-dialog--${tone}`}
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
