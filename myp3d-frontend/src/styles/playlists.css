@@ -156,14 +156,3 @@
   max-width: 100%;
 }
 
-.playlist-name__favorites {
-  display: inline-flex;
-  flex-shrink: 0;
-  color: var(--color-text-secondary);
-}
-
-.playlist-name__favorites svg {
-  width: 14px;
-  height: 14px;
-  fill: currentColor;
-}

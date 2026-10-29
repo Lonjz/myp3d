@@ -169,6 +169,12 @@
   background: color-mix(in srgb, var(--color-lavender) 16%, transparent);
 }
 
+.library-table tbody tr.is-menu-open,
+.library-table tbody tr.is-menu-open:hover {
+  background: var(--selected-bg);
+  box-shadow: var(--selected-shadow);
+}
+
 .library-table tbody tr.is-selected:hover {
   background: color-mix(in srgb, var(--color-lavender) 22%, transparent);
 }
@@ -278,9 +284,28 @@
   font-size: var(--text-sm);
 }
 
-.table-actions {
+.track-title-cell {
   display: flex;
+  align-items: center;
   gap: var(--space-2);
+  min-width: 0;
+}
+
+.track-title-cell__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.favorite-badge {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+}
+
+.favorite-badge svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
 }
 
 .favorite-toggle.is-favorite svg {

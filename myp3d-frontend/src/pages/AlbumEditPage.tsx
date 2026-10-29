@@ -7,10 +7,12 @@ import { CoverCropModal } from '../components/cover/CoverCropModal';
 import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
 import { useToast } from '../components/messages/toastContext';
 import { InfiniteSidebarList } from '../components/sidebar/InfiniteSidebarList';
+import { useTrackActions } from '../components/library/trackActionsContext';
 import { usePlayer } from '../components/player/playerContext';
 import { TrackIndexButton } from '../components/player/TrackIndexButton';
 import { DataTable } from '../components/table/DataTable';
 import { HeaderIcon } from '../components/table/HeaderIcon';
+import { TrackTitleCell } from '../components/table/TrackTitleCell';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
@@ -120,6 +122,7 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
 
   const { blocker, allowNavigation } = useUnsavedChangesGuard(isDirty);
   const player = usePlayer();
+  const { favorites, openMenu, menuFilename } = useTrackActions();
 
   const handleSave = async () => {
     if (!albumDetail) {
@@ -291,7 +294,23 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
             className="album-tracks-table"
             items={albumDetail.tracks}
             getRowKey={(track) => track.filename}
-            getRowClassName={(track) => (player.isCurrent(track.filename) ? 'is-current' : undefined)}
+            getRowClassName={(track) =>
+              [player.isCurrent(track.filename) ? 'is-current' : '', menuFilename === track.filename ? 'is-menu-open' : '']
+                .filter(Boolean)
+                .join(' ') || undefined
+            }
+            onRowMenu={(track, event) =>
+              openMenu(event, track, {
+                play: () => player.playTracks(albumDetail.tracks, albumDetail.tracks.indexOf(track)),
+                onDeleted: (deleted) => {
+                  if (deleted.length >= albumDetail.tracks.length) {
+                    onBack();
+                    return;
+                  }
+                  void loadAlbum(albumKey, { clearToast: false, force: true });
+                },
+              })
+            }
             emptyMessage="No tracks"
             columns={[
               {
@@ -313,10 +332,11 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
                 key: 'title',
                 header: <HeaderIcon label="Title" icon={Music} />,
                 render: (track) => (
-                  <>
-                    <span className="table-cell-ellipsis" title={track.title || '-'}>{track.title || '-'}</span>
-                    {track.artist && <span className="table-cell-subtitle" title={track.artist}>{track.artist}</span>}
-                  </>
+                  <TrackTitleCell
+                    title={track.title || '-'}
+                    subtitle={track.artist ?? undefined}
+                    favorite={favorites.has(track.filename)}
+                  />
                 ),
               },
               {

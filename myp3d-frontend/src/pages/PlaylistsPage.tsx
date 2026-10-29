@@ -80,7 +80,7 @@ export function PlaylistsPage() {
         <span className="playlist-name">
           <span className="table-cell-ellipsis" title={playlist.name}>{playlist.name}</span>
           {playlist.is_favorites && (
-            <span className="playlist-name__favorites" title="Favourites" aria-label="Favourites" role="img">
+            <span className="favorite-badge" title="Favourites" aria-label="Favourites" role="img">
               <Star aria-hidden="true" />
             </span>
           )}

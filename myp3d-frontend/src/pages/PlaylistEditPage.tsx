@@ -1,18 +1,20 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlignLeft, Clock, DiscAlbum, GripVertical, ImagePlus, ListMusic, Music, Play, Save, Shuffle, Trash2, TriangleAlert, Undo2, X } from 'lucide-react';
+import { AlignLeft, Clock, DiscAlbum, GripVertical, ImagePlus, ListMinus, ListMusic, Music, Play, Save, Shuffle, Trash2, TriangleAlert, Undo2 } from 'lucide-react';
 import type { MP3Info } from '../api/mp3Api';
 import { NEW_PLAYLIST_NAME, playlistApi } from '../api/playlistApi';
 import type { PlaylistDetail, PlaylistInfo } from '../api/playlistApi';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
 import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
 import { useToast } from '../components/messages/toastContext';
+import { useTrackActions } from '../components/library/trackActionsContext';
 import { usePlayer } from '../components/player/playerContext';
 import { TrackIndexButton } from '../components/player/TrackIndexButton';
 import { InfiniteSidebarList } from '../components/sidebar/InfiniteSidebarList';
 import { DataTable } from '../components/table/DataTable';
 import { HeaderIcon } from '../components/table/HeaderIcon';
+import { TrackTitleCell } from '../components/table/TrackTitleCell';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
@@ -51,6 +53,7 @@ const sameOrder = (left: MP3Info[], right: MP3Info[]) =>
 export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) {
   const navigate = useNavigate();
   const player = usePlayer();
+  const { favorites, openMenu, menuFilename } = useTrackActions();
   const { showSuccess, showError, showInfo, clearToast } = useToast();
   const [detail, setDetail] = useState<PlaylistDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -166,6 +169,15 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
   const moveTrack = (from: number, to: number) => {
     if (to < 0 || to >= rows.length || from === to) return;
     setRows((current) => moveItem(current, from, to));
+  };
+
+  const removeRow = (key: string) => setRows((current) => current.filter((row) => row.key !== key));
+
+  const dropDeleted = (filenames: string[]) => {
+    const deleted = new Set(filenames);
+    const kept = (track: MP3Info) => !deleted.has(track.filename);
+    setRows((current) => current.filter((row) => kept(row.track)));
+    setDetail((current) => current && { ...current, tracks: current.tracks.filter(kept) });
   };
 
   const handleGripKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
@@ -313,7 +325,15 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
               [
                 player.isCurrent(track.filename) ? 'is-current' : '',
                 dragIndex !== null && rows[dragIndex]?.key === key ? 'is-dragging' : '',
+                menuFilename === track.filename ? 'is-menu-open' : '',
               ].filter(Boolean).join(' ') || undefined
+            }
+            onRowMenu={saving ? undefined : ({ key, track }, event) =>
+              openMenu(event, track, {
+                play: () => player.playTracks(tracks, rows.findIndex((row) => row.key === key)),
+                extra: [{ id: 'remove-from-playlist', label: 'Remove from playlist', icon: ListMinus, run: () => removeRow(key) }],
+                onDeleted: dropDeleted,
+              })
             }
             getRowProps={({ track }, index) => ({
               draggable: !saving,
@@ -371,12 +391,11 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
                 key: 'title',
                 header: <HeaderIcon label="Title" icon={Music} />,
                 render: ({ track }) => (
-                  <>
-                    <span className="table-cell-ellipsis" title={track.title || track.filename}>
-                      {track.title || track.filename}
-                    </span>
-                    {track.artist && <span className="table-cell-subtitle" title={track.artist}>{track.artist}</span>}
-                  </>
+                  <TrackTitleCell
+                    title={track.title || track.filename}
+                    subtitle={track.artist ?? undefined}
+                    favorite={favorites.has(track.filename)}
+                  />
                 ),
               },
               {
@@ -391,23 +410,6 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
                 width: '80px',
                 hideBelow: 'md',
                 render: ({ track }) => formatDuration(track.duration),
-              },
-              {
-                key: 'remove',
-                header: <span className="sr-only">Remove</span>,
-                width: '56px',
-                render: ({ key }) => (
-                  <div className="table-actions">
-                    <IconButton
-                      icon={X}
-                      label="Remove from playlist"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setRows((current) => current.filter((row) => row.key !== key))}
-                      disabled={saving}
-                    />
-                  </div>
-                ),
               },
             ]}
           />

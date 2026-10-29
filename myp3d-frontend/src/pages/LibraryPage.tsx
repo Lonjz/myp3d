@@ -25,9 +25,7 @@ import {
   Square,
   Star,
   Trash2,
-  TriangleAlert,
   Type,
-  Undo2,
   X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -41,19 +39,19 @@ import { useSequentialDownload } from '../hooks/useSequentialDownload';
 import { useSortState } from '../hooks/useSortState';
 import { useTrackSelection } from '../hooks/useTrackSelection';
 import { formatBytes, formatDate, formatDateTime, formatDuration } from '../utils/formatters';
-import { emitAppEvent } from '../utils/appEvents';
+import { subscribeAppEvent } from '../utils/appEvents';
 import { DataTable } from '../components/table/DataTable';
 import type { DataTableColumn } from '../components/table/DataTable';
 import { SortableHeaderButton } from '../components/table/SortableHeaderButton';
-import { useFavorites } from '../components/favorites/useFavorites';
+import { TrackTitleCell } from '../components/table/TrackTitleCell';
 import { BulkEditDialog } from '../components/library/BulkEditDialog';
 import { useLibrarySelectionCommands } from '../components/library/useLibrarySelectionCommands';
+import { useTrackActions } from '../components/library/trackActionsContext';
 import { AddToPlaylistDialog } from '../components/playlists/AddToPlaylistDialog';
 import { useToast } from '../components/messages/toastContext';
 import { CoverPlayButton } from '../components/player/CoverPlayButton';
 import { usePlayer } from '../components/player/playerContext';
 import { Checkbox } from '../components/ui/Checkbox';
-import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { IconSelect } from '../components/ui/IconSelect';
@@ -105,7 +103,6 @@ function pickOption<T extends string>(value: string | null, options: readonly T[
 }
 
 const getTrackKey = (mp3: MP3Info) => mp3.filename;
-const trackCount = (count: number) => `${count} track${count === 1 ? '' : 's'}`;
 const isShiftClick = (event: ChangeEvent<HTMLInputElement>) =>
   event.nativeEvent instanceof MouseEvent && event.nativeEvent.shiftKey;
 
@@ -172,8 +169,8 @@ export function LibraryPage() {
   });
 
   const player = usePlayer();
-  const { favorites, toggle: toggleFavorite } = useFavorites();
-  const { showSuccess, showError } = useToast();
+  const { favorites, deleting, requestDelete, openMenu, menuFilename } = useTrackActions();
+  const { showError } = useToast();
   const selection = useTrackSelection();
   const downloads = useSequentialDownload();
   const [selectingAll, setSelectingAll] = useState(false);
@@ -181,15 +178,17 @@ export function LibraryPage() {
   const editPresence = usePresence(editOpen);
   const [playlistOpen, setPlaylistOpen] = useState(false);
   const playlistPresence = usePresence(playlistOpen);
-  const [deleteTargets, setDeleteTargets] = useState<string[] | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const { clear: clearSelection } = selection;
 
   useEffect(() => () => {
     clearSelection();
     setEditOpen(false);
-    setDeleteTargets(null);
   }, [clearSelection]);
+
+  useEffect(() => {
+    if (!favoritesOnly) return undefined;
+    return subscribeAppEvent('playlists-changed', () => void refresh());
+  }, [favoritesOnly, refresh]);
 
   const loadMatchingTracks = () => mp3Api.listAll(queryParams);
 
@@ -232,29 +231,6 @@ export function LibraryPage() {
     }
   };
 
-  const confirmDelete = async () => {
-    if (!deleteTargets) return;
-    const targets = deleteTargets;
-    setDeleteTargets(null);
-    setDeleting(true);
-    try {
-      const result = await mp3Api.bulkDelete(targets);
-      selection.deselect(result.updated);
-      emitAppEvent('library-changed');
-      if (result.failed.length === 0) {
-        showSuccess(`Deleted ${trackCount(result.updated.length)}`);
-      } else if (targets.length === 1) {
-        showError(`Couldn't delete: ${result.failed[0].detail}`);
-      } else {
-        showError(`${result.failed.length} of ${trackCount(targets.length)} couldn't be deleted`);
-      }
-    } catch (err) {
-      showError(err instanceof Error ? err.message : 'Delete failed');
-    } finally {
-      setDeleting(false);
-    }
-  };
-
   const hasSelection = selection.size > 0;
   const playSelected = () => {
     if (hasSelection) player.playTracks(selection.tracks, 0);
@@ -269,7 +245,7 @@ export function LibraryPage() {
     if (hasSelection) void downloads.start(selection.filenames);
   };
   const deleteSelected = () => {
-    if (hasSelection) setDeleteTargets(selection.filenames);
+    if (hasSelection) requestDelete(selection.filenames, selection.deselect);
   };
 
   useLibrarySelectionCommands(selection.size, {
@@ -336,15 +312,13 @@ export function LibraryPage() {
     {
       key: 'title',
       header: renderSortHeader('title'),
-      render: (mp3) => {
-        const subtitle = [mp3.artist, mp3.album].filter(Boolean).join(' · ');
-        return (
-          <>
-            <span className="table-cell-ellipsis" title={mp3.title || '-'}>{mp3.title || '-'}</span>
-            {subtitle && <span className="table-cell-subtitle" title={subtitle}>{subtitle}</span>}
-          </>
-        );
-      },
+      render: (mp3) => (
+        <TrackTitleCell
+          title={mp3.title || '-'}
+          subtitle={[mp3.artist, mp3.album].filter(Boolean).join(' · ')}
+          favorite={favorites.has(mp3.filename)}
+        />
+      ),
     },
     {
       key: 'artist',
@@ -388,42 +362,6 @@ export function LibraryPage() {
       hideBelow: 'sm',
       render: (mp3) => <span className="library-date" title={formatDateTime(mp3.date_added)}>{formatDate(mp3.date_added)}</span>,
     },
-    {
-      key: 'actions',
-      header: <span className="sr-only">Actions</span>,
-      width: '148px',
-      render: (mp3) => (
-        <div className="table-actions">
-          <IconButton
-            icon={Star}
-            label={favorites.has(mp3.filename) ? 'Unfavourite' : 'Favourite'}
-            size="sm"
-            className={`favorite-toggle ${favorites.has(mp3.filename) ? 'is-favorite' : ''}`.trim()}
-            aria-pressed={favorites.has(mp3.filename)}
-            onClick={async () => {
-              await toggleFavorite(mp3.filename);
-              if (favoritesOnly) await refresh();
-            }}
-          />
-          <a
-            href={mp3Api.getFileUrl(mp3.filename)}
-            download
-            className="icon-btn icon-btn--default icon-btn--sm"
-            aria-label="Download"
-            title="Download"
-          >
-            <Download aria-hidden="true" />
-          </a>
-          <IconButton
-            icon={Trash2}
-            label="Delete"
-            size="sm"
-            variant="danger"
-            onClick={() => setDeleteTargets([mp3.filename])}
-          />
-        </div>
-      ),
-    },
   ];
 
   const downloadControl = downloads.progress ? (
@@ -451,7 +389,14 @@ export function LibraryPage() {
         items={mp3s}
         getRowKey={getTrackKey}
         onRowOpen={(mp3) => navigate(`/details/${encodeURIComponent(mp3.filename)}`)}
-        getRowClassName={(mp3) => (selection.isSelected(mp3.filename) ? 'is-selected' : undefined)}
+        onRowMenu={(mp3, event) =>
+          openMenu(event, mp3, { play: () => void playFrom(mp3.filename), onDeleted: selection.deselect })
+        }
+        getRowClassName={(mp3) =>
+          [selection.isSelected(mp3.filename) ? 'is-selected' : '', menuFilename === mp3.filename ? 'is-menu-open' : '']
+            .filter(Boolean)
+            .join(' ') || undefined
+        }
         className="library-table--selectable"
         emptyMessage={
           debouncedSearchQuery.trim() || favoritesOnly || issue !== 'any' || durationRange !== 'any'
@@ -545,19 +490,6 @@ export function LibraryPage() {
           }}
         />
       )}
-
-      <ConfirmDialog
-        open={deleteTargets !== null}
-        icon={TriangleAlert}
-        title={deleteTargets?.length === 1 ? `Delete "${deleteTargets[0]}"?` : `Delete ${trackCount(deleteTargets?.length ?? 0)}?`}
-        cancelLabel="Keep"
-        cancelIcon={Undo2}
-        confirmLabel="Delete"
-        confirmIcon={Trash2}
-        tone="danger"
-        onCancel={() => setDeleteTargets(null)}
-        onConfirm={() => void confirmDelete()}
-      />
     </div>
   );
 }
