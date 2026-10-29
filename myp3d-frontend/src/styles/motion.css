@@ -222,6 +222,10 @@
     transition: none;
   }
 
+  .inline-select__option {
+    transition-property: opacity, background, box-shadow, color;
+  }
+
   .app-shell {
     --sidebar-label-transition: opacity var(--duration-fast) var(--ease-standard);
   }

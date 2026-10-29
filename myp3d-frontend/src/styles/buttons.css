@@ -181,6 +181,16 @@
   height: 18px;
 }
 
+.segmented__option--text {
+  width: auto;
+  min-width: 2.25rem;
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .segmented__option:hover:not(:disabled),
 .segmented__option:focus-visible {
   color: var(--color-text);

@@ -4,16 +4,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   CalendarPlus,
   Clock,
-  CopyX,
   DiscAlbum,
   Download,
   FileAudio,
   HardDrive,
-  HeartPulse,
-  Image,
   ListChecks,
-  ListFilter,
-  ListMusic,
   ListPlus,
   MicVocal,
   Music,
@@ -23,9 +18,7 @@ import {
   Search,
   Shuffle,
   Square,
-  Star,
   Trash2,
-  Type,
   X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -45,6 +38,8 @@ import type { DataTableColumn } from '../components/table/DataTable';
 import { SortableHeaderButton } from '../components/table/SortableHeaderButton';
 import { TrackTitleCell } from '../components/table/TrackTitleCell';
 import { BulkEditDialog } from '../components/library/BulkEditDialog';
+import { LibraryFilters } from '../components/library/LibraryFilters';
+import { DURATION_OPTIONS, ISSUE_OPTIONS, SCOPE_OPTIONS } from '../components/library/libraryFilterOptions';
 import { useLibrarySelectionCommands } from '../components/library/useLibrarySelectionCommands';
 import { useTrackActions } from '../components/library/trackActionsContext';
 import { AddToPlaylistDialog } from '../components/playlists/AddToPlaylistDialog';
@@ -54,8 +49,7 @@ import { usePlayer } from '../components/player/playerContext';
 import { Checkbox } from '../components/ui/Checkbox';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
-import { IconSelect } from '../components/ui/IconSelect';
-import type { IconSelectOption } from '../components/ui/IconSelect';
+import { InlineSelect } from '../components/ui/InlineSelect';
 
 const PAGE_SIZE = 50;
 const SORT_COLUMNS: Record<MP3SortBy, { label: string; icon: LucideIcon }> = {
@@ -67,34 +61,6 @@ const SORT_COLUMNS: Record<MP3SortBy, { label: string; icon: LucideIcon }> = {
   duration: { label: 'Duration', icon: Clock },
   date_added: { label: 'Date added', icon: CalendarPlus },
 };
-
-const DURATION_OPTIONS: Array<[MP3DurationRange, string]> = [
-  ['any', 'Any'],
-  ['under-2', '< 2'],
-  ['2-3', '2–3'],
-  ['3-4', '3–4'],
-  ['4-5', '4–5'],
-  ['5-7', '5–7'],
-  ['over-7', '7+'],
-];
-
-const SCOPE_OPTIONS: IconSelectOption<MP3FilterBy>[] = [
-  { value: 'all', label: 'All', icon: ListFilter },
-  { value: 'title', label: 'Title', icon: Music },
-  { value: 'artist', label: 'Artist', icon: MicVocal },
-  { value: 'album', label: 'Album', icon: DiscAlbum },
-  { value: 'filename', label: 'File name', icon: FileAudio },
-];
-
-const ISSUE_OPTIONS: IconSelectOption<MP3Issue>[] = [
-  { value: 'any', label: 'Any', icon: HeartPulse },
-  { value: 'title', label: 'Missing title', icon: Type },
-  { value: 'artist', label: 'Missing artist', icon: MicVocal },
-  { value: 'album', label: 'Missing album', icon: DiscAlbum },
-  { value: 'cover', label: 'Missing cover art', icon: Image },
-  { value: 'duplicate', label: 'Duplicates', icon: CopyX },
-  { value: 'playlist', label: 'Not in a playlist', icon: ListMusic },
-];
 
 const LINK_PARAMS = ['q', 'filter', 'duration', 'favorites', 'issue'];
 
@@ -141,9 +107,9 @@ export function LibraryPage() {
     if (!LINK_PARAMS.some((key) => params.has(key))) return;
     setSearchQuery(params.get('q') ?? '');
     setFilterBy(pickOption(params.get('filter'), SCOPE_OPTIONS.map((option) => option.value), 'all'));
-    setDurationRange(pickOption(params.get('duration'), DURATION_OPTIONS.map(([value]) => value), 'any'));
+    setDurationRange(pickOption<MP3DurationRange>(params.get('duration'), DURATION_OPTIONS.map((option) => option.value), 'any'));
     setFavoritesOnly(params.get('favorites') === '1');
-    setIssue(pickOption(params.get('issue'), ISSUE_OPTIONS.map((option) => option.value), 'any'));
+    setIssue(pickOption<MP3Issue>(params.get('issue'), ISSUE_OPTIONS.map((option) => option.value), 'any'));
     setSearchParams({}, { replace: true });
   });
 
@@ -429,34 +395,29 @@ export function LibraryPage() {
               className="library-search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              trailing={
+                <>
+                  {searchQuery && (
+                    <IconButton
+                      icon={X}
+                      label="Clear search"
+                      variant="ghost"
+                      size="sm"
+                      className="motion-fade"
+                      onClick={() => setSearchQuery('')}
+                    />
+                  )}
+                  <InlineSelect label="Search in" value={filterBy} options={SCOPE_OPTIONS} onChange={setFilterBy} />
+                </>
+              }
             />
-            <IconSelect label="Search in" value={filterBy} options={SCOPE_OPTIONS} onChange={setFilterBy} />
-            <label className="icon-field library-duration" title="Duration in minutes">
-              <Clock className="icon-field__icon" aria-hidden="true" />
-              <select
-                aria-label="Duration in minutes"
-                value={durationRange}
-                onChange={(e) => setDurationRange(e.target.value as MP3DurationRange)}
-              >
-                {DURATION_OPTIONS.map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
-            </label>
-            <IconSelect
-              label="Issues"
-              value={issue}
-              options={ISSUE_OPTIONS}
-              onChange={setIssue}
-              active={issue !== 'any'}
-            />
-            <IconButton
-              icon={Star}
-              label="Favourites only"
-              active={favoritesOnly}
-              className={`favorite-filter favorite-toggle ${favoritesOnly ? 'is-favorite' : ''}`.trim()}
-              aria-pressed={favoritesOnly}
-              onClick={() => setFavoritesOnly(!favoritesOnly)}
+            <LibraryFilters
+              durationRange={durationRange}
+              onDurationChange={setDurationRange}
+              issue={issue}
+              onIssueChange={setIssue}
+              favoritesOnly={favoritesOnly}
+              onFavoritesChange={setFavoritesOnly}
             />
             <IconButton icon={Play} label="Play all" onClick={() => void playAll(false)} disabled={totalItems === 0} />
             <IconButton icon={Shuffle} label="Shuffle all" onClick={() => void playAll(true)} disabled={totalItems === 0} />
