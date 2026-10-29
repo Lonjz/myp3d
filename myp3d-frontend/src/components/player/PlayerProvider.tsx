@@ -4,7 +4,6 @@ import { mp3Api } from '../../api/mp3Api';
 import type { MP3Info } from '../../api/mp3Api';
 import { readStoredValue, useStoredValueWriter, writeStoredValue } from '../../hooks/usePersistentState';
 import { emitAppEvent, subscribeAppEvent } from '../../utils/appEvents';
-import type { PlayRequest } from '../../utils/appEvents';
 import { useToast } from '../messages/toastContext';
 import { PlayerContext, PlayerTimeContext } from './playerContext';
 import type { PlayerContextValue, PlayerTimeValue, PlayOptions } from './playerContext';
@@ -208,14 +207,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   usePlayerCommands(value);
 
-  const onPlayRequest = useEffectEvent((request: PlayRequest) => {
-    if ('albumKey' in request) {
-      void playAlbum(request.albumKey, { shuffle: request.shuffle });
-    } else {
-      playTracks(request.tracks, request.startIndex, { shuffle: request.shuffle });
-    }
-  });
-
   const onLibraryChanged = useEffectEvent(() => {
     if (state.queue.length === 0) return;
     mp3Api
@@ -226,7 +217,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const unsubscribers = [
-      subscribeAppEvent('play-request', (request) => onPlayRequest(request)),
       subscribeAppEvent('preview-play', () => dispatch({ type: 'setPlaying', playing: false })),
       subscribeAppEvent('library-changed', () => onLibraryChanged()),
     ];

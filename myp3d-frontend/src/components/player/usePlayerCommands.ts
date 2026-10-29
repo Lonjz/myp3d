@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { ListX, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward } from 'lucide-react';
+import { ListX, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react';
 import { useSpotlightCommands } from '../spotlight/useSpotlightCommands';
 import type { SpotlightCommand } from '../spotlight/spotlightTypes';
 import type { PlayerContextValue } from './playerContext';
@@ -9,8 +9,8 @@ const NEXT_REPEAT_TITLES = { off: 'Repeat all', all: 'Repeat one', one: 'Repeat 
 export function usePlayerCommands(player: PlayerContextValue): void {
   const { state } = player;
   const hasQueue = state.queue.length > 0;
-  const { isPlaying, shuffle, repeat } = state;
-  const { togglePlay, next, previous, toggleShuffle, cycleRepeat, clear } = player;
+  const { isPlaying, shuffle, repeat, muted } = state;
+  const { togglePlay, next, previous, toggleShuffle, cycleRepeat, toggleMute, clear } = player;
 
   const commands = useMemo<SpotlightCommand[]>(() => {
     if (!hasQueue) return [];
@@ -38,9 +38,16 @@ export function usePlayerCommands(player: PlayerContextValue): void {
         keywords: ['loop'],
         run: cycleRepeat,
       },
+      {
+        id: 'mute',
+        title: muted ? 'Unmute' : 'Mute',
+        icon: muted ? Volume2 : VolumeX,
+        keywords: ['sound', 'volume', 'silence', 'quiet'],
+        run: toggleMute,
+      },
       { id: 'clear-queue', title: 'Clear queue', icon: ListX, keywords: ['stop', 'empty'], run: clear },
     ];
-  }, [hasQueue, isPlaying, shuffle, repeat, togglePlay, next, previous, toggleShuffle, cycleRepeat, clear]);
+  }, [hasQueue, isPlaying, shuffle, repeat, muted, togglePlay, next, previous, toggleShuffle, cycleRepeat, toggleMute, clear]);
 
   useSpotlightCommands('player', commands);
 }

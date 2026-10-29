@@ -3,14 +3,13 @@ import type { ReactNode } from 'react';
 import { Spotlight } from './Spotlight';
 import { SpotlightContext } from './spotlightContext';
 import type { SpotlightContextValue } from './spotlightContext';
-import { librarySource } from './sources/librarySource';
 import { pagesSource } from './sources/pagesSource';
 import { useAppCommandsSource } from './sources/useAppCommandsSource';
 import { spotifySource } from './sources/spotifySource';
 import { youtubeSource } from './sources/youtubeSource';
 import type { SpotlightSource } from './spotlightTypes';
 
-const BUILT_IN_SOURCES: SpotlightSource[] = [youtubeSource, spotifySource, pagesSource, librarySource];
+const BUILT_IN_SOURCES: SpotlightSource[] = [youtubeSource, spotifySource, pagesSource];
 
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;

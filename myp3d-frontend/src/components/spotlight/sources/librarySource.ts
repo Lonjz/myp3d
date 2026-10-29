@@ -1,16 +1,21 @@
-import { CalendarPlus, Clock, DiscAlbum, HardDrive, MicVocal, Music, Play } from 'lucide-react';
+import { CalendarPlus, Clock, DiscAlbum, HardDrive, MicVocal, Music } from 'lucide-react';
 import { mp3Api } from '../../../api/mp3Api';
 import type { AlbumInfo, MP3Info } from '../../../api/mp3Api';
-import { emitAppEvent } from '../../../utils/appEvents';
 import { formatBytes, formatDate, formatDuration } from '../../../utils/formatters';
+import type { MenuAction } from '../../ui/ContextMenu';
 import { SPOTLIGHT_SECTION_LIMIT } from '../spotlightTypes';
 import type { RemoteSpotlightSource, SpotlightItem, SpotlightMeta } from '../spotlightTypes';
+
+export interface LibrarySourceActions {
+  track: (track: MP3Info) => MenuAction[];
+  album: (album: AlbumInfo) => MenuAction[];
+}
 
 function compactMeta(entries: Array<SpotlightMeta | null>): SpotlightMeta[] {
   return entries.filter((entry): entry is SpotlightMeta => entry !== null && Boolean(entry.value));
 }
 
-function trackItem(track: MP3Info): SpotlightItem {
+function trackItem(track: MP3Info, actions: MenuAction[]): SpotlightItem {
   const hasCover = track.has_cover;
   return {
     id: `track:${track.filename}`,
@@ -30,15 +35,11 @@ function trackItem(track: MP3Info): SpotlightItem {
       ]),
     },
     run: ({ navigate }) => navigate(`/details/${encodeURIComponent(track.filename)}`),
-    secondary: {
-      label: 'Play',
-      icon: Play,
-      run: () => emitAppEvent('play-request', { tracks: [track], startIndex: 0 }),
-    },
+    actions,
   };
 }
 
-function albumItem(album: AlbumInfo): SpotlightItem {
+function albumItem(album: AlbumInfo, actions: MenuAction[]): SpotlightItem {
   const hasCover = album.has_cover;
   return {
     id: `album:${album.album_key}`,
@@ -57,19 +58,21 @@ function albumItem(album: AlbumInfo): SpotlightItem {
       ]),
     },
     run: ({ navigate }) => navigate(`/albums/${encodeURIComponent(album.album_key)}`),
-    secondary: {
-      label: 'Play album',
-      icon: Play,
-      run: () => emitAppEvent('play-request', { albumKey: album.album_key }),
-    },
+    actions,
   };
 }
 
-export const librarySource: RemoteSpotlightSource = {
-  id: 'library',
-  remote: true,
-  search: async (query, signal) => {
-    const { tracks, albums } = await mp3Api.searchLibrary(query, SPOTLIGHT_SECTION_LIMIT, signal);
-    return [...tracks.map(trackItem), ...albums.map(albumItem)];
-  },
-};
+export function createLibrarySource(getActions: () => LibrarySourceActions): RemoteSpotlightSource {
+  return {
+    id: 'library',
+    remote: true,
+    search: async (query, signal) => {
+      const { tracks, albums } = await mp3Api.searchLibrary(query, SPOTLIGHT_SECTION_LIMIT, signal);
+      const actions = getActions();
+      return [
+        ...tracks.map((track) => trackItem(track, actions.track(track))),
+        ...albums.map((album) => albumItem(album, actions.album(album))),
+      ];
+    },
+  };
+}

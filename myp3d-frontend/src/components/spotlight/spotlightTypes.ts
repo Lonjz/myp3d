@@ -1,8 +1,9 @@
-import { Compass, DiscAlbum, MonitorPlay, Music, SquareTerminal, Zap } from 'lucide-react';
+import { Compass, DiscAlbum, ListMusic, MonitorPlay, Music, SquareTerminal, Zap } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { NavigateFunction } from 'react-router-dom';
+import type { MenuAction } from '../ui/ContextMenu';
 
-export type SpotlightSectionId = 'action' | 'commands' | 'pages' | 'tracks' | 'albums' | 'web';
+export type SpotlightSectionId = 'action' | 'commands' | 'pages' | 'tracks' | 'albums' | 'playlists' | 'web';
 
 export interface SpotlightSection {
   id: SpotlightSectionId;
@@ -17,6 +18,7 @@ export const SPOTLIGHT_SECTIONS: SpotlightSection[] = [
   { id: 'pages', label: 'Pages', icon: Compass },
   { id: 'tracks', label: 'Songs', icon: Music },
   { id: 'albums', label: 'Albums', icon: DiscAlbum },
+  { id: 'playlists', label: 'Playlists', icon: ListMusic },
   { id: 'web', label: 'YouTube', icon: MonitorPlay },
 ];
 
@@ -40,12 +42,6 @@ export interface SpotlightRunContext {
   query: string;
 }
 
-export interface SpotlightSecondaryAction {
-  label: string;
-  icon: LucideIcon;
-  run: (context: SpotlightRunContext) => void;
-}
-
 export interface SpotlightItem {
   id: string;
   section: SpotlightSectionId;
@@ -55,7 +51,7 @@ export interface SpotlightItem {
   thumbnail?: string;
   preview?: SpotlightPreview;
   run: (context: SpotlightRunContext) => void;
-  secondary?: SpotlightSecondaryAction;
+  actions?: MenuAction[];
 }
 
 export interface SpotlightCommand {
@@ -72,6 +68,7 @@ export interface InstantSpotlightSource {
   id: string;
   remote?: false;
   commands?: boolean;
+  browse?: boolean;
   search: (query: string) => SpotlightItem[];
 }
 

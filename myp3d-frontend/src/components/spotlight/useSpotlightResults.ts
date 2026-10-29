@@ -22,8 +22,9 @@ export interface SpotlightResults {
   loading: boolean;
 }
 
-export function useSpotlightResults(query: string, sources: SpotlightSource[]): SpotlightResults {
+export function useSpotlightResults(query: string, sources: SpotlightSource[], browsing: boolean): SpotlightResults {
   const trimmed = query.trim();
+  const browseMode = browsing && !trimmed;
   const commandMode = trimmed.startsWith(SPOTLIGHT_COMMAND_PREFIX);
   const searchText = commandMode ? trimmed.slice(SPOTLIGHT_COMMAND_PREFIX.length).trim() : trimmed;
   const debounced = useDebouncedValue(commandMode ? '' : trimmed, REMOTE_DELAY_MS);
@@ -54,10 +55,13 @@ export function useSpotlightResults(query: string, sources: SpotlightSource[]): 
   }, [debounced, remoteSources]);
 
   const instantItems = useMemo(() => {
+    if (browseMode) {
+      return instantSources.filter((source) => source.commands || source.browse).flatMap((source) => source.search(''));
+    }
     if (!trimmed) return [];
     const activeSources = commandMode ? instantSources.filter((source) => source.commands) : instantSources;
     return activeSources.flatMap((source) => source.search(searchText));
-  }, [commandMode, instantSources, searchText, trimmed]);
+  }, [browseMode, commandMode, instantSources, searchText, trimmed]);
 
   const remoteItems = trimmed && !commandMode && remote.query ? remote.items : null;
 
@@ -65,7 +69,9 @@ export function useSpotlightResults(query: string, sources: SpotlightSource[]): 
     const allItems = [...instantItems, ...(remoteItems ?? [])];
     const sections = SPOTLIGHT_SECTIONS.map((section) => ({
       section,
-      items: allItems.filter((item) => item.section === section.id).slice(0, section.limit ?? SPOTLIGHT_SECTION_LIMIT),
+      items: allItems
+        .filter((item) => item.section === section.id)
+        .slice(0, browseMode || commandMode ? undefined : (section.limit ?? SPOTLIGHT_SECTION_LIMIT)),
     })).filter((entry) => entry.items.length > 0);
 
     return {
@@ -73,5 +79,5 @@ export function useSpotlightResults(query: string, sources: SpotlightSource[]): 
       items: sections.flatMap((entry) => entry.items),
       loading: Boolean(trimmed) && !commandMode && remoteSources.length > 0 && remote.query !== trimmed,
     };
-  }, [commandMode, instantItems, remoteItems, remoteSources.length, remote.query, trimmed]);
+  }, [browseMode, commandMode, instantItems, remoteItems, remoteSources.length, remote.query, trimmed]);
 }

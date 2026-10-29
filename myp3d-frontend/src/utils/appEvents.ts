@@ -1,9 +1,3 @@
-import type { MP3Info } from '../api/mp3Api';
-
-export type PlayRequest =
-  | { tracks: MP3Info[]; startIndex: number; shuffle?: boolean }
-  | { albumKey: string; shuffle?: boolean };
-
 export interface AppEventMap {
   'library-changed': undefined;
   'playlists-changed': undefined;
@@ -11,7 +5,6 @@ export interface AppEventMap {
   'queue-changed': undefined;
   'player-play': undefined;
   'preview-play': undefined;
-  'play-request': PlayRequest;
 }
 
 type AppEventName = keyof AppEventMap;

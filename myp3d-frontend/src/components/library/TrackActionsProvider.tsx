@@ -1,15 +1,37 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Download, ListEnd, ListPlus, ListStart, Pencil, Play, Star, StarOff, Trash2, TriangleAlert, Undo2 } from 'lucide-react';
+import {
+  Download,
+  Library,
+  ListEnd,
+  ListPlus,
+  ListStart,
+  Music,
+  Pencil,
+  Play,
+  Shuffle,
+  Star,
+  StarOff,
+  Trash2,
+  TriangleAlert,
+  Undo2,
+} from 'lucide-react';
 import { mp3Api } from '../../api/mp3Api';
-import type { MP3Info } from '../../api/mp3Api';
+import type { AlbumInfo, MP3Info } from '../../api/mp3Api';
+import { playlistApi } from '../../api/playlistApi';
+import type { PlaylistInfo } from '../../api/playlistApi';
 import { usePresence } from '../../hooks/usePresence';
 import { emitAppEvent } from '../../utils/appEvents';
 import { useFavorites } from '../favorites/useFavorites';
 import { useToast } from '../messages/toastContext';
 import { usePlayer } from '../player/playerContext';
 import { AddToPlaylistDialog } from '../playlists/AddToPlaylistDialog';
+import { createLibrarySource } from '../spotlight/sources/librarySource';
+import { createPlaylistsSource } from '../spotlight/sources/playlistsSource';
+import type { SpotlightCommand } from '../spotlight/spotlightTypes';
+import { useSpotlightCommands } from '../spotlight/useSpotlightCommands';
+import { useSpotlightSource } from '../spotlight/useSpotlightSource';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { ContextMenu } from '../ui/ContextMenu';
 import type { MenuAction } from '../ui/ContextMenu';
@@ -22,6 +44,14 @@ interface OpenMenu {
   y: number;
   track: MP3Info;
   actions: MenuAction[];
+}
+
+type PlayMode = 'play' | 'shuffle' | 'queue';
+
+interface SearchActions {
+  track: (track: MP3Info) => MenuAction[];
+  album: (album: AlbumInfo) => MenuAction[];
+  playlist: (playlist: PlaylistInfo) => MenuAction[];
 }
 
 interface PendingDelete {
@@ -43,7 +73,7 @@ const downloadFile = (filename: string) => {
 
 export function TrackActionsProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
-  const { playNext, enqueue } = usePlayer();
+  const { playNext, enqueue, playTracks, currentTrack } = usePlayer();
   const { showSuccess, showError } = useToast();
   const { favorites, toggle: toggleFavorite } = useFavorites();
   const [menu, setMenu] = useState<OpenMenu | null>(null);
@@ -127,6 +157,112 @@ export function TrackActionsProvider({ children }: { children: ReactNode }) {
     },
     [trackActions],
   );
+
+  const playLoaded = async (load: () => Promise<MP3Info[]>, mode: PlayMode) => {
+    try {
+      const tracks = await load();
+      if (mode === 'queue') {
+        enqueue(tracks);
+        return;
+      }
+      playTracks(tracks, mode === 'shuffle' ? undefined : 0, { shuffle: mode === 'shuffle' });
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Failed to load tracks');
+    }
+  };
+
+  const collectionActions = (load: () => Promise<MP3Info[]>): MenuAction[] => [
+    { id: 'play', label: 'Play', icon: Play, run: () => void playLoaded(load, 'play') },
+    { id: 'shuffle', label: 'Shuffle', icon: Shuffle, run: () => void playLoaded(load, 'shuffle') },
+    { id: 'enqueue', label: 'Add to queue', icon: ListEnd, run: () => void playLoaded(load, 'queue') },
+  ];
+
+  const searchActions: SearchActions = {
+    track: (track) => trackActions(track, { play: () => playTracks([track], 0) }).filter((action) => action.id !== 'edit'),
+    album: (album) => collectionActions(async () => (await mp3Api.getAlbum(album.album_key)).tracks),
+    playlist: (playlist) => collectionActions(async () => (await playlistApi.get(playlist.id)).tracks),
+  };
+  const searchActionsRef = useRef(searchActions);
+
+  useEffect(() => {
+    searchActionsRef.current = searchActions;
+  });
+
+  const librarySource = useMemo(() => createLibrarySource(() => searchActionsRef.current), []);
+  const playlistsSource = useMemo(() => createPlaylistsSource(() => searchActionsRef.current.playlist), []);
+  useSpotlightSource(librarySource);
+  useSpotlightSource(playlistsSource);
+
+  const playLoadedRef = useRef(playLoaded);
+
+  useEffect(() => {
+    playLoadedRef.current = playLoaded;
+  });
+
+  const commands = useMemo<SpotlightCommand[]>(() => {
+    const loadLibrary = () => mp3Api.listAll();
+    const loadFavorites = () => mp3Api.listAll({ favoritesOnly: true });
+    const playback: SpotlightCommand[] = [
+      {
+        id: 'play-library',
+        title: 'Play library',
+        icon: Library,
+        keywords: ['all', 'songs', 'music'],
+        run: () => playLoadedRef.current(loadLibrary, 'play'),
+      },
+      {
+        id: 'shuffle-library',
+        title: 'Shuffle library',
+        icon: Shuffle,
+        keywords: ['all', 'songs', 'random', 'mix'],
+        run: () => playLoadedRef.current(loadLibrary, 'shuffle'),
+      },
+      {
+        id: 'play-favourites',
+        title: 'Play favourites',
+        icon: Star,
+        keywords: ['favorites', 'liked', 'starred'],
+        run: () => playLoadedRef.current(loadFavorites, 'play'),
+      },
+      {
+        id: 'shuffle-favourites',
+        title: 'Shuffle favourites',
+        icon: Shuffle,
+        keywords: ['favorites', 'liked', 'starred', 'random', 'mix'],
+        run: () => playLoadedRef.current(loadFavorites, 'shuffle'),
+      },
+    ];
+    if (!currentTrack) return playback;
+
+    const { filename } = currentTrack;
+    const favorite = favorites.has(filename);
+    return [
+      ...playback,
+      {
+        id: 'favorite-current',
+        title: favorite ? 'Unfavourite current song' : 'Favourite current song',
+        icon: favorite ? StarOff : Star,
+        keywords: ['favorite', 'like', 'star', 'now playing'],
+        run: () => toggleFavorite(filename),
+      },
+      {
+        id: 'add-current-to-playlist',
+        title: 'Add current song to playlist',
+        icon: ListPlus,
+        keywords: ['now playing', 'collection'],
+        run: () => addToPlaylist([filename]),
+      },
+      {
+        id: 'show-current',
+        title: 'Show current song',
+        icon: Music,
+        keywords: ['now playing', 'details', 'edit', 'go to'],
+        run: () => navigate(`/details/${encodeURIComponent(filename)}`),
+      },
+    ];
+  }, [currentTrack, favorites, toggleFavorite, addToPlaylist, navigate]);
+
+  useSpotlightCommands('library-playback', commands);
 
   const value = useMemo<TrackActionsContextValue>(
     () => ({
