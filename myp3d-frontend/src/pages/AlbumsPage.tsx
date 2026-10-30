@@ -15,6 +15,7 @@ import { HeaderIcon } from '../components/table/HeaderIcon';
 import { SortableHeaderButton } from '../components/table/SortableHeaderButton';
 import { CoverPlayButton } from '../components/player/CoverPlayButton';
 import { usePlayer } from '../components/player/playerContext';
+import { LoadFailed } from '../components/ui/EmptyState';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 
@@ -48,7 +49,7 @@ export function AlbumsPage() {
     total: totalItems,
     loading,
     loadingMore,
-    error,
+    failed,
     hasMore,
     loadMore,
     refresh,
@@ -57,11 +58,10 @@ export function AlbumsPage() {
     params: queryParams,
     fetchPage: mp3Api.listAlbumsPaged,
     getKey: getAlbumKey,
-    errorMessage: 'Failed to load albums',
   });
 
   const player = usePlayer();
-  const currentAlbumName = (player.currentTrack?.album || '').trim().toLowerCase();
+  const currentAlbumKey = player.currentTrack?.album_key;
 
   const renderSortHeader = (column: AlbumSortBy, label: string, icon: LucideIcon) => {
     return (
@@ -87,7 +87,8 @@ export function AlbumsPage() {
           <CoverPlayButton
             src={album.has_cover ? mp3Api.getAlbumCoverUrl(album.album_key, 'thumb') : undefined}
             label={`Play ${album.album_name}`}
-            isCurrent={player.currentTrack !== null && currentAlbumName === album.album_name.toLowerCase()}
+            icon={DiscAlbum}
+            isCurrent={currentAlbumKey === album.album_key}
             isPlaying={player.state.isPlaying}
             onPlay={() => void player.playAlbum(album.album_key)}
             onToggle={player.togglePlay}
@@ -138,34 +139,36 @@ export function AlbumsPage() {
 
   return (
     <div className="page page--fill">
-      {error && <p className="error">{error}</p>}
-
-      <DataTable
-        fill
-        columns={columns}
-        items={albums}
-        getRowKey={getAlbumKey}
-        onRowOpen={(album) => navigate(`/albums/${encodeURIComponent(album.album_key)}`)}
-        emptyMessage={debouncedSearchQuery.trim() ? 'No matches' : 'No albums yet'}
-        loading={loading}
-        loadingMore={loadingMore}
-        hasMore={hasMore}
-        onEndReached={loadMore}
-        resetKey={queryParams}
-        toolbar={(
-          <>
-            <IconField
-              icon={Search}
-              label="Search"
-              className="library-search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            <IconButton icon={RefreshCw} label="Refresh" onClick={() => void refresh()} />
-            <span className="library-count">{albums.length} / {totalItems}</span>
-          </>
-        )}
-      />
+      {failed ? (
+        <LoadFailed label="Couldn't load albums" onRetry={() => void refresh()} />
+      ) : (
+        <DataTable
+          fill
+          columns={columns}
+          items={albums}
+          getRowKey={getAlbumKey}
+          onRowOpen={(album) => navigate(`/albums/${encodeURIComponent(album.album_key)}`)}
+          emptyMessage={debouncedSearchQuery.trim() ? 'No matches' : 'No albums yet'}
+          loading={loading}
+          loadingMore={loadingMore}
+          hasMore={hasMore}
+          onEndReached={loadMore}
+          resetKey={queryParams}
+          toolbar={(
+            <>
+              <IconField
+                icon={Search}
+                label="Search"
+                className="library-search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <IconButton icon={RefreshCw} label="Refresh" onClick={() => void refresh()} />
+              <span className="library-count">{albums.length} / {totalItems}</span>
+            </>
+          )}
+        />
+      )}
     </div>
   );
 }

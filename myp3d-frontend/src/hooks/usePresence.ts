@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-export const EXIT_DURATION_MS = 180;
+const EXIT_DURATION_MS = 180;
 
 export function usePresence(open: boolean, exitMs = EXIT_DURATION_MS) {
   const [mounted, setMounted] = useState(open);

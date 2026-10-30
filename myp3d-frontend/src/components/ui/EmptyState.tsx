@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
+import { CircleAlert, RefreshCw } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { IconButton } from './IconButton';
 import { Spinner } from './Spinner';
 
 interface EmptyStateProps {
@@ -11,6 +13,14 @@ interface EmptyStateProps {
   compact?: boolean;
   className?: string;
   children?: ReactNode;
+}
+
+export function LoadFailed({ label, onRetry, compact = false }: { label: string; onRetry: () => void; compact?: boolean }) {
+  return (
+    <EmptyState icon={CircleAlert} label={label} compact={compact}>
+      <IconButton icon={RefreshCw} label="Retry" onClick={onRetry} />
+    </EmptyState>
+  );
 }
 
 export function EmptyState({

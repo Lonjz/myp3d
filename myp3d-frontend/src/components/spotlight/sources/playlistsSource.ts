@@ -1,13 +1,11 @@
 import { CalendarClock, ListMusic, Music } from 'lucide-react';
 import { playlistApi } from '../../../api/playlistApi';
 import type { PlaylistInfo } from '../../../api/playlistApi';
-import { formatDate } from '../../../utils/formatters';
+import { formatDate, trackCount } from '../../../utils/formatters';
 import { matchScore } from '../../../utils/matchScore';
 import type { MenuAction } from '../../ui/ContextMenu';
 import { SPOTLIGHT_SECTION_LIMIT } from '../spotlightTypes';
 import type { RemoteSpotlightSource, SpotlightItem } from '../spotlightTypes';
-
-const trackCount = (count: number) => `${count} track${count === 1 ? '' : 's'}`;
 
 function playlistItem(playlist: PlaylistInfo, actions: MenuAction[]): SpotlightItem {
   const hasCover = playlist.has_cover;

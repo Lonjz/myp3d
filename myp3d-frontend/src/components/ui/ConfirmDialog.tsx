@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useId, useRef, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { usePresence } from '../../hooks/usePresence';
+import { Modal } from './Modal';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -29,6 +29,7 @@ export function ConfirmDialog({
   onCancel,
 }: ConfirmDialogProps) {
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const titleId = useId();
   const { mounted, closing } = usePresence(open);
   const [shownTitle, setShownTitle] = useState(title);
 
@@ -36,37 +37,21 @@ export function ConfirmDialog({
     setShownTitle(title);
   }
 
-  useEffect(() => {
-    if (!open) return undefined;
-    cancelRef.current?.focus();
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        event.stopPropagation();
-        onCancel();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown, true);
-    return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [open, onCancel]);
-
   if (!mounted) return null;
 
-  return createPortal(
-    <div className="confirm-layer" data-state={closing ? 'closed' : 'open'}>
-      <div className="confirm-scrim motion-fade" onMouseDown={onCancel} />
-      <div
-        className={`confirm-dialog glass motion-pop confirm-dialog--${tone}`}
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="confirm-dialog-title"
-      >
+  return (
+    <Modal
+      className={`confirm-dialog confirm-dialog--${tone}`}
+      closing={closing}
+      onClose={onCancel}
+      role="alertdialog"
+      labelledBy={titleId}
+      initialFocus={cancelRef}
+    >
         <span className="confirm-dialog__icon">
           <Icon aria-hidden="true" />
         </span>
-        <h2 id="confirm-dialog-title" className="confirm-dialog__title">
+        <h2 id={titleId} className="confirm-dialog__title">
           {shownTitle}
         </h2>
         <div className="confirm-dialog__actions">
@@ -79,8 +64,6 @@ export function ConfirmDialog({
             {confirmLabel}
           </button>
         </div>
-      </div>
-    </div>,
-    document.body,
+    </Modal>
   );
 }

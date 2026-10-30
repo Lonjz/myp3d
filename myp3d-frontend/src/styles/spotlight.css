@@ -249,7 +249,7 @@
 }
 
 .spotlight-row__more:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--glass-tint-hover);
   color: var(--color-text);
 }
 
@@ -282,7 +282,7 @@
 }
 
 .spotlight-actions__back:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--glass-tint-hover);
   color: var(--color-text);
 }
 

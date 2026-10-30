@@ -5,6 +5,8 @@ export interface AppEventMap {
   'queue-changed': undefined;
   'player-play': undefined;
   'preview-play': undefined;
+  'backend-unreachable': undefined;
+  'show-shortcuts': undefined;
 }
 
 type AppEventName = keyof AppEventMap;

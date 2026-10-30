@@ -3,6 +3,7 @@ import { Check, CircleAlert, CircleCheck } from 'lucide-react';
 import { AppleMusicIcon } from '../ui/BrandIcons';
 import { ProgressRow } from '../ui/ProgressRow';
 import { Spinner } from '../ui/Spinner';
+import { IconButton } from '../ui/IconButton';
 
 interface MusicJobPanelProps {
   status: 'syncing' | 'done' | 'failed';
@@ -38,10 +39,7 @@ export function MusicJobPanel({ status, error, total, done, failed, busy, onDism
       />
       {status === 'failed' && <h2 className="sync-panel__title" title={error ?? ''}>{error ?? 'Sync failed'}</h2>}
       {status === 'done' && <div className="album-chips sync-panel__chips">{children}</div>}
-      <button type="button" className="btn-primary" onClick={onDismiss} disabled={busy}>
-        <Check aria-hidden="true" />
-        Done
-      </button>
+      <IconButton icon={Check} label="Done" variant="primary" onClick={onDismiss} disabled={busy} />
     </section>
   );
 }

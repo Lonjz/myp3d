@@ -253,7 +253,7 @@
   width: 1.15rem;
   height: 1.15rem;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.18);
+  background: var(--color-surface-selected);
   color: var(--color-text-secondary);
   font-size: 0.65rem;
   font-weight: var(--font-weight-semibold);

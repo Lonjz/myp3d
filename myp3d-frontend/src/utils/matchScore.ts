@@ -1,6 +1,6 @@
 const WORD_SPLIT = /[^\p{L}\p{N}]+/u;
 
-export function splitWords(value: string): string[] {
+function splitWords(value: string): string[] {
   return value.toLocaleLowerCase().split(WORD_SPLIT).filter(Boolean);
 }
 

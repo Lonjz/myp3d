@@ -182,7 +182,7 @@
   height: 8px;
   overflow: hidden;
   border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--glass-tint-hover);
 }
 
 .sync-meter span {

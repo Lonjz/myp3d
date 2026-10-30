@@ -29,7 +29,7 @@ import { syncApi } from '../api/syncApi';
 import type { SyncDiff, SyncDiffRecord, SyncDiffTrack, SyncSession } from '../api/syncApi';
 import { Cover, DiffColumn, TrackText } from '../components/diff/DiffColumns';
 import { useSyncSession } from '../components/sync/useSyncSession';
-import { EmptyState } from '../components/ui/EmptyState';
+import { EmptyState, LoadFailed } from '../components/ui/EmptyState';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
@@ -37,7 +37,7 @@ import { ProgressRow } from '../components/ui/ProgressRow';
 import { Spinner } from '../components/ui/Spinner';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { usePersistentState } from '../hooks/usePersistentState';
-import { formatTrackSubtitle } from '../utils/formatters';
+import { formatTrackSubtitle, trackCount } from '../utils/formatters';
 
 const DEFAULT_PORT = '47817';
 const MIN_PORT = 1024;
@@ -137,11 +137,17 @@ function RecordRow({
 
 const recordKey = (record: SyncDiffRecord) => `${record.kind}:${record.key}`;
 
-function PairedColumns({ diff, loading, peerName }: { diff: SyncDiff | null; loading: boolean; peerName: string }) {
+interface PairedColumnsProps {
+  diff: SyncDiff | null;
+  loading: boolean;
+  failed: boolean;
+  peerName: string;
+  onRetry: () => void;
+}
+
+function PairedColumns({ diff, loading, failed, peerName, onRetry }: PairedColumnsProps) {
   if (!diff) {
-    return (
-      <EmptyState loading />
-    );
+    return failed && !loading ? <LoadFailed label="Couldn't compare libraries" onRetry={onRetry} /> : <EmptyState loading />;
   }
 
   return (
@@ -264,10 +270,7 @@ function SessionPanel({
           )}
         </div>
       )}
-      <button type="button" className="btn-primary" onClick={onDismiss} disabled={busy}>
-        <Check aria-hidden="true" />
-        Done
-      </button>
+      <IconButton icon={Check} label="Done" variant="primary" onClick={onDismiss} disabled={busy} />
     </section>
   );
 }
@@ -281,11 +284,14 @@ export function SyncPage() {
   const {
     status,
     startError,
+    startFailed,
+    retryStart,
     peers,
     session,
     busy,
     diff,
     diffLoading,
+    diffFailed,
     refreshDiff,
     requestSync,
     accept,
@@ -330,6 +336,7 @@ export function SyncPage() {
               onClick={() => void start()}
               disabled={busy || diffLoading || pending === 0}
               title={`Sync with ${paired.peer.name}`}
+              aria-label={`Sync ${trackCount(pending)} with ${paired.peer.name}`}
             >
               <ArrowLeftRight aria-hidden="true" />
               {pending}
@@ -361,9 +368,11 @@ export function SyncPage() {
       </div>
 
       {paired ? (
-        <PairedColumns diff={diff} loading={diffLoading} peerName={paired.peer.name} />
+        <PairedColumns diff={diff} loading={diffLoading} failed={diffFailed} peerName={paired.peer.name} onRetry={() => void refreshDiff()} />
       ) : showSession ? (
         <SessionPanel session={session} busy={busy} onCancel={() => void cancel()} onDismiss={() => void dismiss()} />
+      ) : startFailed ? (
+        <LoadFailed label="Couldn't start listening" onRetry={retryStart} />
       ) : peers.length > 0 ? (
         <ul className="sync-peers">
           {peers.map((peer, index) => (

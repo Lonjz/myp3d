@@ -45,3 +45,11 @@ export function formatDuration(value: number | null | undefined): string {
 export function formatTrackSubtitle(artist: string | null, album: string | null): string {
   return [artist, album].filter(Boolean).join(' · ');
 }
+
+export function trackCount(count: number): string {
+  return `${count} track${count === 1 ? '' : 's'}`;
+}
+
+export function errorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error ? err.message : fallback;
+}

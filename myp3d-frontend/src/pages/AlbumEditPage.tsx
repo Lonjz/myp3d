@@ -1,6 +1,6 @@
-import { useEffect, useEffectEvent, useReducer, useRef, useState } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DiscAlbum, FileAudio, HardDrive, ImagePlus, MicVocal, Music, Play, Save, Shuffle, Trash2, TriangleAlert, Undo2 } from 'lucide-react';
+import { DiscAlbum, FileAudio, HardDrive, ImagePlus, MicVocal, Music, Play, Save, Shuffle } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { AlbumDetail, AlbumInfo } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
@@ -13,15 +13,17 @@ import { TrackIndexButton } from '../components/player/TrackIndexButton';
 import { DataTable } from '../components/table/DataTable';
 import { HeaderIcon } from '../components/table/HeaderIcon';
 import { TrackTitleCell } from '../components/table/TrackTitleCell';
-import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { Spinner } from '../components/ui/Spinner';
-import { EmptyState } from '../components/ui/EmptyState';
+import { EmptyState, LoadFailed } from '../components/ui/EmptyState';
+import { useDetail } from '../hooks/useDetail';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { emitAppEvent, subscribeAppEvent } from '../utils/appEvents';
 import { getCachedAlbumDetail, setCachedAlbumDetail } from '../utils/detailCache';
-import { formatBytes } from '../utils/formatters';
+import { errorMessage, formatBytes, trackCount } from '../utils/formatters';
+import { DiscardChangesDialog } from '../components/ui/DiscardChangesDialog';
+import { useSaveShortcut } from '../hooks/useSaveShortcut';
 
 interface AlbumEditPageProps {
   albumKey: string;
@@ -33,10 +35,16 @@ const NO_ALBUM_LABEL = '(No Album)';
 const getSharedArtist = (detail: AlbumDetail) => (detail.album.artists.length === 1 ? detail.album.artists[0] : '');
 const ALBUM_SIDEBAR_PAGE_SIZE = 25;
 
+async function fetchAlbum(albumKey: string, force: boolean): Promise<AlbumDetail> {
+  const cached = force ? null : getCachedAlbumDetail(albumKey);
+  if (cached) return cached;
+  const detail = await mp3Api.getAlbum(albumKey);
+  setCachedAlbumDetail(albumKey, detail);
+  return detail;
+}
+
 export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
   const navigate = useNavigate();
-  const [albumDetail, setAlbumDetail] = useState<AlbumDetail | null>(null);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { showSuccess, showError, showInfo, clearToast } = useToast();
 
@@ -47,19 +55,10 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
+    cropModalProps,
     coverFile,
     coverPreview,
-    cropSource,
-    crop,
-    zoom,
-    isCropModalOpen,
-    isApplyingCrop,
-    setCrop,
-    setZoom,
-    handleCropComplete,
     handleCoverChange,
-    handleApplyCrop,
-    handleCancelCrop,
     resetCoverState,
   } = useCoverImageCrop({
     onError: showError,
@@ -68,49 +67,15 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
   });
 
   const applyAlbumDetail = (detail: AlbumDetail) => {
-    setAlbumDetail(detail);
-
+    resetCoverState();
     const editableName = detail.album.album_name === NO_ALBUM_LABEL ? '' : detail.album.album_name;
     setAlbumName(editableName);
     setArtist(getSharedArtist(detail));
   };
 
-  const loadAlbum = async (targetKey: string, options?: { clearToast?: boolean; force?: boolean }) => {
-    const force = options?.force ?? false;
-    if (options?.clearToast ?? true) {
-      clearToast();
-    }
-
-    if (!force) {
-      const cached = getCachedAlbumDetail(targetKey);
-      if (cached) {
-        applyAlbumDetail(cached);
-        setLoading(false);
-        return;
-      }
-    }
-
-    try {
-      setLoading(true);
-      const detail = await mp3Api.getAlbum(targetKey);
-      setCachedAlbumDetail(targetKey, detail);
-      applyAlbumDetail(detail);
-    } catch (err) {
-      showError(err instanceof Error ? err.message : 'Failed to load album');
-      setAlbumDetail(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadCurrentAlbum = useEffectEvent((targetKey: string) => {
-    resetCoverState();
-    void loadAlbum(targetKey);
-  });
-
-  useEffect(() => {
-    loadCurrentAlbum(albumKey);
-  }, [albumKey]);
+  const { detail: albumDetail, current, missing, failed, reload } = useDetail(albumKey, fetchAlbum, applyAlbumDetail, (err) =>
+    showError(errorMessage(err, 'Failed to load album')),
+  );
 
   useEffect(() => subscribeAppEvent('library-changed', refreshCoverPreview), []);
 
@@ -121,13 +86,12 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
   const isDirty = albumDetail !== null && (albumName !== loadedAlbumName || isArtistDirty || coverFile !== null);
 
   const { blocker, allowNavigation } = useUnsavedChangesGuard(isDirty);
+  useSaveShortcut(() => void handleSave(), !(saving || !current || !isDirty));
   const player = usePlayer();
   const { favorites, openMenu, menuFilename } = useTrackActions();
 
   const handleSave = async () => {
-    if (!albumDetail) {
-      return;
-    }
+    if (!albumDetail || !current) return;
 
     setSaving(true);
     showInfo('Saving album changes...');
@@ -151,24 +115,24 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
         return;
       }
 
-      await loadAlbum(targetAlbumKey, { clearToast: false, force: true });
-      resetCoverState();
+      await reload();
       showSuccess('Album updated successfully!');
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Failed to save album');
+      showError(errorMessage(err, 'Failed to save album'));
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading && !albumDetail) return <div className="page"><Spinner /></div>;
-  if (!albumDetail) return <div className="page"><EmptyState icon={DiscAlbum} label="Album not found" /></div>;
+  if (missing) return <div className="page"><EmptyState icon={DiscAlbum} label="Album not found" /></div>;
+  if (failed) return <div className="page"><LoadFailed label="Couldn't load the album" onRetry={() => void reload()} /></div>;
+  if (!albumDetail) return <div className="page"><Spinner /></div>;
 
   const existingCoverPreview = albumDetail.album.has_cover ? mp3Api.getAlbumCoverUrl(albumDetail.album.album_key, 'full') : null;
   const effectiveCoverPreview = coverPreview || existingCoverPreview;
   const getAlbumSubtitle = (album: AlbumInfo) => {
     const subtitleParts = [
-      `${album.track_count} track${album.track_count === 1 ? '' : 's'}`,
+      `${trackCount(album.track_count)}`,
       album.artists.length > 0 ? album.artists.slice(0, 2).join(', ') : '',
     ].filter(Boolean);
 
@@ -222,14 +186,14 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
               type="button"
               className="cover-preview"
               onClick={() => fileInputRef.current?.click()}
-              disabled={saving}
+              disabled={saving || !current}
               aria-label="Change album cover"
               title="Change album cover"
             >
               {effectiveCoverPreview ? (
                 <img src={effectiveCoverPreview} alt="" />
               ) : (
-                <div className="no-cover-large">🎵</div>
+                <div className="no-cover-large"><DiscAlbum aria-hidden="true" /></div>
               )}
               <span className="cover-preview__overlay" aria-hidden="true">
                 <ImagePlus />
@@ -242,14 +206,14 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
                 label="Album name"
                 value={albumName}
                 onChange={(e) => setAlbumName(e.target.value)}
-                disabled={saving}
+                disabled={saving || !current}
               />
               <IconField
                 icon={MicVocal}
                 label="Artist"
                 value={artist}
                 onChange={(e) => setArtist(e.target.value)}
-                disabled={saving}
+                disabled={saving || !current}
               />
 
               <div className="album-chips">
@@ -282,10 +246,14 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
                   onClick={() => player.playTracks(albumDetail.tracks, undefined, { shuffle: true })}
                   disabled={albumDetail.tracks.length === 0}
                 />
-                <button onClick={handleSave} disabled={saving} className="btn-primary metadata-save">
-                  {saving ? <Spinner inline /> : <Save aria-hidden="true" />}
-                  Save
-                </button>
+                <IconButton
+                  icon={Save}
+                  label="Save"
+                  variant="primary"
+                  onClick={() => void handleSave()}
+                  busy={saving}
+                  disabled={saving || !current || !isDirty}
+                />
               </div>
             </div>
           </div>
@@ -307,7 +275,7 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
                     onBack();
                     return;
                   }
-                  void loadAlbum(albumKey, { clearToast: false, force: true });
+                  void reload();
                 },
               })
             }
@@ -363,32 +331,9 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
         </section>
       </div>
 
-      <ConfirmDialog
-        open={blocker.state === 'blocked'}
-        icon={TriangleAlert}
-        title="Discard changes?"
-        cancelLabel="Stay"
-        cancelIcon={Undo2}
-        confirmLabel="Discard"
-        confirmIcon={Trash2}
-        tone="danger"
-        onCancel={() => blocker.reset?.()}
-        onConfirm={() => blocker.proceed?.()}
-      />
+      <DiscardChangesDialog blocker={blocker} />
 
-      <CoverCropModal
-        isOpen={isCropModalOpen}
-        cropSource={cropSource}
-        crop={crop}
-        zoom={zoom}
-        isApplyingCrop={isApplyingCrop}
-        zoomInputId="albumCropZoom"
-        onCropChange={setCrop}
-        onZoomChange={setZoom}
-        onCropComplete={handleCropComplete}
-        onCancel={handleCancelCrop}
-        onApply={handleApplyCrop}
-      />
+      <CoverCropModal {...cropModalProps} />
     </div>
   );
 }

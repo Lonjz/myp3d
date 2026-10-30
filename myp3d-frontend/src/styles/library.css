@@ -1,4 +1,3 @@
-/* Library */
 .data-table {
   container: data-table / inline-size;
 }
@@ -200,7 +199,7 @@
 }
 
 .library-sort-button:hover,
-.library-sort-button.active {
+.library-sort-button.is-active {
   color: var(--color-text);
 }
 

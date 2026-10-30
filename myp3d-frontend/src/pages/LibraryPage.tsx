@@ -31,7 +31,7 @@ import { usePresence } from '../hooks/usePresence';
 import { useSequentialDownload } from '../hooks/useSequentialDownload';
 import { useSortState } from '../hooks/useSortState';
 import { useTrackSelection } from '../hooks/useTrackSelection';
-import { formatBytes, formatDate, formatDateTime, formatDuration } from '../utils/formatters';
+import { errorMessage, formatBytes, formatDate, formatDateTime, formatDuration, formatTrackSubtitle } from '../utils/formatters';
 import { subscribeAppEvent } from '../utils/appEvents';
 import { DataTable } from '../components/table/DataTable';
 import type { DataTableColumn } from '../components/table/DataTable';
@@ -47,6 +47,7 @@ import { useToast } from '../components/messages/toastContext';
 import { CoverPlayButton } from '../components/player/CoverPlayButton';
 import { usePlayer } from '../components/player/playerContext';
 import { Checkbox } from '../components/ui/Checkbox';
+import { LoadFailed } from '../components/ui/EmptyState';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { InlineSelect } from '../components/ui/InlineSelect';
@@ -122,7 +123,7 @@ export function LibraryPage() {
     total: totalItems,
     loading,
     loadingMore,
-    error,
+    failed,
     hasMore,
     loadMore,
     refresh,
@@ -131,7 +132,6 @@ export function LibraryPage() {
     params: queryParams,
     fetchPage: mp3Api.listAllPaged,
     getKey: getTrackKey,
-    errorMessage: 'Failed to load MP3 library',
   });
 
   const player = usePlayer();
@@ -182,7 +182,7 @@ export function LibraryPage() {
     try {
       selection.selectMany(await loadMatchingTracks());
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Failed to select tracks');
+      showError(errorMessage(err, 'Failed to select tracks'));
     } finally {
       setSelectingAll(false);
     }
@@ -285,7 +285,7 @@ export function LibraryPage() {
       render: (mp3) => (
         <TrackTitleCell
           title={mp3.title || '-'}
-          subtitle={[mp3.artist, mp3.album].filter(Boolean).join(' · ')}
+          subtitle={formatTrackSubtitle(mp3.artist, mp3.album)}
           favorite={favorites.has(mp3.filename)}
         />
       ),
@@ -351,86 +351,88 @@ export function LibraryPage() {
 
   return (
     <div className="page page--fill">
-      {error && <p className="error">{error}</p>}
-
-      <DataTable
-        fill
-        columns={columns}
-        items={mp3s}
-        getRowKey={getTrackKey}
-        onRowOpen={(mp3) => navigate(`/details/${encodeURIComponent(mp3.filename)}`)}
-        onRowMenu={(mp3, event) =>
-          openMenu(event, mp3, { play: () => void playFrom(mp3.filename), onDeleted: selection.deselect })
-        }
-        getRowClassName={(mp3) =>
-          [selection.isSelected(mp3.filename) ? 'is-selected' : '', menuFilename === mp3.filename ? 'is-menu-open' : '']
-            .filter(Boolean)
-            .join(' ') || undefined
-        }
-        className="library-table--selectable"
-        emptyMessage={
-          debouncedSearchQuery.trim() || favoritesOnly || issue !== 'any' || durationRange !== 'any'
-            ? 'No matches'
-            : 'No tracks yet'
-        }
-        loading={loading}
-        loadingMore={loadingMore}
-        hasMore={hasMore}
-        onEndReached={loadMore}
-        resetKey={queryParams}
-        toolbar={showSelection ? (
-          <div key="selection" className="library-toolbar__set" data-state={toolbarState}>
-            <IconButton icon={X} label="Clear selection" onClick={selection.clear} />
-            <span className="library-selection-count" title="Selected">
-              <ListChecks aria-hidden="true" />
-              {selection.size}
-            </span>
-            <IconButton icon={Play} label="Play selected" onClick={playSelected} />
-            <IconButton icon={Pencil} label="Edit selected" onClick={editSelected} disabled={deleting} />
-            <IconButton icon={ListPlus} label="Add to playlist" onClick={addSelectedToPlaylist} disabled={deleting} />
-            {downloadControl}
-            <IconButton icon={Trash2} label="Delete selected" variant="danger" onClick={deleteSelected} disabled={deleting} />
-          </div>
-        ) : (
-          <div key="browse" className="library-toolbar__set" data-state={toolbarState}>
-            <IconField
-              icon={Search}
-              label="Search"
-              className="library-search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              trailing={
-                <>
-                  {searchQuery && (
-                    <IconButton
-                      icon={X}
-                      label="Clear search"
-                      variant="ghost"
-                      size="sm"
-                      className="motion-fade"
-                      onClick={() => setSearchQuery('')}
-                    />
-                  )}
-                  <InlineSelect label="Search in" value={filterBy} options={SCOPE_OPTIONS} onChange={setFilterBy} />
-                </>
-              }
-            />
-            <LibraryFilters
-              durationRange={durationRange}
-              onDurationChange={setDurationRange}
-              issue={issue}
-              onIssueChange={setIssue}
-              favoritesOnly={favoritesOnly}
-              onFavoritesChange={setFavoritesOnly}
-            />
-            <IconButton icon={Play} label="Play all" onClick={() => void playAll(false)} disabled={totalItems === 0} />
-            <IconButton icon={Shuffle} label="Shuffle all" onClick={() => void playAll(true)} disabled={totalItems === 0} />
-            <IconButton icon={RefreshCw} label="Refresh" onClick={() => void refresh()} />
-            {downloads.progress && downloadControl}
-            <span className="library-count">{mp3s.length} / {totalItems}</span>
-          </div>
-        )}
-      />
+      {failed ? (
+        <LoadFailed label="Couldn't load the library" onRetry={() => void refresh()} />
+      ) : (
+        <DataTable
+          fill
+          columns={columns}
+          items={mp3s}
+          getRowKey={getTrackKey}
+          onRowOpen={(mp3) => navigate(`/details/${encodeURIComponent(mp3.filename)}`)}
+          onRowMenu={(mp3, event) =>
+            openMenu(event, mp3, { play: () => void playFrom(mp3.filename), onDeleted: selection.deselect })
+          }
+          getRowClassName={(mp3) =>
+            [selection.isSelected(mp3.filename) ? 'is-selected' : '', menuFilename === mp3.filename ? 'is-menu-open' : '']
+              .filter(Boolean)
+              .join(' ') || undefined
+          }
+          className="library-table--selectable"
+          emptyMessage={
+            debouncedSearchQuery.trim() || favoritesOnly || issue !== 'any' || durationRange !== 'any'
+              ? 'No matches'
+              : 'No tracks yet'
+          }
+          loading={loading}
+          loadingMore={loadingMore}
+          hasMore={hasMore}
+          onEndReached={loadMore}
+          resetKey={queryParams}
+          toolbar={showSelection ? (
+            <div key="selection" className="library-toolbar__set" data-state={toolbarState}>
+              <IconButton icon={X} label="Clear selection" onClick={selection.clear} />
+              <span className="library-selection-count" title="Selected">
+                <ListChecks aria-hidden="true" />
+                {selection.size}
+              </span>
+              <IconButton icon={Play} label="Play selected" onClick={playSelected} />
+              <IconButton icon={Pencil} label="Edit selected" onClick={editSelected} disabled={deleting} />
+              <IconButton icon={ListPlus} label="Add to playlist" onClick={addSelectedToPlaylist} disabled={deleting} />
+              {downloadControl}
+              <IconButton icon={Trash2} label="Delete selected" variant="danger" onClick={deleteSelected} disabled={deleting} />
+            </div>
+          ) : (
+            <div key="browse" className="library-toolbar__set" data-state={toolbarState}>
+              <IconField
+                icon={Search}
+                label="Search"
+                className="library-search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                trailing={
+                  <>
+                    {searchQuery && (
+                      <IconButton
+                        icon={X}
+                        label="Clear search"
+                        variant="ghost"
+                        size="sm"
+                        className="motion-fade"
+                        onClick={() => setSearchQuery('')}
+                      />
+                    )}
+                    <InlineSelect label="Search in" value={filterBy} options={SCOPE_OPTIONS} onChange={setFilterBy} />
+                  </>
+                }
+              />
+              <LibraryFilters
+                durationRange={durationRange}
+                onDurationChange={setDurationRange}
+                issue={issue}
+                onIssueChange={setIssue}
+                favoritesOnly={favoritesOnly}
+                onFavoritesChange={setFavoritesOnly}
+              />
+              <IconButton icon={Play} label="Play all" onClick={() => void playAll(false)} disabled={totalItems === 0} />
+              <IconButton icon={Shuffle} label="Shuffle all" onClick={() => void playAll(true)} disabled={totalItems === 0} />
+              <IconButton icon={RefreshCw} label="Refresh" onClick={() => void refresh()} />
+              {downloads.progress && downloadControl}
+              <span className="library-count">{mp3s.length} / {totalItems}</span>
+            </div>
+          )}
+        />
+      )}
 
       {editPresence.mounted && (
         <BulkEditDialog

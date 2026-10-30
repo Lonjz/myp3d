@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
-import { DatabaseZap, DiscAlbum, Music } from 'lucide-react';
+import { DatabaseZap, DiscAlbum, Keyboard, Music } from 'lucide-react';
 import { exportApi } from '../../../api/exportApi';
 import { mp3Api } from '../../../api/mp3Api';
 import { emitAppEvent } from '../../../utils/appEvents';
 import { useToast } from '../../messages/toastContext';
 import { createCommandsSource } from './commandsSource';
 import type { InstantSpotlightSource } from '../spotlightTypes';
+import { errorMessage } from '../../../utils/formatters';
 
 export function useAppCommandsSource(): InstantSpotlightSource {
   const { showSuccess, showError } = useToast();
@@ -22,7 +23,7 @@ export function useAppCommandsSource(): InstantSpotlightSource {
             try {
               await mp3Api.clearServerCache();
             } catch (err) {
-              showError(err instanceof Error ? err.message : 'Failed to clear cache');
+              showError(errorMessage(err, 'Failed to clear cache'));
               return;
             }
             emitAppEvent('library-changed');
@@ -42,6 +43,13 @@ export function useAppCommandsSource(): InstantSpotlightSource {
           icon: DiscAlbum,
           keywords: ['zip', 'covers', 'images', 'artwork', 'archive'],
           run: () => exportApi.start(exportApi.albumArtUrl()),
+        },
+        {
+          id: 'shortcuts',
+          title: 'Keyboard shortcuts',
+          icon: Keyboard,
+          keywords: ['keys', 'hotkeys', 'help'],
+          run: () => emitAppEvent('show-shortcuts'),
         },
       ]),
     [showError, showSuccess],

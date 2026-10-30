@@ -1,3 +1,4 @@
+import { startDownload } from '../utils/download';
 import { API_BASE } from './mp3Api';
 
 export const exportApi = {
@@ -10,11 +11,6 @@ export const exportApi = {
   },
 
   start(url: string): void {
-    const link = document.createElement('a');
-    link.href = url;
-    link.hidden = true;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    startDownload(url);
   },
 };

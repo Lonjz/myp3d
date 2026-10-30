@@ -2,111 +2,59 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { musicApi } from '../../api/musicApi';
 import type { MusicDiff, MusicSync } from '../../api/musicApi';
 import { usePersistentState } from '../../hooks/usePersistentState';
-import { emitAppEvent } from '../../utils/appEvents';
+import { errorMessage } from '../../utils/formatters';
 import { useToast } from '../messages/toastContext';
+import { useMusicJob } from './useMusicJob';
+import type { MusicJobApi } from './useMusicJob';
 
-const SYNC_POLL_MS = 1000;
-
-const errorMessage = (err: unknown, fallback: string) => (err instanceof Error ? err.message : fallback);
+const SONG_SYNC: MusicJobApi<MusicDiff, MusicSync> = {
+  diff: musicApi.diff,
+  status: musicApi.syncStatus,
+  start: musicApi.startSync,
+  dismiss: musicApi.dismiss,
+  doneEvent: 'favorites-changed',
+  errors: {
+    diff: 'Failed to compare with Apple Music',
+    start: 'Failed to sync with Apple Music',
+    dismiss: 'Failed to close the Apple Music sync',
+  },
+};
 
 export function useMusicSync() {
   const { showError } = useToast();
   const [folder, setFolder] = usePersistentState('music:folder', '');
   const [available, setAvailable] = useState<boolean | null>(null);
-  const [diff, setDiff] = useState<MusicDiff | null>(null);
-  const [scanning, setScanning] = useState(false);
-  const [job, setJob] = useState<MusicSync | null>(null);
-  const [busy, setBusy] = useState(false);
-  const folderRef = useRef(folder);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const { folderRef, setJob, scan, ...job } = useMusicJob(folder, SONG_SYNC);
   const startedRef = useRef(false);
 
-  useEffect(() => {
-    folderRef.current = folder;
-  }, [folder]);
-
-  const scan = useCallback(async () => {
-    const target = folderRef.current.trim();
-    if (!target) return;
-    setScanning(true);
+  const load = useCallback(async () => {
     try {
-      setDiff(await musicApi.diff(target));
+      const status = await musicApi.status(!folderRef.current.trim());
+      setAvailable(status.available);
+      if (!status.available) return;
+      if (!folderRef.current.trim() && status.detected_folder) {
+        folderRef.current = status.detected_folder;
+        setFolder(status.detected_folder);
+      }
+      setJob(await musicApi.syncStatus());
+      await scan();
     } catch (err) {
-      showError(errorMessage(err, 'Failed to compare with Apple Music'));
-    } finally {
-      setScanning(false);
+      setLoadFailed(true);
+      showError(errorMessage(err, 'Failed to check Apple Music'));
     }
-  }, [showError]);
+  }, [folderRef, scan, setFolder, setJob, showError]);
 
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
-
-    const load = async () => {
-      try {
-        const status = await musicApi.status(!folderRef.current.trim());
-        setAvailable(status.available);
-        if (!status.available) return;
-        if (!folderRef.current.trim() && status.detected_folder) {
-          folderRef.current = status.detected_folder;
-          setFolder(status.detected_folder);
-        }
-        setJob(await musicApi.syncStatus());
-        await scan();
-      } catch (err) {
-        showError(errorMessage(err, 'Failed to check Apple Music'));
-      }
-    };
-
     void load();
-  }, [scan, setFolder, showError]);
+  }, [load]);
 
-  const syncing = job?.status === 'syncing';
+  const retry = () => {
+    setLoadFailed(false);
+    void load();
+  };
 
-  useEffect(() => {
-    if (!syncing) return undefined;
-    let cancelled = false;
-
-    const poll = async () => {
-      try {
-        const next = await musicApi.syncStatus();
-        if (cancelled) return;
-        setJob(next);
-        if (next?.status !== 'syncing') emitAppEvent('favorites-changed');
-      } catch {
-        return;
-      }
-    };
-
-    const timer = window.setInterval(poll, SYNC_POLL_MS);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [syncing]);
-
-  const startSync = useCallback(async () => {
-    setBusy(true);
-    try {
-      setJob(await musicApi.startSync(folderRef.current.trim()));
-    } catch (err) {
-      showError(errorMessage(err, 'Failed to sync with Apple Music'));
-    } finally {
-      setBusy(false);
-    }
-  }, [showError]);
-
-  const dismiss = useCallback(async () => {
-    setBusy(true);
-    try {
-      await musicApi.dismiss();
-      setJob(null);
-    } catch (err) {
-      showError(errorMessage(err, 'Failed to close the Apple Music sync'));
-    } finally {
-      setBusy(false);
-    }
-    await scan();
-  }, [scan, showError]);
-
-  return { available, folder, setFolder, diff, scanning, job, busy, scan, startSync, dismiss };
+  return { available, loadFailed, retry, folder, setFolder, scan, ...job };
 }

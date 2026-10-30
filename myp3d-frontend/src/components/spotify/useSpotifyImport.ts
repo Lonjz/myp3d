@@ -6,6 +6,7 @@ import { emitAppEvent } from '../../utils/appEvents';
 import { extractTrackLinks } from '../../utils/spotify';
 import { getVideoIdFromUrl, getYouTubeThumbnailUrl } from '../../utils/youtube';
 import { useToast } from '../messages/toastContext';
+import { errorMessage } from '../../utils/formatters';
 
 export const GOOD_MATCH = 0.7;
 const MATCH_CONCURRENCY = 4;
@@ -22,8 +23,6 @@ type ReadyRow = SpotifyRow & { match: SpotifyTrackMatch; choice: SpotifyCandidat
 
 export const isReadyRow = (row: SpotifyRow): row is ReadyRow =>
   row.match !== null && row.choice !== null && !row.queued;
-
-const errorMessage = (err: unknown, fallback: string) => (err instanceof Error ? err.message : fallback);
 
 const songs = (count: number) => `${count} song${count === 1 ? '' : 's'}`;
 

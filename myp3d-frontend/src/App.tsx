@@ -1,20 +1,6 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { AudioLines, ChevronLeft, Menu, Search } from 'lucide-react';
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { DashboardPage } from './pages/DashboardPage';
-import { QueryPage } from './pages/QueryPage';
-import { LibraryPage } from './pages/LibraryPage';
-import { EditPage } from './pages/EditPage';
-import { AlbumsPage } from './pages/AlbumsPage';
-import { AlbumEditPage } from './pages/AlbumEditPage';
-import { PlaylistsPage } from './pages/PlaylistsPage';
-import { PlaylistEditPage } from './pages/PlaylistEditPage';
-import { SyncPage } from './pages/SyncPage';
-import { MusicPage } from './pages/MusicPage';
-import { DownloadsPage } from './pages/DownloadsPage';
-import { SpotifyPage } from './pages/SpotifyPage';
-import { ExportPage } from './pages/ExportPage';
-import { HealthPage } from './pages/HealthPage';
 import { ToastProvider } from './components/messages/ToastProvider';
 import { DownloadQueueProvider } from './components/downloads/DownloadQueueProvider';
 import { useDownloadQueue } from './components/downloads/downloadQueueContext';
@@ -31,6 +17,26 @@ import { SpotlightProvider } from './components/spotlight/SpotlightProvider';
 import { useSpotlight } from './components/spotlight/spotlightContext';
 import { SPOTLIGHT_SHORTCUT_LABEL } from './components/spotlight/spotlightTypes';
 import { usePresence } from './hooks/usePresence';
+import { Spinner } from './components/ui/Spinner';
+import { BackendStatus } from './components/shell/BackendStatus';
+import { ShortcutsOverlay } from './components/shell/ShortcutsOverlay';
+import { ErrorBoundary } from './components/shell/ErrorBoundary';
+import { NotFoundPage } from './pages/NotFoundPage';
+
+const DashboardPage = lazy(() => import('./pages/DashboardPage').then((module) => ({ default: module.DashboardPage })));
+const QueryPage = lazy(() => import('./pages/QueryPage').then((module) => ({ default: module.QueryPage })));
+const LibraryPage = lazy(() => import('./pages/LibraryPage').then((module) => ({ default: module.LibraryPage })));
+const EditPage = lazy(() => import('./pages/EditPage').then((module) => ({ default: module.EditPage })));
+const AlbumsPage = lazy(() => import('./pages/AlbumsPage').then((module) => ({ default: module.AlbumsPage })));
+const AlbumEditPage = lazy(() => import('./pages/AlbumEditPage').then((module) => ({ default: module.AlbumEditPage })));
+const PlaylistsPage = lazy(() => import('./pages/PlaylistsPage').then((module) => ({ default: module.PlaylistsPage })));
+const PlaylistEditPage = lazy(() => import('./pages/PlaylistEditPage').then((module) => ({ default: module.PlaylistEditPage })));
+const SyncPage = lazy(() => import('./pages/SyncPage').then((module) => ({ default: module.SyncPage })));
+const MusicPage = lazy(() => import('./pages/MusicPage').then((module) => ({ default: module.MusicPage })));
+const DownloadsPage = lazy(() => import('./pages/DownloadsPage').then((module) => ({ default: module.DownloadsPage })));
+const SpotifyPage = lazy(() => import('./pages/SpotifyPage').then((module) => ({ default: module.SpotifyPage })));
+const ExportPage = lazy(() => import('./pages/ExportPage').then((module) => ({ default: module.ExportPage })));
+const HealthPage = lazy(() => import('./pages/HealthPage').then((module) => ({ default: module.HealthPage })));
 
 function safeDecode(value: string): string {
   try {
@@ -164,6 +170,8 @@ function App() {
             <DownloadQueueProvider>
               <DocumentTitle />
               <AppBackdrop />
+              <BackendStatus />
+              <ShortcutsOverlay />
               <div className="app-shell">
                 <aside
                   className={`sidebar glass ${isSidebarExpanded ? 'expanded' : 'collapsed'} ${
@@ -191,7 +199,7 @@ function App() {
                       <NavLink
                         key={item.to}
                         to={item.to}
-                        className={() => (item.isActive(location.pathname) ? 'sidebar-link active' : 'sidebar-link')}
+                        className={() => (item.isActive(location.pathname) ? 'sidebar-link is-active' : 'sidebar-link')}
                         title={item.label}
                       >
                         <item.icon aria-hidden="true" />
@@ -224,16 +232,20 @@ function App() {
                   </header>
 
                   <main className="content-main">
-                    <KeepAliveRoutes pages={KEEP_ALIVE_PAGES}>
-                      <Routes>
-                        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                        <Route path="/download" element={<Navigate to="/query" replace />} />
-                        <Route path="/details/:songName" element={<EditRoute />} />
-                        <Route path="/albums/:albumKey" element={<AlbumEditRoute />} />
-                        <Route path="/playlists/:playlistId" element={<PlaylistEditRoute />} />
-                        <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                      </Routes>
-                    </KeepAliveRoutes>
+                    <ErrorBoundary resetKey={location.pathname}>
+                      <Suspense fallback={<Spinner />}>
+                        <KeepAliveRoutes pages={KEEP_ALIVE_PAGES}>
+                          <Routes>
+                            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                            <Route path="/download" element={<Navigate to="/query" replace />} />
+                            <Route path="/details/:songName" element={<EditRoute />} />
+                            <Route path="/albums/:albumKey" element={<AlbumEditRoute />} />
+                            <Route path="/playlists/:playlistId" element={<PlaylistEditRoute />} />
+                            <Route path="*" element={<NotFoundPage />} />
+                          </Routes>
+                        </KeepAliveRoutes>
+                      </Suspense>
+                    </ErrorBoundary>
                   </main>
 
                   <PlayerBar />

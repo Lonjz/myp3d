@@ -21,7 +21,7 @@ export function SortableHeaderButton({
   return (
     <button
       type="button"
-      className={`library-sort-button ${isActive ? 'active' : ''}`}
+      className={`library-sort-button ${isActive ? 'is-active' : ''}`}
       title={label}
       onClick={onClick}
     >

@@ -1,7 +1,7 @@
 import { CalendarPlus, Clock, DiscAlbum, HardDrive, MicVocal, Music } from 'lucide-react';
 import { mp3Api } from '../../../api/mp3Api';
 import type { AlbumInfo, MP3Info } from '../../../api/mp3Api';
-import { formatBytes, formatDate, formatDuration } from '../../../utils/formatters';
+import { formatBytes, formatDate, formatDuration, formatTrackSubtitle } from '../../../utils/formatters';
 import type { MenuAction } from '../../ui/ContextMenu';
 import { SPOTLIGHT_SECTION_LIMIT } from '../spotlightTypes';
 import type { RemoteSpotlightSource, SpotlightItem, SpotlightMeta } from '../spotlightTypes';
@@ -21,7 +21,7 @@ function trackItem(track: MP3Info, actions: MenuAction[]): SpotlightItem {
     id: `track:${track.filename}`,
     section: 'tracks',
     title: track.title || track.filename,
-    subtitle: [track.artist, track.album].filter(Boolean).join(' · ') || undefined,
+    subtitle: formatTrackSubtitle(track.artist, track.album) || undefined,
     icon: Music,
     thumbnail: hasCover ? mp3Api.getCoverUrl(track.filename, 'thumb') : undefined,
     preview: {

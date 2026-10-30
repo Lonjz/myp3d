@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
+import { UNREACHABLE_MESSAGE } from '../../api/mp3Api';
 import { FeedbackToast, type FeedbackMessage } from './FeedbackToast';
 import { ToastContext } from './toastContext';
 import type { ToastContextValue } from './toastContext';
@@ -12,6 +13,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const showError = useCallback((text: string) => {
+    if (text === UNREACHABLE_MESSAGE) return;
     setMessage({ type: 'error', text });
   }, []);
 

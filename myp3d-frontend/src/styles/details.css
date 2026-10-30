@@ -1,4 +1,3 @@
-/* Edit Page */
 .details-layout {
   display: flex;
   align-items: flex-start;
@@ -64,13 +63,13 @@
   background: var(--color-surface-hover);
 }
 
-.details-song-item.active {
+.details-song-item.is-active {
   background: var(--selected-bg);
   box-shadow: var(--selected-shadow);
   cursor: default;
 }
 
-.details-song-item.active .details-song-subtitle {
+.details-song-item.is-active .details-song-subtitle {
   color: var(--color-text-secondary);
 }
 
@@ -141,7 +140,7 @@
   align-items: center;
   justify-content: center;
   color: var(--color-text);
-  background: rgba(12, 8, 26, 0.45);
+  background: var(--color-scrim-nav);
   opacity: 0;
   transition: opacity var(--duration-fast) var(--ease-standard);
 }
@@ -166,7 +165,12 @@
   justify-content: center;
   width: 100%;
   height: 100%;
-  font-size: 4rem;
+}
+
+.no-cover-large svg {
+  width: 4rem;
+  height: 4rem;
+  opacity: 0.6;
 }
 
 .metadata-section {

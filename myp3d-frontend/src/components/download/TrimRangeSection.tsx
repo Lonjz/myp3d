@@ -182,7 +182,7 @@ export function TrimRangeSection({
         </span>
       </div>
 
-      {playHint ? <div className="trim-range-hint input-help">{playHint}</div> : null}
+      {playHint ? <div className="input-help">{playHint}</div> : null}
     </section>
   );
 }

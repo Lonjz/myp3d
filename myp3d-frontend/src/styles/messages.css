@@ -1,20 +1,3 @@
-/* Messages */
-.message {
-  margin-top: var(--space-4);
-  padding: var(--space-4);
-  border-radius: var(--radius-md);
-}
-
-.message.success {
-  background: color-mix(in srgb, var(--color-success) 25%, transparent);
-  color: var(--color-text);
-}
-
-.message.error {
-  background: color-mix(in srgb, var(--color-danger) 25%, transparent);
-  color: var(--color-text);
-}
-
 .drop-message-layer {
   position: fixed;
   top: var(--space-4);
@@ -96,9 +79,4 @@
     top: var(--space-3);
     width: calc(100vw - var(--space-5));
   }
-}
-
-/* Error */
-.error {
-  color: var(--color-danger-text);
 }

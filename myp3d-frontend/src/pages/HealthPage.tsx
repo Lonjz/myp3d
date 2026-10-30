@@ -9,15 +9,17 @@ import type { BulkResult, MP3Info } from '../api/mp3Api';
 import { Cover, DiffColumn, TrackText } from '../components/diff/DiffColumns';
 import { useToast } from '../components/messages/toastContext';
 import { Checkbox } from '../components/ui/Checkbox';
-import { EmptyState } from '../components/ui/EmptyState';
+import { EmptyState, LoadFailed } from '../components/ui/EmptyState';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { usePersistentState } from '../hooks/usePersistentState';
+import { usePoll } from '../hooks/usePoll';
 import { useSelection } from '../hooks/useSelection';
 import type { Selection } from '../hooks/useSelection';
 import { emitAppEvent, subscribeAppEvent } from '../utils/appEvents';
 import { normalizeFilenameInput, stripMp3Extension } from '../utils/filenames';
-import { formatTrackSubtitle } from '../utils/formatters';
+import { errorMessage, formatTrackSubtitle, trackCount } from '../utils/formatters';
+import { SegmentedControl } from '../components/ui/SegmentedControl';
 
 type CheckName = 'silence' | 'naming' | 'artists';
 
@@ -30,8 +32,6 @@ const CHECKS: { value: CheckName; label: string; icon: LucideIcon }[] = [
   { value: 'artists', label: 'Multiple artists', icon: MicVocal },
 ];
 
-const errorMessage = (err: unknown, fallback: string) => (err instanceof Error ? err.message : fallback);
-const trackCount = (count: number) => `${count} track${count === 1 ? '' : 's'}`;
 const stopClick = (event: { stopPropagation: () => void }) => event.stopPropagation();
 
 function useFix(verb: string, past: string, failure: string) {
@@ -62,16 +62,16 @@ function useFix(verb: string, past: string, failure: string) {
   return { busy, run };
 }
 
-function useIssues<T>(load: () => Promise<T[]>, failure: string) {
-  const { showError } = useToast();
+function useIssues<T>(load: () => Promise<T[]>) {
   const [tracks, setTracks] = useState<T[] | null>(null);
+  const [failed, setFailed] = useState(false);
 
   const reload = async () => {
     try {
       setTracks(await load());
-    } catch (err) {
-      showError(errorMessage(err, failure));
-      setTracks((current) => current ?? []);
+      setFailed(false);
+    } catch {
+      setFailed(true);
     }
   };
 
@@ -84,7 +84,7 @@ function useIssues<T>(load: () => Promise<T[]>, failure: string) {
     return subscribeAppEvent('library-changed', () => loadIssues());
   }, []);
 
-  return { tracks, reload };
+  return { tracks, failed, reload };
 }
 
 function CheckToolbar({
@@ -184,6 +184,7 @@ function SilenceCheck({ picker }: { picker: ReactNode }) {
   const { showError } = useToast();
   const [scan, setScan] = useState<SilenceScan | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [threshold, setThreshold] = usePersistentState('health:threshold', DEFAULT_THRESHOLD);
   const startedRef = useRef(false);
   const fix = useFix('trim', 'trimmed', 'Failed to trim the silence');
@@ -191,51 +192,40 @@ function SilenceCheck({ picker }: { picker: ReactNode }) {
   const startScan = useCallback(async () => {
     try {
       setScan(await healthApi.scanSilence());
+      setFailed(false);
     } catch (err) {
       showError(errorMessage(err, 'Failed to scan for silence'));
     }
   }, [showError]);
 
+  const load = useCallback(async () => {
+    try {
+      setScan((await healthApi.silence()) ?? (await healthApi.scanSilence()));
+      setFailed(false);
+    } catch {
+      setFailed(true);
+    } finally {
+      setLoaded(true);
+    }
+  }, []);
+
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
-
-    const load = async () => {
-      try {
-        const current = await healthApi.silence();
-        if (current) setScan(current);
-        else await startScan();
-      } catch (err) {
-        showError(errorMessage(err, 'Failed to load the silence scan'));
-      } finally {
-        setLoaded(true);
-      }
-    };
-
     void load();
-  }, [showError, startScan]);
+  }, [load]);
 
   const scanning = scan?.status === 'scanning';
 
-  useEffect(() => {
-    if (!scanning) return undefined;
-    let cancelled = false;
+  const refreshScan = async () => {
+    try {
+      setScan(await healthApi.silence());
+    } catch {
+      setFailed(true);
+    }
+  };
 
-    const poll = async () => {
-      try {
-        const next = await healthApi.silence();
-        if (!cancelled) setScan(next);
-      } catch {
-        return;
-      }
-    };
-
-    const timer = window.setInterval(poll, SCAN_POLL_MS);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [scanning]);
+  usePoll(refreshScan, SCAN_POLL_MS, scanning && !failed);
 
   const visible: SilentTrack[] = (scan?.tracks ?? []).filter((track) => track.silence >= threshold);
   const selection = useSelection(visible.map((track) => track.filename));
@@ -249,6 +239,7 @@ function SilenceCheck({ picker }: { picker: ReactNode }) {
   };
 
   const renderBody = () => {
+    if (failed) return <LoadFailed label="Couldn't load the silence scan" onRetry={() => void load()} />;
     if (!loaded || scanning) {
       const progress = scan && scan.total > 0 ? `${scan.done} / ${scan.total}` : undefined;
       return <EmptyState loading text={progress} label="Scanning for silent endings" />;
@@ -290,21 +281,13 @@ function SilenceCheck({ picker }: { picker: ReactNode }) {
         fixTitle="Trim silence"
         onFix={trim}
       >
-        <div className="segmented health-thresholds" role="group" aria-label="Minimum silence">
-          {THRESHOLDS.map((value) => (
-            <button
-              key={value}
-              type="button"
-              className={`segmented__option ${threshold === value ? 'is-active' : ''}`.trim()}
-              aria-pressed={threshold === value}
-              aria-label={`At least ${value}s of silence`}
-              title={`At least ${value}s of silence`}
-              onClick={() => setThreshold(value)}
-            >
-              {value}s
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          label="Minimum silence"
+          className="health-thresholds"
+          options={THRESHOLDS.map((value) => ({ value, label: `At least ${value}s of silence`, text: `${value}s` }))}
+          value={threshold}
+          onChange={setThreshold}
+        />
       </CheckToolbar>
       {renderBody()}
     </>
@@ -312,7 +295,7 @@ function SilenceCheck({ picker }: { picker: ReactNode }) {
 }
 
 function NamingCheck({ picker }: { picker: ReactNode }) {
-  const { tracks, reload } = useIssues<NamingTrack>(healthApi.naming, 'Failed to check the file names');
+  const { tracks, failed, reload } = useIssues<NamingTrack>(healthApi.naming);
   const [names, setNames] = useState<Record<string, string>>({});
   const list = tracks ?? [];
   const selection = useSelection(list.map((track) => track.filename));
@@ -338,7 +321,9 @@ function NamingCheck({ picker }: { picker: ReactNode }) {
         fixTitle="Rename"
         onFix={rename}
       />
-      {tracks === null ? (
+      {failed ? (
+        <LoadFailed label="Couldn't check the file names" onRetry={() => void reload()} />
+      ) : tracks === null ? (
         <EmptyState loading label="Checking file names" />
       ) : (
         <CheckBody busy={fix.busy} icon={FileAudio} label="File names" count={list.length}>
@@ -384,7 +369,7 @@ function NamingCheck({ picker }: { picker: ReactNode }) {
 }
 
 function ArtistCheck({ picker }: { picker: ReactNode }) {
-  const { tracks, reload } = useIssues<ArtistTrack>(healthApi.artists, 'Failed to check the artists');
+  const { tracks, failed, reload } = useIssues<ArtistTrack>(healthApi.artists);
   const [primaries, setPrimaries] = useState<Record<string, string>>({});
   const list = tracks ?? [];
   const selection = useSelection(list.map((track) => track.filename));
@@ -410,7 +395,9 @@ function ArtistCheck({ picker }: { picker: ReactNode }) {
         fixTitle="Fix artists"
         onFix={fixArtists}
       />
-      {tracks === null ? (
+      {failed ? (
+        <LoadFailed label="Couldn't check the artists" onRetry={() => void reload()} />
+      ) : tracks === null ? (
         <EmptyState loading label="Checking artists" />
       ) : (
         <CheckBody busy={fix.busy} icon={MicVocal} label="Multiple artists" count={list.length}>
@@ -450,23 +437,7 @@ function ArtistCheck({ picker }: { picker: ReactNode }) {
 export function HealthPage() {
   const [check, setCheck] = usePersistentState<CheckName>('health:check', 'silence');
 
-  const picker = (
-    <div className="segmented" role="group" aria-label="Check">
-      {CHECKS.map(({ value, label, icon: Icon }) => (
-        <button
-          key={value}
-          type="button"
-          className={`segmented__option ${check === value ? 'is-active' : ''}`.trim()}
-          aria-pressed={check === value}
-          aria-label={label}
-          title={label}
-          onClick={() => setCheck(value)}
-        >
-          <Icon aria-hidden="true" />
-        </button>
-      ))}
-    </div>
-  );
+  const picker = <SegmentedControl label="Check" options={CHECKS} value={check} onChange={setCheck} />;
 
   return (
     <div className="page page--fill sync-page health-page">

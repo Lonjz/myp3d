@@ -3,8 +3,8 @@ import { musicApi } from '../../api/musicApi';
 import type { MusicAlbumIssue } from '../../api/musicApi';
 import { useSelection } from '../../hooks/useSelection';
 import { useToast } from '../messages/toastContext';
+import { errorMessage } from '../../utils/formatters';
 
-const errorMessage = (err: unknown, fallback: string) => (err instanceof Error ? err.message : fallback);
 const albumCount = (count: number) => `${count} album${count === 1 ? '' : 's'}`;
 
 export function useAlbumHealth(active: boolean) {

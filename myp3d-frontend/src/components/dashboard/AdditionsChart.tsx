@@ -6,6 +6,7 @@ import { AdditionsCalendar } from './AdditionsCalendar';
 import { ChartCard } from './ChartCard';
 import { ChartTooltip } from './ChartTooltip';
 import { ANIMATE_CHARTS, AXIS_TICK, CHART_COLORS, COLUMN_RADIUS, MAX_BAR_SIZE } from './chartTheme';
+import { SegmentedControl } from '../ui/SegmentedControl';
 
 interface AdditionsChartProps {
   months: LibraryStats['additions_by_month'];
@@ -43,23 +44,7 @@ export function AdditionsChart({ months, days }: AdditionsChartProps) {
   const [storedView, setView] = usePersistentState<AdditionsView>('dashboard:additions-view', 'months');
   const view: AdditionsView = storedView === 'days' ? 'days' : 'months';
 
-  const toggle = (
-    <div className="segmented segmented--sm" role="group" aria-label="View">
-      {VIEWS.map(({ value, label, icon: Icon }) => (
-        <button
-          key={value}
-          type="button"
-          className={`segmented__option ${view === value ? 'is-active' : ''}`.trim()}
-          aria-pressed={view === value}
-          aria-label={label}
-          title={label}
-          onClick={() => setView(value)}
-        >
-          <Icon aria-hidden="true" />
-        </button>
-      ))}
-    </div>
-  );
+  const toggle = <SegmentedControl label="View" options={VIEWS} value={view} onChange={setView} small />;
 
   return (
     <ChartCard title="Added" icon={CalendarPlus} className="chart-card--span-2" actions={toggle}>

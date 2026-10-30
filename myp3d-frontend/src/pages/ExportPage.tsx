@@ -59,7 +59,7 @@ export function ExportPage() {
   const albumDetail = stats ? `${stats.total_albums} albums` : '';
 
   return (
-    <div className="page export-page">
+    <div className="page">
       <div className="export-tiles">
         <ExportTile
           icon={Music}

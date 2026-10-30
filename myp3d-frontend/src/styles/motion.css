@@ -50,16 +50,16 @@
   inset: -1px;
 }
 
-.sidebar-link.active,
-.details-song-item.active,
-.query-result-item.active {
+.sidebar-link.is-active,
+.details-song-item.is-active,
+.query-result-item.is-active {
   background: transparent;
   box-shadow: none;
 }
 
-.sidebar-link.active::before,
-.details-song-item.active::before,
-.query-result-item.active::before {
+.sidebar-link.is-active::before,
+.details-song-item.is-active::before,
+.query-result-item.is-active::before {
   opacity: 1;
   transform: scale(1);
 }

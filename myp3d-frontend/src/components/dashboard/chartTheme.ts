@@ -14,5 +14,4 @@ export const MAX_BAR_SIZE = 24;
 export const COLUMN_RADIUS: [number, number, number, number] = [4, 4, 0, 0];
 export const ROW_RADIUS: [number, number, number, number] = [0, 4, 4, 0];
 
-export const ANIMATE_CHARTS =
-  typeof window === 'undefined' || !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+export const ANIMATE_CHARTS = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;

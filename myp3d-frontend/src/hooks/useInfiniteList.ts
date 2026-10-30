@@ -11,7 +11,6 @@ type UseInfiniteListOptions<TParams extends Record<string, unknown>, TItem> = {
   params: TParams;
   fetchPage: (params: TParams & { page: number; limit: number }) => Promise<InfinitePage<TItem>>;
   getKey: (item: TItem) => string;
-  errorMessage: string;
 };
 
 type ListState<TItem> = {
@@ -44,12 +43,11 @@ export function useInfiniteList<TParams extends Record<string, unknown>, TItem>(
   params,
   fetchPage,
   getKey,
-  errorMessage,
 }: UseInfiniteListOptions<TParams, TItem>) {
   const [list, setList] = useState<ListState<TItem>>({ items: [], total: 0, pages: 0 });
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
   const requestIdRef = useRef(0);
   const loadingMoreRef = useRef(false);
   const loadedParamsRef = useRef<TParams | null>(null);
@@ -75,10 +73,10 @@ export function useInfiniteList<TParams extends Record<string, unknown>, TItem>(
           total: responses[responses.length - 1].meta.total,
           pages: pageCount,
         });
-        setError(null);
+        setFailed(false);
       } catch {
         if (requestId === requestIdRef.current) {
-          setError(errorMessage);
+          setFailed(true);
         }
       } finally {
         if (requestId === requestIdRef.current) {
@@ -86,10 +84,10 @@ export function useInfiniteList<TParams extends Record<string, unknown>, TItem>(
         }
       }
     },
-    [errorMessage, fetchPage, getKey, pageSize, params],
+    [fetchPage, getKey, pageSize, params],
   );
 
-  const hasMore = !error && list.pages > 0 && list.pages * pageSize < list.total;
+  const hasMore = !failed && list.pages > 0 && list.pages * pageSize < list.total;
 
   const loadMore = useCallback(async () => {
     if (loadingMoreRef.current || loading || !hasMore) {
@@ -111,16 +109,16 @@ export function useInfiniteList<TParams extends Record<string, unknown>, TItem>(
         total: response.meta.total,
         pages: prev.pages + 1,
       }));
-      setError(null);
+      setFailed(false);
     } catch {
       if (requestId === requestIdRef.current) {
-        setError(errorMessage);
+        setFailed(true);
       }
     } finally {
       loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }, [errorMessage, fetchPage, getKey, hasMore, list.pages, loading, pageSize, params]);
+  }, [fetchPage, getKey, hasMore, list.pages, loading, pageSize, params]);
 
   const refresh = useCallback(() => replace(Math.max(1, list.pages)), [list.pages, replace]);
 
@@ -140,7 +138,7 @@ export function useInfiniteList<TParams extends Record<string, unknown>, TItem>(
     total: list.total,
     loading,
     loadingMore,
-    error,
+    failed,
     hasMore,
     loadMore,
     refresh,

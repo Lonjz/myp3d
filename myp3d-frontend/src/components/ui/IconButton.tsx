@@ -1,4 +1,5 @@
 import type { ComponentProps } from 'react';
+import { LoaderCircle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 interface IconButtonProps extends ComponentProps<'button'> {
@@ -7,6 +8,7 @@ interface IconButtonProps extends ComponentProps<'button'> {
   variant?: 'default' | 'primary' | 'danger' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
   active?: boolean;
+  busy?: boolean;
 }
 
 export function IconButton({
@@ -15,6 +17,7 @@ export function IconButton({
   variant = 'default',
   size = 'md',
   active = false,
+  busy = false,
   className,
   type = 'button',
   ...props
@@ -25,7 +28,7 @@ export function IconButton({
 
   return (
     <button type={type} className={classes} aria-label={label} title={label} {...props}>
-      <Icon aria-hidden="true" />
+      {busy ? <LoaderCircle className="spin" aria-hidden="true" /> : <Icon aria-hidden="true" />}
     </button>
   );
 }

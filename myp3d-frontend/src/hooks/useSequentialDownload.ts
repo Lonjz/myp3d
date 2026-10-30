@@ -1,6 +1,8 @@
 import { useCallback, useRef, useState } from 'react';
 import { mp3Api } from '../api/mp3Api';
 import { useToast } from '../components/messages/toastContext';
+import { startDownload } from '../utils/download';
+import { trackCount } from '../utils/formatters';
 
 interface DownloadProgress {
   done: number;
@@ -9,17 +11,9 @@ interface DownloadProgress {
 
 const saveBlob = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.hidden = true;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
+  startDownload(url, filename);
   window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
 };
-
-const plural = (count: number) => `${count} track${count === 1 ? '' : 's'}`;
 
 export function useSequentialDownload() {
   const { showSuccess, showError, showInfo } = useToast();
@@ -53,11 +47,11 @@ export function useSequentialDownload() {
     setProgress(null);
 
     if (controller.signal.aborted) {
-      showInfo(`Stopped after ${plural(done - failed)}`);
+      showInfo(`Stopped after ${trackCount(done - failed)}`);
     } else if (failed > 0) {
-      showError(`${failed} of ${plural(total)} failed to download`);
+      showError(`${failed} of ${trackCount(total)} failed to download`);
     } else {
-      showSuccess(`Downloaded ${plural(total)}`);
+      showSuccess(`Downloaded ${trackCount(total)}`);
     }
   }, [showError, showInfo, showSuccess]);
 

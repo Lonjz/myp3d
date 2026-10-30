@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import type { Area, Point } from 'react-easy-crop';
+import { errorMessage } from '../../utils/formatters';
 
 const COVER_SIZE = 500;
 
@@ -59,6 +60,7 @@ export function useCoverImageCrop({
   outputFilename = 'cover.jpg',
   initialCover,
 }: UseCoverImageCropOptions) {
+  const zoomInputId = useId();
   const [coverImageBase64, setCoverImageBase64] = useState<string | undefined>(initialCover);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(initialCover ?? null);
@@ -69,6 +71,18 @@ export function useCoverImageCrop({
   const [isCropModalOpen, setIsCropModalOpen] = useState(false);
   const [isApplyingCrop, setIsApplyingCrop] = useState(false);
 
+  const applyCover = async (imageSrc: string, cropArea: Area) => {
+    const croppedImage = await getCroppedCoverDataUrl(imageSrc, cropArea);
+    const blob = await fetch(croppedImage).then((response) => response.blob());
+
+    setCoverImageBase64(croppedImage);
+    setCoverFile(new File([blob], outputFilename, { type: 'image/jpeg' }));
+    setCoverPreview(croppedImage);
+    setIsCropModalOpen(false);
+    setCropSource(null);
+    onClearError?.();
+  };
+
   const handleCoverFileSelect = async (file: File) => {
     if (!file.type.startsWith('image/')) {
       onError('Cover file must be an image');
@@ -77,6 +91,12 @@ export function useCoverImageCrop({
 
     try {
       const dataUrl = await fileToDataUrl(file);
+      const { naturalWidth: width, naturalHeight: height } = await loadImage(dataUrl);
+      if (width === height && width >= COVER_SIZE) {
+        await applyCover(dataUrl, { x: 0, y: 0, width, height });
+        return;
+      }
+
       setCropSource(dataUrl);
       setCrop({ x: 0, y: 0 });
       setZoom(1);
@@ -84,7 +104,7 @@ export function useCoverImageCrop({
       setIsCropModalOpen(true);
       onClearError?.();
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Invalid cover image');
+      onError(errorMessage(err, 'Invalid cover image'));
     }
   };
 
@@ -96,17 +116,9 @@ export function useCoverImageCrop({
 
     try {
       setIsApplyingCrop(true);
-      const croppedImage = await getCroppedCoverDataUrl(cropSource, croppedAreaPixels);
-      const blob = await fetch(croppedImage).then((response) => response.blob());
-
-      setCoverImageBase64(croppedImage);
-      setCoverFile(new File([blob], outputFilename, { type: 'image/jpeg' }));
-      setCoverPreview(croppedImage);
-      setIsCropModalOpen(false);
-      setCropSource(null);
-      onClearError?.();
+      await applyCover(cropSource, croppedAreaPixels);
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Failed to crop image');
+      onError(errorMessage(err, 'Failed to crop image'));
     } finally {
       setIsApplyingCrop(false);
     }
@@ -148,7 +160,22 @@ export function useCoverImageCrop({
     e.target.value = '';
   };
 
+  const cropModalProps = {
+    isOpen: isCropModalOpen,
+    cropSource,
+    crop,
+    zoom,
+    isApplyingCrop,
+    zoomInputId,
+    onCropChange: setCrop,
+    onZoomChange: setZoom,
+    onCropComplete: handleCropComplete,
+    onCancel: handleCancelCrop,
+    onApply: handleApplyCrop,
+  };
+
   return {
+    cropModalProps,
     coverImageBase64,
     coverFile,
     coverPreview,

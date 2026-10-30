@@ -1,4 +1,4 @@
-import { Link, MonitorPlay, Search } from 'lucide-react';
+import { Link, MonitorPlay } from 'lucide-react';
 import { hasSpotifyLink } from '../../../utils/spotify';
 import { getVideoIdFromUrl, getYouTubeThumbnailUrl, isYouTubeUrl } from '../../../utils/youtube';
 import type { InstantSpotlightSource } from '../spotlightTypes';
@@ -34,7 +34,7 @@ export const youtubeSource: InstantSpotlightSource = {
         id: 'youtube:search',
         section: 'web',
         title: value,
-        icon: Search,
+        icon: MonitorPlay,
         run: ({ navigate }) => navigate(`/query?q=${encodeURIComponent(value)}`),
       },
     ];

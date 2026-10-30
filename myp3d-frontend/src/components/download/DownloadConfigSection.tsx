@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { CircleAlert, CircleCheck, DiscAlbum, FileAudio, Link, LoaderCircle, MicVocal, Type } from 'lucide-react';
+import { CircleAlert, CircleCheck, DiscAlbum, FileAudio, Link, LoaderCircle, MicVocal, Music } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { CoverUploadSquare } from '../cover/CoverUploadSquare';
 import { IconField } from '../ui/IconField';
@@ -85,7 +85,7 @@ export function DownloadConfigSection({
       </div>
 
       <IconField
-        icon={Type}
+        icon={Music}
         label="Title"
         value={title}
         onChange={(event) => onTitleChange(event.target.value)}

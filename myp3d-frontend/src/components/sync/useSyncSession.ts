@@ -1,22 +1,25 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
+import { isUnreachable } from '../../api/mp3Api';
 import { SYNC_ACTIVE_STATUSES, syncApi } from '../../api/syncApi';
 import type { SyncDiff, SyncPeer, SyncSession, SyncStatus } from '../../api/syncApi';
+import { usePoll } from '../../hooks/usePoll';
 import { emitAppEvent } from '../../utils/appEvents';
 import { useToast } from '../messages/toastContext';
+import { errorMessage } from '../../utils/formatters';
 
 const SESSION_POLL_MS = 1000;
 const PEERS_POLL_MS = 2000;
-
-const errorMessage = (err: unknown, fallback: string) => (err instanceof Error ? err.message : fallback);
 
 export function useSyncSession(port: number | null) {
   const { showError } = useToast();
   const [status, setStatus] = useState<SyncStatus | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
+  const [startFailed, setStartFailed] = useState(false);
+  const [startAttempt, setStartAttempt] = useState(0);
   const [peers, setPeers] = useState<SyncPeer[]>([]);
   const [session, setSession] = useState<SyncSession | null>(null);
   const [busy, setBusy] = useState(false);
-  const [diffState, setDiffState] = useState<{ sessionId: string; diff: SyncDiff } | null>(null);
+  const [diffState, setDiffState] = useState<{ sessionId: string; diff: SyncDiff | null } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const refreshedSessionRef = useRef<string | null>(null);
 
@@ -30,9 +33,12 @@ export function useSyncSession(port: number | null) {
         if (cancelled) return;
         setStatus(next);
         setStartError(null);
+        setStartFailed(false);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setStartError(errorMessage(err, `Couldn't listen on port ${port}`));
+        if (cancelled) return;
+        setStartFailed(isUnreachable(err));
+        setStartError(errorMessage(err, `Couldn't listen on port ${port}`));
       });
 
     return () => {
@@ -40,41 +46,23 @@ export function useSyncSession(port: number | null) {
       setPeers([]);
       void syncApi.stop().catch(() => undefined);
     };
-  }, [port]);
+  }, [port, startAttempt]);
+
+  const pollSession = async () => setSession(await syncApi.session());
+  const pollPeers = async () => setPeers(await syncApi.peers());
+
+  const loadInitial = useEffectEvent(() => {
+    void syncApi.device().then(setStatus).catch(() => undefined);
+    void pollSession().catch(() => undefined);
+    void pollPeers().catch(() => undefined);
+  });
 
   useEffect(() => {
-    let cancelled = false;
-
-    const pollSession = async () => {
-      try {
-        const next = await syncApi.session();
-        if (!cancelled) setSession(next);
-      } catch {
-        return;
-      }
-    };
-
-    const pollPeers = async () => {
-      try {
-        const next = await syncApi.peers();
-        if (!cancelled) setPeers(next);
-      } catch {
-        return;
-      }
-    };
-
-    void syncApi.device().then((next) => !cancelled && setStatus(next)).catch(() => undefined);
-    void pollSession();
-    void pollPeers();
-    const sessionTimer = window.setInterval(pollSession, SESSION_POLL_MS);
-    const peersTimer = window.setInterval(pollPeers, PEERS_POLL_MS);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(sessionTimer);
-      window.clearInterval(peersTimer);
-    };
+    loadInitial();
   }, []);
+
+  usePoll(pollSession, SESSION_POLL_MS);
+  usePoll(pollPeers, PEERS_POLL_MS);
 
   useEffect(() => {
     if (!session || SYNC_ACTIVE_STATUSES.has(session.status) || session.local.done === 0) return;
@@ -86,7 +74,9 @@ export function useSyncSession(port: number | null) {
   }, [session]);
 
   const pairedId = session?.status === 'paired' ? session.id : null;
-  const diff = diffState !== null && diffState.sessionId === pairedId ? diffState.diff : null;
+  const diffForSession = diffState !== null && diffState.sessionId === pairedId ? diffState : null;
+  const diff = diffForSession?.diff ?? null;
+  const diffFailed = diffForSession !== null && diffForSession.diff === null;
 
   const fetchDiff = useCallback(
     async (sessionId: string) => {
@@ -94,6 +84,7 @@ export function useSyncSession(port: number | null) {
         const next = await syncApi.diff();
         setDiffState({ sessionId, diff: next });
       } catch (err) {
+        setDiffState({ sessionId, diff: null });
         showError(errorMessage(err, 'Failed to compare libraries'));
       }
     },
@@ -144,16 +135,19 @@ export function useSyncSession(port: number | null) {
     [run],
   );
 
-  const diffLoading = pairedId !== null && (diff === null || refreshing);
+  const diffLoading = pairedId !== null && ((diff === null && !diffFailed) || refreshing);
 
   return {
     status,
     startError,
+    startFailed,
+    retryStart: () => setStartAttempt((attempt) => attempt + 1),
     peers,
     session,
     busy,
     diff,
     diffLoading,
+    diffFailed,
     refreshDiff,
     requestSync,
     accept,

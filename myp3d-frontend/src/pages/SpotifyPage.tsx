@@ -25,7 +25,7 @@ import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { ProgressRow } from '../components/ui/ProgressRow';
 import { Spinner } from '../components/ui/Spinner';
-import { formatDuration } from '../utils/formatters';
+import { formatDuration, formatTrackSubtitle, trackCount } from '../utils/formatters';
 
 const TRUNCATED_HINT =
   'Spotify only shows the first 100 songs of a playlist. Export it at exportify.net and drop the CSV here to get the rest.';
@@ -260,6 +260,7 @@ export function SpotifyPage() {
           onClick={() => void queueSelected()}
           disabled={queueing || selectedCount === 0}
           title="Add to queue"
+          aria-label={`Add ${trackCount(selectedCount)} to the queue`}
         >
           {queueing ? <Spinner inline /> : <ListPlus aria-hidden="true" />}
           {selectedCount}
@@ -300,7 +301,7 @@ export function SpotifyPage() {
               const title = row.match?.title ?? (row.ref.name || (row.error ? row.ref.id : ''));
               const artist = row.match?.artist ?? row.ref.subtitle;
               const album = row.match?.track.album ?? row.ref.album;
-              const sub = [artist, album].filter(Boolean).join(' · ');
+              const sub = formatTrackSubtitle(artist, album);
               const cover = row.match?.track.cover_url ?? row.ref.cover_url;
               return (
                 <li

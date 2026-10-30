@@ -17,15 +17,15 @@ import { queueApi } from '../api/queueApi';
 import type { QueueItem } from '../api/queueApi';
 import { QueueItemDialog } from '../components/downloads/QueueItemDialog';
 import { useDownloadQueue } from '../components/downloads/downloadQueueContext';
-import { EmptyState } from '../components/ui/EmptyState';
+import { EmptyState, LoadFailed } from '../components/ui/EmptyState';
 import { IconButton } from '../components/ui/IconButton';
 import { Spinner } from '../components/ui/Spinner';
 import { usePresence } from '../hooks/usePresence';
-import { formatDuration } from '../utils/formatters';
+import { formatDuration, formatTrackSubtitle, trackCount } from '../utils/formatters';
 import { rowOpenProps } from '../utils/rowOpen';
 import { getVideoIdFromUrl, getYouTubeThumbnailUrl } from '../utils/youtube';
 
-const subtitle = (item: QueueItem) => [item.artist, item.album].filter(Boolean).join(' · ');
+const subtitle = (item: QueueItem) => formatTrackSubtitle(item.artist, item.album);
 
 function coverSource(item: QueueItem): string | undefined {
   if (item.has_cover) return queueApi.getCoverUrl(item);
@@ -87,9 +87,10 @@ interface QueueRowProps {
   onStart: () => void;
   onEdit: () => void;
   onRemove: () => void;
+  onCancel: () => void;
 }
 
-function QueueRow({ item, index, busy, onStart, onEdit, onRemove }: QueueRowProps) {
+function QueueRow({ item, index, busy, onStart, onEdit, onRemove, onCancel }: QueueRowProps) {
   const cover = coverSource(item);
   const title = item.title || item.custom_filename || item.url;
   const sub = item.status === 'failed' ? item.error ?? '' : subtitle(item);
@@ -129,7 +130,9 @@ function QueueRow({ item, index, busy, onStart, onEdit, onRemove }: QueueRowProp
             disabled={busy}
           />
         )}
-        {item.status !== 'running' && (
+        {item.status === 'running' ? (
+          <IconButton icon={X} label="Cancel download" size="sm" variant="ghost" onClick={onCancel} disabled={busy} />
+        ) : (
           <IconButton icon={X} label="Remove" size="sm" variant="ghost" onClick={onRemove} disabled={busy} />
         )}
       </span>
@@ -138,7 +141,7 @@ function QueueRow({ item, index, busy, onStart, onEdit, onRemove }: QueueRowProp
 }
 
 export function DownloadsPage() {
-  const { items, active, busy, start, stop, clearDone, remove } = useDownloadQueue();
+  const { items, loadFailed, reload, active, busy, start, stop, cancel, clearDone, remove } = useDownloadQueue();
   const [editTarget, setEditTarget] = useState<QueueItem | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const editPresence = usePresence(editOpen);
@@ -168,6 +171,7 @@ export function DownloadsPage() {
             onClick={() => void stop()}
             disabled={busy || queuedCount === 0}
             title="Stop after the current download"
+            aria-label={`Stop after the current download, ${queuedCount} waiting`}
           >
             <Square aria-hidden="true" />
             {queuedCount}
@@ -179,6 +183,7 @@ export function DownloadsPage() {
             onClick={() => void start()}
             disabled={busy || pendingCount === 0}
             title="Start downloads"
+            aria-label={`Start ${trackCount(pendingCount)}`}
           >
             <Play aria-hidden="true" />
             {pendingCount}
@@ -186,7 +191,9 @@ export function DownloadsPage() {
         )}
       </div>
 
-      {items === null || items.length === 0 ? (
+      {loadFailed ? (
+        <LoadFailed label="Couldn't load downloads" onRetry={() => void reload()} />
+      ) : items === null || items.length === 0 ? (
         <EmptyState icon={Download} loading={items === null} />
       ) : (
         <section className="downloads-list glass" aria-label="Downloads">
@@ -200,6 +207,7 @@ export function DownloadsPage() {
                 onStart={() => void start([item.id])}
                 onEdit={() => openEditor(item)}
                 onRemove={() => void remove(item.id)}
+                onCancel={() => void cancel(item.id)}
               />
             ))}
           </ul>

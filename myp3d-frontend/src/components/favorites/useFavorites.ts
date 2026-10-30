@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { favoriteApi } from '../../api/favoriteApi';
 import { emitAppEvent, subscribeAppEvent } from '../../utils/appEvents';
 import { useToast } from '../messages/toastContext';
-
-const errorMessage = (err: unknown, fallback: string) => (err instanceof Error ? err.message : fallback);
+import { errorMessage } from '../../utils/formatters';
 
 const withFilename = (current: Set<string>, filename: string, on: boolean) => {
   const next = new Set(current);
@@ -14,7 +13,13 @@ const withFilename = (current: Set<string>, filename: string, on: boolean) => {
 
 export function useFavorites() {
   const { showError } = useToast();
-  const [favorites, setFavorites] = useState<Set<string>>(() => new Set());
+  const [favorites, setFavoritesState] = useState<Set<string>>(() => new Set());
+  const favoritesRef = useRef(favorites);
+
+  const setFavorites = useCallback((next: Set<string>) => {
+    favoritesRef.current = next;
+    setFavoritesState(next);
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -34,21 +39,21 @@ export function useFavorites() {
       unsubscribeLibrary();
       unsubscribePlaylists();
     };
-  }, [showError]);
+  }, [setFavorites, showError]);
 
   const toggle = useCallback(
     async (filename: string) => {
-      const on = !favorites.has(filename);
-      setFavorites((current) => withFilename(current, filename, on));
+      const on = !favoritesRef.current.has(filename);
+      setFavorites(withFilename(favoritesRef.current, filename, on));
       try {
         await (on ? favoriteApi.add(filename) : favoriteApi.remove(filename));
         emitAppEvent('playlists-changed');
       } catch (err) {
-        setFavorites((current) => withFilename(current, filename, !on));
+        setFavorites(withFilename(favoritesRef.current, filename, !on));
         showError(errorMessage(err, on ? 'Failed to favourite' : 'Failed to unfavourite'));
       }
     },
-    [favorites, showError],
+    [setFavorites, showError],
   );
 
   return { favorites, toggle };

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useEffectEvent, useMemo, useReducer, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { mp3Api } from '../../api/mp3Api';
+import { apiFetch, isUnreachable, mp3Api, UNREACHABLE_MESSAGE } from '../../api/mp3Api';
 import type { MP3Info } from '../../api/mp3Api';
 import { readStoredValue, useStoredValueWriter, writeStoredValue } from '../../hooks/usePersistentState';
 import { emitAppEvent, subscribeAppEvent } from '../../utils/appEvents';
@@ -10,6 +10,7 @@ import type { PlayerContextValue, PlayerTimeValue, PlayOptions } from './playerC
 import { playerReducer, restorePlayerState } from './playerReducer';
 import { usePlayerCommands } from './usePlayerCommands';
 import type { PersistedPlayerState } from './playerReducer';
+import { errorMessage } from '../../utils/formatters';
 
 const STATE_KEY = 'player';
 const POSITION_KEY = 'player:position';
@@ -154,7 +155,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         const detail = await mp3Api.getAlbum(albumKey);
         playTracks(detail.tracks, options?.shuffle ? undefined : 0, options);
       } catch (err) {
-        showError(err instanceof Error ? err.message : 'Failed to load album');
+        showError(errorMessage(err, 'Failed to load album'));
       }
     },
     [playTracks, showError],
@@ -370,13 +371,19 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const audio = audioRef.current;
     if (!audio?.getAttribute('src') || !currentTrack) return;
     switchingRef.current = false;
-    errorCountRef.current += 1;
-    showError(`Couldn't play ${currentTrack.title || currentTrack.filename}`);
-    if (errorCountRef.current >= state.queue.length) {
-      dispatch({ type: 'setPlaying', playing: false });
-      return;
-    }
-    dispatch({ type: 'ended' });
+    const name = currentTrack.title || currentTrack.filename;
+    void apiFetch('/', undefined, '').then(
+      () => {
+        errorCountRef.current += 1;
+        showError(`Couldn't play ${name}`);
+        if (errorCountRef.current >= state.queue.length) dispatch({ type: 'setPlaying', playing: false });
+        else dispatch({ type: 'ended' });
+      },
+      (err: unknown) => {
+        dispatch({ type: 'setPlaying', playing: false });
+        showError(isUnreachable(err) ? UNREACHABLE_MESSAGE : `Couldn't play ${name}`);
+      },
+    );
   };
 
   return (

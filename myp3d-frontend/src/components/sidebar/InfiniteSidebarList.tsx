@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { ArrowLeft, Search } from 'lucide-react';
+import { LoadFailed } from '../ui/EmptyState';
 import { IconButton } from '../ui/IconButton';
 import { IconField } from '../ui/IconField';
 import { Spinner } from '../ui/Spinner';
@@ -54,16 +55,13 @@ export function InfiniteSidebarList<T>({
   const [cacheByQuery, setCacheByQuery] = useState<Record<string, QueryCacheEntry<T>>>({});
   const [isLoadingInitial, setIsLoadingInitial] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState<{ query: string; page: number } | null>(null);
 
   const listRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const inflightKeysRef = useRef<Set<string>>(new Set());
   const hasRestoredScrollRef = useRef(false);
 
-  // Mirror props/state that change identity every render into refs so the
-  // fetch callback below stays stable and doesn't tear down the
-  // IntersectionObserver on each parent re-render.
   const fetchPageRef = useRef(fetchPage);
   fetchPageRef.current = fetchPage;
   const getItemKeyRef = useRef(getItemKey);
@@ -148,9 +146,9 @@ export function InfiniteSidebarList<T>({
             },
           };
         });
-        setError(null);
+        setFailed(null);
       } catch {
-        setError('Failed to load sidebar items.');
+        setFailed({ query, page });
       } finally {
         inflightKeysRef.current.delete(requestKey);
         setIsLoadingInitial(false);
@@ -204,7 +202,7 @@ export function InfiniteSidebarList<T>({
   }, [fetchQueryPage, hasMore, isLoadingInitial, isLoadingMore, maxLoadedPage, normalizedQuery]);
 
   useEffect(() => {
-    if (!scrollStorageKey || hasRestoredScrollRef.current || !listRef.current || typeof window === 'undefined') {
+    if (!scrollStorageKey || hasRestoredScrollRef.current || !listRef.current) {
       return;
     }
 
@@ -219,7 +217,7 @@ export function InfiniteSidebarList<T>({
   }, [scrollStorageKey]);
 
   const handleListScroll = useCallback(() => {
-    if (!scrollStorageKey || typeof window === 'undefined' || !listRef.current) {
+    if (!scrollStorageKey || !listRef.current) {
       return;
     }
 
@@ -238,6 +236,8 @@ export function InfiniteSidebarList<T>({
 
     return [pinnedItem, ...loadedItems];
   }, [getItemKey, loadedItems, pinnedItem]);
+
+  const failedHere = failed?.query === normalizedQuery ? failed : null;
 
   return (
     <aside className="details-sidebar glass">
@@ -262,7 +262,7 @@ export function InfiniteSidebarList<T>({
             <button
               key={itemKey}
               type="button"
-              className={`details-song-item ${isActive ? 'active' : ''}`}
+              className={`details-song-item ${isActive ? 'is-active' : ''}`}
               style={{ '--row': index } as CSSProperties}
               onClick={() => onSelect(item)}
               disabled={isActive}
@@ -273,8 +273,10 @@ export function InfiniteSidebarList<T>({
           );
         })}
 
-        {!isLoadingInitial && visibleItems.length === 0 && (
-          <p className="input-help">{emptyMessage}</p>
+        {failedHere && !isLoadingInitial && !isLoadingMore ? (
+          <LoadFailed compact label="Couldn't load the list" onRetry={() => void fetchQueryPage(failedHere.query, failedHere.page)} />
+        ) : (
+          !isLoadingInitial && visibleItems.length === 0 && <p className="input-help">{emptyMessage}</p>
         )}
 
         {(isLoadingInitial || isLoadingMore) && (
@@ -283,8 +285,6 @@ export function InfiniteSidebarList<T>({
 
         <div ref={sentinelRef} className="details-sidebar-sentinel" aria-hidden="true" />
       </div>
-
-      {error && <p className="error">{error}</p>}
     </aside>
   );
 }

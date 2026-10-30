@@ -59,6 +59,10 @@ export const queueApi = {
     return apiFetch('/queue/start', jsonInit('POST', { ids }), 'Failed to start downloads');
   },
 
+  cancel(id: number): Promise<QueueItem[]> {
+    return apiFetch(`/queue/${id}/cancel`, jsonInit('POST', {}), 'Failed to cancel the download');
+  },
+
   stop(): Promise<QueueItem[]> {
     return apiFetch('/queue/stop', jsonInit('POST', {}), 'Failed to stop downloads');
   },

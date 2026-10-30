@@ -110,10 +110,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.downloads-dialog__save {
-  min-height: 2.75rem;
-}
-
 .sidebar-link__activity {
   position: absolute;
   top: 0.55rem;

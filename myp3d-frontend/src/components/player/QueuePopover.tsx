@@ -23,6 +23,7 @@ export function QueuePopover({ anchorRef, closing, onClose }: QueuePopoverProps)
     if (!list || !row) return;
     const offset = row.getBoundingClientRect().top - list.getBoundingClientRect().top;
     list.scrollTop += offset - (list.clientHeight - row.offsetHeight) / 2;
+    row.querySelector<HTMLElement>('button')?.focus();
   }, []);
 
   useEffect(() => {
@@ -32,7 +33,9 @@ export function QueuePopover({ anchorRef, closing, onClose }: QueuePopoverProps)
       onClose();
     };
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key !== 'Escape') return;
+      onClose();
+      anchorRef.current?.focus();
     };
     document.addEventListener('pointerdown', handlePointerDown);
     window.addEventListener('keydown', handleKeyDown);

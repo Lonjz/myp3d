@@ -9,6 +9,7 @@ import { CoverPlayButton } from '../player/CoverPlayButton';
 import { usePlayer } from '../player/playerContext';
 import { EmptyState } from '../ui/EmptyState';
 import { ChartCard } from './ChartCard';
+import { SegmentedControl } from '../ui/SegmentedControl';
 
 interface TrackListCardProps {
   recent: MP3Info[];
@@ -39,23 +40,7 @@ export function TrackListCard({ recent, favorites }: TrackListCardProps) {
   const current = MODES.find((option) => option.value === mode) ?? MODES[0];
   const tracks = mode === 'recent' ? recent : favorites;
 
-  const toggle = (
-    <div className="segmented segmented--sm" role="group" aria-label="Tracks">
-      {MODES.map(({ value, label, icon: Icon }) => (
-        <button
-          key={value}
-          type="button"
-          className={`segmented__option ${mode === value ? 'is-active' : ''}`.trim()}
-          aria-pressed={mode === value}
-          aria-label={label}
-          title={label}
-          onClick={() => setMode(value)}
-        >
-          <Icon aria-hidden="true" />
-        </button>
-      ))}
-    </div>
-  );
+  const toggle = <SegmentedControl label="Tracks" options={MODES} value={mode} onChange={setMode} small />;
 
   return (
     <ChartCard title={current.label} icon={current.icon} heading={toggle} className="chart-card--tracks">

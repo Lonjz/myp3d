@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CircleAlert, Clock, DiscAlbum, Download, HardDrive, Image, MicVocal, Music, RefreshCw, Star } from 'lucide-react';
+import { Clock, DiscAlbum, Download, HardDrive, Image, MicVocal, Music, Star } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { LibraryStats } from '../api/mp3Api';
 import { AdditionsChart } from '../components/dashboard/AdditionsChart';
@@ -13,10 +13,9 @@ import { TopArtistsChart } from '../components/dashboard/TopArtistsChart';
 import { TrackListCard } from '../components/dashboard/TrackListCard';
 import { useDownloadQueue } from '../components/downloads/downloadQueueContext';
 import { useToast } from '../components/messages/toastContext';
-import { EmptyState } from '../components/ui/EmptyState';
-import { IconButton } from '../components/ui/IconButton';
+import { LoadFailed } from '../components/ui/EmptyState';
 import { subscribeAppEvent } from '../utils/appEvents';
-import { formatBytes, formatHours } from '../utils/formatters';
+import { errorMessage, formatBytes, formatHours } from '../utils/formatters';
 
 const STAT_TILE_COUNT = 7;
 const CHART_SLOTS = ['chart-card--span-2', '', '', '', '', 'chart-card--tracks', 'chart-card--span-2 chart-card--albums'];
@@ -47,7 +46,7 @@ export function DashboardPage() {
     try {
       setStats(await mp3Api.getStats());
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Failed to load library stats');
+      showError(errorMessage(err, 'Failed to load library stats'));
     } finally {
       setLoading(false);
     }
@@ -80,9 +79,7 @@ export function DashboardPage() {
             </div>
           </>
         ) : (
-          <EmptyState icon={CircleAlert} label="Couldn't load stats">
-            <IconButton icon={RefreshCw} label="Retry" onClick={() => void loadStats()} />
-          </EmptyState>
+          <LoadFailed label="Couldn't load stats" onRetry={() => void loadStats()} />
         )}
       </div>
     );

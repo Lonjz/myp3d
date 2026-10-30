@@ -31,11 +31,12 @@ import { useAlbumHealth } from '../components/music/useAlbumHealth';
 import { useMusicSync } from '../components/music/useMusicSync';
 import { usePlaylistMusicSync } from '../components/music/usePlaylistMusicSync';
 import { Checkbox } from '../components/ui/Checkbox';
-import { EmptyState } from '../components/ui/EmptyState';
+import { EmptyState, LoadFailed } from '../components/ui/EmptyState';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { AppleMusicIcon } from '../components/ui/BrandIcons';
 import { formatTrackSubtitle } from '../utils/formatters';
+import { SegmentedControl } from '../components/ui/SegmentedControl';
 
 type MusicStep = 'songs' | 'playlists' | 'albums';
 
@@ -144,7 +145,7 @@ function MusicEmpty({ scanning }: { scanning: boolean }) {
 
 export function MusicPage() {
   const songs = useMusicSync();
-  const { available, folder, setFolder } = songs;
+  const { available, loadFailed, retry, folder, setFolder } = songs;
   const [step, setStep] = useState<MusicStep>('songs');
   const playlists = usePlaylistMusicSync(folder, available === true && step === 'playlists');
   const albums = useAlbumHealth(available === true && step === 'albums');
@@ -152,7 +153,7 @@ export function MusicPage() {
   if (available === null) {
     return (
       <div className="page sync-page music-page">
-        <EmptyState loading />
+        {loadFailed ? <LoadFailed label="Couldn't check Apple Music" onRetry={retry} /> : <EmptyState loading />}
       </div>
     );
   }
@@ -318,6 +319,7 @@ export function MusicPage() {
         onClick={startSync}
         disabled={active.busy || active.scanning || jobOpen || anySyncing || songsBlocking || pendingCount === 0}
         title={songsBlocking ? 'Sync songs first' : 'Sync with Apple Music'}
+        aria-label={songsBlocking ? 'Sync songs first' : `Sync ${pendingCount} with Apple Music`}
       >
         <RefreshCw aria-hidden="true" />
         {pendingCount}
@@ -362,42 +364,17 @@ export function MusicPage() {
   return (
     <div className="page page--fill sync-page music-page">
       <div className="sync-toolbar glass">
-        <div className="segmented" role="group" aria-label="Sync step">
-          <button
-            type="button"
-            className={`segmented__option ${step === 'songs' ? 'is-active' : ''}`.trim()}
-            aria-pressed={step === 'songs'}
-            aria-label="Songs"
-            title="Songs"
-            onClick={() => switchStep('songs')}
-            disabled={anySyncing}
-          >
-            <Music aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className={`segmented__option ${step === 'playlists' ? 'is-active' : ''}`.trim()}
-            aria-pressed={step === 'playlists'}
-            aria-label={songsPending ? 'Playlists (songs still to sync)' : 'Playlists'}
-            title={songsPending ? 'Playlists (songs still to sync)' : 'Playlists'}
-            onClick={() => switchStep('playlists')}
-            disabled={anySyncing}
-          >
-            <ListMusic aria-hidden="true" />
-            {songsPending && <span className="segmented__dot" aria-hidden="true" />}
-          </button>
-          <button
-            type="button"
-            className={`segmented__option ${step === 'albums' ? 'is-active' : ''}`.trim()}
-            aria-pressed={step === 'albums'}
-            aria-label="Album artists"
-            title="Album artists"
-            onClick={() => switchStep('albums')}
-            disabled={anySyncing}
-          >
-            <DiscAlbum aria-hidden="true" />
-          </button>
-        </div>
+        <SegmentedControl
+          label="Sync step"
+          options={[
+            { value: 'songs', label: 'Songs', icon: Music },
+            { value: 'playlists', label: songsPending ? 'Playlists (songs still to sync)' : 'Playlists', icon: ListMusic, dot: songsPending },
+            { value: 'albums', label: 'Album artists', icon: DiscAlbum },
+          ]}
+          value={step}
+          onChange={switchStep}
+          disabled={anySyncing}
+        />
         {step === 'albums' ? albumTools : syncTools}
       </div>
 

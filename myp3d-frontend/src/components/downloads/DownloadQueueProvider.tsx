@@ -2,21 +2,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { queueApi } from '../../api/queueApi';
 import type { QueueItem, QueueItemUpdate } from '../../api/queueApi';
+import { usePoll } from '../../hooks/usePoll';
 import { emitAppEvent, subscribeAppEvent } from '../../utils/appEvents';
 import { useToast } from '../messages/toastContext';
 import { DownloadQueueContext, isQueueItemActive } from './downloadQueueContext';
 import type { DownloadQueueContextValue } from './downloadQueueContext';
+import { errorMessage, trackCount } from '../../utils/formatters';
 
 const POLL_MS = 1000;
-
-const errorMessage = (err: unknown, fallback: string) => (err instanceof Error ? err.message : fallback);
-
-const plural = (count: number) => `${count} track${count === 1 ? '' : 's'}`;
 
 export function DownloadQueueProvider({ children }: { children: ReactNode }) {
   const { showSuccess, showError } = useToast();
   const [items, setItems] = useState<QueueItem[] | null>(null);
   const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
   const doneRef = useRef<ReadonlySet<number> | null>(null);
   const runRef = useRef(new Set<number>());
 
@@ -34,8 +33,8 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
         runRef.current = new Set();
         const finished = run.filter((item) => item.status === 'done' || item.status === 'failed').length;
         const failed = run.filter((item) => item.status === 'failed').length;
-        if (failed > 0) showError(`${failed} of ${plural(finished)} failed to download`);
-        else if (finished > 0) showSuccess(`Downloaded ${plural(finished)}`);
+        if (failed > 0) showError(`${failed} of ${trackCount(finished)} failed to download`);
+        else if (finished > 0) showSuccess(`Downloaded ${trackCount(finished)}`);
       }
 
       setItems(next);
@@ -46,8 +45,9 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
   const reload = useCallback(async () => {
     try {
       apply(await queueApi.list());
+      setFailed(false);
     } catch {
-      return;
+      setFailed(true);
     }
   }, [apply]);
 
@@ -59,11 +59,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
 
   const active = items?.some(isQueueItemActive) ?? false;
 
-  useEffect(() => {
-    if (!active) return undefined;
-    const timer = window.setInterval(() => void reload(), POLL_MS);
-    return () => window.clearInterval(timer);
-  }, [active, reload]);
+  usePoll(reload, POLL_MS, active);
 
   const run = useCallback(
     async (action: () => Promise<QueueItem[]>, fallbackError: string) => {
@@ -88,6 +84,8 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
 
   const stop = useCallback(() => run(queueApi.stop, 'Failed to stop downloads'), [run]);
 
+  const cancel = useCallback((id: number) => run(() => queueApi.cancel(id), 'Failed to cancel the download'), [run]);
+
   const clearDone = useCallback(() => run(queueApi.clearDone, 'Failed to clear downloads'), [run]);
 
   const remove = useCallback(
@@ -109,8 +107,8 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<DownloadQueueContextValue>(
-    () => ({ items, active, busy, start, stop, clearDone, remove, update }),
-    [items, active, busy, start, stop, clearDone, remove, update],
+    () => ({ items, loadFailed: items === null && failed, reload, active, busy, start, stop, cancel, clearDone, remove, update }),
+    [items, failed, reload, active, busy, start, stop, cancel, clearDone, remove, update],
   );
 
   return <DownloadQueueContext.Provider value={value}>{children}</DownloadQueueContext.Provider>;

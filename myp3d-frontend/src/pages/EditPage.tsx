@@ -1,6 +1,6 @@
-import { useEffect, useEffectEvent, useReducer, useRef, useState } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DiscAlbum, FileAudio, ImagePlus, MicVocal, Music, Pause, Play, Save, Trash2, TriangleAlert, Type, Undo2 } from 'lucide-react';
+import { DiscAlbum, FileAudio, ImagePlus, MicVocal, Music, Pause, Play, Save } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { MP3Info } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
@@ -8,15 +8,18 @@ import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
 import { useToast } from '../components/messages/toastContext';
 import { InfiniteSidebarList } from '../components/sidebar/InfiniteSidebarList';
 import { usePlayer } from '../components/player/playerContext';
-import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { Spinner } from '../components/ui/Spinner';
-import { EmptyState } from '../components/ui/EmptyState';
+import { EmptyState, LoadFailed } from '../components/ui/EmptyState';
+import { useDetail } from '../hooks/useDetail';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { emitAppEvent, subscribeAppEvent } from '../utils/appEvents';
 import { getCachedMp3Info, setCachedMp3Info } from '../utils/detailCache';
 import { normalizeFilenameInput, stripMp3Extension } from '../utils/filenames';
+import { errorMessage } from '../utils/formatters';
+import { DiscardChangesDialog } from '../components/ui/DiscardChangesDialog';
+import { useSaveShortcut } from '../hooks/useSaveShortcut';
 
 interface EditPageProps {
   filename: string;
@@ -26,10 +29,16 @@ interface EditPageProps {
 const SIDEBAR_SCROLL_KEY = 'edit-sidebar-scroll-top';
 const SIDEBAR_PAGE_SIZE = 25;
 
+async function fetchMp3Info(filename: string, force: boolean): Promise<MP3Info> {
+  const cached = force ? null : getCachedMp3Info(filename);
+  if (cached) return cached;
+  const info = await mp3Api.getInfo(filename);
+  setCachedMp3Info(filename, info);
+  return info;
+}
+
 export function EditPage({ filename, onBack }: EditPageProps) {
   const navigate = useNavigate();
-  const [mp3, setMp3] = useState<MP3Info | null>(null);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { showSuccess, showError, clearToast } = useToast();
 
@@ -37,24 +46,15 @@ export function EditPage({ filename, onBack }: EditPageProps) {
   const [artist, setArtist] = useState('');
   const [album, setAlbum] = useState('');
   const [newFilename, setNewFilename] = useState('');
-  
+  const backTimerRef = useRef<number | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [, refreshCoverPreview] = useReducer((count: number) => count + 1, 0);
 
   const {
+    cropModalProps,
     coverFile,
     coverPreview,
-    cropSource,
-    crop,
-    zoom,
-    isCropModalOpen,
-    isApplyingCrop,
-    setCrop,
-    setZoom,
-    handleCropComplete,
     handleCoverChange,
-    handleApplyCrop,
-    handleCancelCrop,
     resetCoverState,
   } = useCoverImageCrop({
     onError: showError,
@@ -63,48 +63,19 @@ export function EditPage({ filename, onBack }: EditPageProps) {
   });
 
   const applyMp3Info = (info: MP3Info) => {
-    setMp3(info);
+    resetCoverState();
     setTitle(info.title || '');
     setArtist(info.artist || '');
     setAlbum(info.album || '');
     setNewFilename(stripMp3Extension(info.filename));
   };
 
-  const loadMp3 = async (options?: { force?: boolean }) => {
-    const force = options?.force ?? false;
-    clearToast();
-    resetCoverState();
-
-    if (!force) {
-      const cached = getCachedMp3Info(filename);
-      if (cached) {
-        applyMp3Info(cached);
-        setLoading(false);
-        return;
-      }
-    }
-
-    try {
-      setLoading(true);
-      const info = await mp3Api.getInfo(filename);
-      setCachedMp3Info(filename, info);
-      applyMp3Info(info);
-    } catch {
-      showError('Failed to load MP3 info');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadCurrentMp3 = useEffectEvent(() => {
-    void loadMp3();
-  });
-
-  useEffect(() => {
-    loadCurrentMp3();
-  }, [filename]);
+  const { detail: mp3, current, missing, failed, reload } = useDetail(filename, fetchMp3Info, applyMp3Info, (err) =>
+    showError(errorMessage(err, 'Failed to load MP3 info')),
+  );
 
   useEffect(() => subscribeAppEvent('library-changed', refreshCoverPreview), []);
+  useEffect(() => () => window.clearTimeout(backTimerRef.current), []);
 
   const isDirty =
     mp3 !== null &&
@@ -115,14 +86,15 @@ export function EditPage({ filename, onBack }: EditPageProps) {
       coverFile !== null);
 
   const { blocker, allowNavigation } = useUnsavedChangesGuard(isDirty);
+  useSaveShortcut(() => void handleSave(), !(saving || !current || !isDirty));
   const player = usePlayer();
 
   const handleSave = async () => {
+    if (!mp3 || !current) return;
     setSaving(true);
     clearToast();
 
     try {
-      // Update metadata
       const result = await mp3Api.updateMetadata(filename, {
         title: title || undefined,
         artist: artist || undefined,
@@ -130,41 +102,36 @@ export function EditPage({ filename, onBack }: EditPageProps) {
         new_filename: newFilename.trim() && newFilename !== stripMp3Extension(filename) ? `${newFilename.trim()}.mp3` : undefined,
       });
 
-      // Update cover if changed
       if (coverFile) {
         await mp3Api.updateCover(result.filename, coverFile);
       }
 
       showSuccess('Saved successfully!');
 
-      if (mp3) {
-        player.trackUpdated(filename, {
-          ...mp3,
-          filename: result.filename,
-          title: title || mp3.title,
-          artist: artist || mp3.artist,
-          album: album || mp3.album,
-        });
-      }
+      player.trackUpdated(filename, {
+        ...mp3,
+        filename: result.filename,
+        title: title || mp3.title,
+        artist: artist || mp3.artist,
+        album: album || mp3.album,
+      });
       emitAppEvent('library-changed');
       if (result.filename === filename) {
-        await loadMp3({ force: true });
-      }
-      
-      // If filename changed, go back to library
-      if (result.filename !== filename) {
+        await reload();
+      } else {
         allowNavigation();
-        window.setTimeout(() => onBack(), 1000);
+        backTimerRef.current = window.setTimeout(onBack, 1000);
       }
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Save failed');
+      showError(errorMessage(err, 'Save failed'));
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading && !mp3) return <div className="page"><Spinner /></div>;
-  if (!mp3) return <div className="page"><EmptyState icon={Music} label="Track not found" /></div>;
+  if (missing) return <div className="page"><EmptyState icon={Music} label="Track not found" /></div>;
+  if (failed) return <div className="page"><LoadFailed label="Couldn't load the song" onRetry={() => void reload()} /></div>;
+  if (!mp3) return <div className="page"><Spinner /></div>;
 
   const existingCoverPreview = mp3.has_cover ? mp3Api.getCoverUrl(mp3.filename, 'full') : null;
   const effectiveCoverPreview = coverPreview || existingCoverPreview;
@@ -225,7 +192,7 @@ export function EditPage({ filename, onBack }: EditPageProps) {
               {effectiveCoverPreview ? (
                 <img src={effectiveCoverPreview} alt="" />
               ) : (
-                <div className="no-cover-large">🎵</div>
+                <div className="no-cover-large"><Music aria-hidden="true" /></div>
               )}
               <span className="cover-preview__overlay" aria-hidden="true">
                 <ImagePlus />
@@ -238,28 +205,28 @@ export function EditPage({ filename, onBack }: EditPageProps) {
                 label="File name"
                 value={newFilename}
                 onChange={(e) => setNewFilename(normalizeFilenameInput(e.target.value))}
-                disabled={saving}
+                disabled={saving || !current}
               />
               <IconField
-                icon={Type}
+                icon={Music}
                 label="Title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                disabled={saving}
+                disabled={saving || !current}
               />
               <IconField
                 icon={MicVocal}
                 label="Artist"
                 value={artist}
                 onChange={(e) => setArtist(e.target.value)}
-                disabled={saving}
+                disabled={saving || !current}
               />
               <IconField
                 icon={DiscAlbum}
                 label="Album"
                 value={album}
                 onChange={(e) => setAlbum(e.target.value)}
-                disabled={saving}
+                disabled={saving || !current}
               />
 
               <div className="metadata-actions">
@@ -268,10 +235,14 @@ export function EditPage({ filename, onBack }: EditPageProps) {
                   label={isPlayingThis ? 'Pause' : 'Play'}
                   onClick={() => (player.isCurrent(mp3.filename) ? player.togglePlay() : player.playTracks([mp3], 0))}
                 />
-                <button onClick={handleSave} disabled={saving} className="btn-primary metadata-save">
-                  {saving ? <Spinner inline /> : <Save aria-hidden="true" />}
-                  Save
-                </button>
+                <IconButton
+                  icon={Save}
+                  label="Save"
+                  variant="primary"
+                  onClick={() => void handleSave()}
+                  busy={saving}
+                  disabled={saving || !current || !isDirty}
+                />
               </div>
             </div>
           </div>
@@ -279,32 +250,9 @@ export function EditPage({ filename, onBack }: EditPageProps) {
         </section>
       </div>
 
-      <ConfirmDialog
-        open={blocker.state === 'blocked'}
-        icon={TriangleAlert}
-        title="Discard changes?"
-        cancelLabel="Stay"
-        cancelIcon={Undo2}
-        confirmLabel="Discard"
-        confirmIcon={Trash2}
-        tone="danger"
-        onCancel={() => blocker.reset?.()}
-        onConfirm={() => blocker.proceed?.()}
-      />
+      <DiscardChangesDialog blocker={blocker} />
 
-      <CoverCropModal
-        isOpen={isCropModalOpen}
-        cropSource={cropSource}
-        crop={crop}
-        zoom={zoom}
-        isApplyingCrop={isApplyingCrop}
-        zoomInputId="editCropZoom"
-        onCropChange={setCrop}
-        onZoomChange={setZoom}
-        onCropComplete={handleCropComplete}
-        onCancel={handleCancelCrop}
-        onApply={handleApplyCrop}
-      />
+      <CoverCropModal {...cropModalProps} />
     </div>
   );
 }

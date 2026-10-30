@@ -15,7 +15,7 @@ interface TopAlbumsProps {
 
 export function TopAlbums({ albums }: TopAlbumsProps) {
   const player = usePlayer();
-  const currentAlbumName = (player.currentTrack?.album || '').trim().toLowerCase();
+  const currentAlbumKey = player.currentTrack?.album_key;
 
   return (
     <ChartCard title="Top albums" icon={DiscAlbum} className="chart-card--span-2 chart-card--albums">
@@ -24,7 +24,7 @@ export function TopAlbums({ albums }: TopAlbumsProps) {
       ) : (
         <div className="album-tile-grid">
           {albums.map((album, index) => {
-            const isCurrent = player.currentTrack !== null && currentAlbumName === album.album_name.toLowerCase();
+            const isCurrent = currentAlbumKey === album.album_key;
             const playingNow = isCurrent && player.state.isPlaying;
             return (
               <div
@@ -37,7 +37,7 @@ export function TopAlbums({ albums }: TopAlbumsProps) {
                     {album.has_cover ? (
                       <img src={mp3Api.getAlbumCoverUrl(album.album_key, 'medium')} alt="" loading="lazy" />
                     ) : (
-                      <Music className="album-tile__placeholder" aria-hidden="true" />
+                      <DiscAlbum className="album-tile__placeholder" aria-hidden="true" />
                     )}
                   </div>
                   <span className="album-tile__name" title={album.album_name}>{album.album_name}</span>

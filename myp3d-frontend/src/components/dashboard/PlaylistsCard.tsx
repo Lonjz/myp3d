@@ -8,6 +8,7 @@ import { usePlaylists } from '../playlists/usePlaylists';
 import { useToast } from '../messages/toastContext';
 import { EmptyState } from '../ui/EmptyState';
 import { ChartCard } from './ChartCard';
+import { errorMessage } from '../../utils/formatters';
 
 const PLAYLIST_LIMIT = 5;
 
@@ -22,7 +23,7 @@ export function PlaylistsCard() {
       const detail = await playlistApi.get(id);
       if (detail.tracks.length > 0) player.playTracks(detail.tracks, 0);
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Failed to load playlist');
+      showError(errorMessage(err, 'Failed to load playlist'));
     }
   };
 
@@ -38,6 +39,7 @@ export function PlaylistsCard() {
                 <CoverPlayButton
                   src={playlist.has_cover ? playlistApi.coverUrl(playlist, 'thumb') : undefined}
                   label={`Play ${playlist.name}`}
+                  icon={ListMusic}
                   isCurrent={false}
                   isPlaying={player.state.isPlaying}
                   onPlay={() => void playPlaylist(playlist.id)}

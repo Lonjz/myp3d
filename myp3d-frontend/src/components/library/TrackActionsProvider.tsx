@@ -37,6 +37,8 @@ import { ContextMenu } from '../ui/ContextMenu';
 import type { MenuAction } from '../ui/ContextMenu';
 import { TrackActionsContext } from './trackActionsContext';
 import type { TrackActionOptions, TrackActionsContextValue } from './trackActionsContext';
+import { startDownload } from '../../utils/download';
+import { errorMessage, trackCount } from '../../utils/formatters';
 
 interface OpenMenu {
   id: number;
@@ -59,17 +61,7 @@ interface PendingDelete {
   onDeleted?: (filenames: string[]) => void;
 }
 
-const trackCount = (count: number) => `${count} track${count === 1 ? '' : 's'}`;
-
-const downloadFile = (filename: string) => {
-  const link = document.createElement('a');
-  link.href = mp3Api.getFileUrl(filename);
-  link.download = filename;
-  link.hidden = true;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-};
+const downloadFile = (filename: string) => startDownload(mp3Api.getFileUrl(filename), filename);
 
 export function TrackActionsProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
@@ -113,7 +105,7 @@ export function TrackActionsProvider({ children }: { children: ReactNode }) {
         showError(`${result.failed.length} of ${trackCount(filenames.length)} couldn't be deleted`);
       }
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Delete failed');
+      showError(errorMessage(err, 'Delete failed'));
     } finally {
       setDeleting(false);
     }
@@ -168,7 +160,7 @@ export function TrackActionsProvider({ children }: { children: ReactNode }) {
       }
       playTracks(tracks, mode === 'shuffle' ? undefined : 0, { shuffle: mode === 'shuffle' });
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Failed to load tracks');
+      showError(errorMessage(err, 'Failed to load tracks'));
     }
   };
 

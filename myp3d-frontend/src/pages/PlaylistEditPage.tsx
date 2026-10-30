@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlignLeft, Clock, DiscAlbum, GripVertical, ImagePlus, ListMinus, ListMusic, Music, Play, Save, Shuffle, Trash2, TriangleAlert, Undo2 } from 'lucide-react';
@@ -19,10 +19,13 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { Spinner } from '../components/ui/Spinner';
-import { EmptyState } from '../components/ui/EmptyState';
+import { EmptyState, LoadFailed } from '../components/ui/EmptyState';
+import { useDetail } from '../hooks/useDetail';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { emitAppEvent } from '../utils/appEvents';
-import { formatDuration } from '../utils/formatters';
+import { errorMessage, formatDuration, trackCount } from '../utils/formatters';
+import { DiscardChangesDialog } from '../components/ui/DiscardChangesDialog';
+import { useSaveShortcut } from '../hooks/useSaveShortcut';
 
 interface PlaylistEditPageProps {
   playlistId: string;
@@ -30,8 +33,6 @@ interface PlaylistEditPageProps {
 }
 
 const PLAYLIST_SIDEBAR_PAGE_SIZE = 25;
-
-const trackCount = (count: number) => `${count} track${count === 1 ? '' : 's'}`;
 
 const moveItem = <T,>(items: T[], from: number, to: number): T[] => {
   const next = [...items];
@@ -55,8 +56,6 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
   const player = usePlayer();
   const { favorites, openMenu, menuFilename } = useTrackActions();
   const { showSuccess, showError, showInfo, clearToast } = useToast();
-  const [detail, setDetail] = useState<PlaylistDetail | null>(null);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -66,19 +65,10 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
+    cropModalProps,
     coverFile,
     coverPreview,
-    cropSource,
-    crop,
-    zoom,
-    isCropModalOpen,
-    isApplyingCrop,
-    setCrop,
-    setZoom,
-    handleCropComplete,
     handleCoverChange,
-    handleApplyCrop,
-    handleCancelCrop,
     resetCoverState,
   } = useCoverImageCrop({
     onError: showError,
@@ -86,34 +76,16 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
     outputFilename: 'playlist-cover.jpg',
   });
 
-  const applyDetail = (next: PlaylistDetail) => {
-    setDetail(next);
+  const applyFields = (next: PlaylistDetail) => {
+    resetCoverState();
     setName(next.name);
     setDescription(next.description);
     setRows(toRows(next.tracks));
   };
 
-  const loadPlaylist = async (targetId: string) => {
-    try {
-      setLoading(true);
-      applyDetail(await playlistApi.get(targetId));
-    } catch (err) {
-      showError(err instanceof Error ? err.message : 'Failed to load playlist');
-      setDetail(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadCurrentPlaylist = useEffectEvent((targetId: string) => {
-    clearToast();
-    resetCoverState();
-    void loadPlaylist(targetId);
-  });
-
-  useEffect(() => {
-    loadCurrentPlaylist(playlistId);
-  }, [playlistId]);
+  const { detail, current, missing, failed, reload, update } = useDetail(playlistId, (id) => playlistApi.get(id), applyFields, (err) =>
+    showError(errorMessage(err, 'Failed to load playlist')),
+  );
 
   const tracks = rows.map((row) => row.track);
   const isNameDirty = detail !== null && name.trim() !== detail.name;
@@ -122,16 +94,16 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
   const isDirty = isNameDirty || isDescriptionDirty || isOrderDirty || coverFile !== null;
 
   const { blocker, allowNavigation } = useUnsavedChangesGuard(isDirty);
+  useSaveShortcut(() => void handleSave(), !(saving || !current || !isDirty || !name.trim()));
 
   const handleSave = async () => {
-    if (!detail) return;
+    if (!detail || !current) return;
 
     setSaving(true);
     showInfo('Saving playlist...');
     try {
-      let next = detail;
       if (isNameDirty || isDescriptionDirty || isOrderDirty) {
-        next = await playlistApi.update(playlistId, {
+        await playlistApi.update(playlistId, {
           name: isNameDirty ? name : undefined,
           description: isDescriptionDirty ? description : undefined,
           filenames: isOrderDirty ? tracks.map((track) => track.filename) : undefined,
@@ -139,14 +111,12 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
       }
       if (coverFile) {
         await playlistApi.updateCover(playlistId, coverFile);
-        next = await playlistApi.get(playlistId);
       }
-      applyDetail(next);
-      resetCoverState();
+      await reload();
       emitAppEvent('playlists-changed');
       showSuccess('Playlist saved');
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Failed to save playlist');
+      showError(errorMessage(err, 'Failed to save playlist'));
     } finally {
       setSaving(false);
     }
@@ -161,7 +131,7 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
       allowNavigation();
       navigate('/playlists', { replace: true });
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Failed to delete playlist');
+      showError(errorMessage(err, 'Failed to delete playlist'));
       setSaving(false);
     }
   };
@@ -177,7 +147,7 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
     const deleted = new Set(filenames);
     const kept = (track: MP3Info) => !deleted.has(track.filename);
     setRows((current) => current.filter((row) => kept(row.track)));
-    setDetail((current) => current && { ...current, tracks: current.tracks.filter(kept) });
+    update((loaded) => ({ ...loaded, tracks: loaded.tracks.filter(kept) }));
   };
 
   const handleGripKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
@@ -190,8 +160,9 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
     window.requestAnimationFrame(() => sibling?.querySelector<HTMLButtonElement>('.playlist-grip')?.focus());
   };
 
-  if (loading && !detail) return <div className="page"><Spinner /></div>;
-  if (!detail) return <div className="page"><EmptyState icon={ListMusic} label="Playlist not found" /></div>;
+  if (missing) return <div className="page"><EmptyState icon={ListMusic} label="Playlist not found" /></div>;
+  if (failed) return <div className="page"><LoadFailed label="Couldn't load the playlist" onRetry={() => void reload()} /></div>;
+  if (!detail) return <div className="page"><Spinner /></div>;
 
   const effectiveCoverPreview = coverPreview || (detail.has_cover ? playlistApi.coverUrl(detail, 'full') : null);
 
@@ -237,7 +208,7 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
               type="button"
               className="cover-preview"
               onClick={() => fileInputRef.current?.click()}
-              disabled={saving}
+              disabled={saving || !current}
               aria-label="Change playlist cover"
               title="Change playlist cover"
             >
@@ -264,7 +235,7 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
                   if (input.value === NEW_PLAYLIST_NAME) window.requestAnimationFrame(() => input.select());
                 }}
                 autoFocus={detail.name === NEW_PLAYLIST_NAME}
-                disabled={saving}
+                disabled={saving || !current}
               />
               <label className="icon-field icon-field--area" title="Description">
                 <AlignLeft className="icon-field__icon" aria-hidden="true" />
@@ -274,7 +245,7 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={2}
-                  disabled={saving}
+                  disabled={saving || !current}
                 />
               </label>
 
@@ -291,7 +262,7 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
                   label="Delete playlist"
                   variant="danger"
                   onClick={() => setConfirmDelete(true)}
-                  disabled={saving}
+                  disabled={saving || !current}
                 />
                 <IconButton
                   icon={Play}
@@ -305,14 +276,14 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
                   onClick={() => player.playTracks(tracks, undefined, { shuffle: true })}
                   disabled={tracks.length === 0}
                 />
-                <button
+                <IconButton
+                  icon={Save}
+                  label="Save"
+                  variant="primary"
                   onClick={() => void handleSave()}
-                  disabled={saving || !isDirty || !name.trim()}
-                  className="btn-primary metadata-save"
-                >
-                  {saving ? <Spinner inline /> : <Save aria-hidden="true" />}
-                  Save
-                </button>
+                  busy={saving}
+                  disabled={saving || !current || !isDirty || !name.trim()}
+                />
               </div>
             </div>
           </div>
@@ -366,7 +337,7 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
                     aria-label={`Move ${track.title || track.filename}`}
                     title="Drag or use arrow keys to move"
                     onKeyDown={(event) => handleGripKeyDown(event, index)}
-                    disabled={saving}
+                    disabled={saving || !current}
                   >
                     <GripVertical aria-hidden="true" />
                   </button>
@@ -416,18 +387,7 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
         </section>
       </div>
 
-      <ConfirmDialog
-        open={blocker.state === 'blocked'}
-        icon={TriangleAlert}
-        title="Discard changes?"
-        cancelLabel="Stay"
-        cancelIcon={Undo2}
-        confirmLabel="Discard"
-        confirmIcon={Trash2}
-        tone="danger"
-        onCancel={() => blocker.reset?.()}
-        onConfirm={() => blocker.proceed?.()}
-      />
+      <DiscardChangesDialog blocker={blocker} />
 
       <ConfirmDialog
         open={confirmDelete}
@@ -442,19 +402,7 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
         onConfirm={() => void handleDelete()}
       />
 
-      <CoverCropModal
-        isOpen={isCropModalOpen}
-        cropSource={cropSource}
-        crop={crop}
-        zoom={zoom}
-        isApplyingCrop={isApplyingCrop}
-        zoomInputId="playlistCropZoom"
-        onCropChange={setCrop}
-        onZoomChange={setZoom}
-        onCropComplete={handleCropComplete}
-        onCancel={handleCancelCrop}
-        onApply={handleApplyCrop}
-      />
+      <CoverCropModal {...cropModalProps} />
     </div>
   );
 }

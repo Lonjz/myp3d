@@ -15,9 +15,9 @@ import { Spinner } from '../components/ui/Spinner';
 import { useDownloadForm } from '../hooks/useDownloadForm';
 import type { DownloadFormValues } from '../hooks/useDownloadForm';
 import { readStoredValue, useStoredValueWriter } from '../hooks/usePersistentState';
-import { formatDuration } from '../utils/formatters';
+import { errorMessage, formatDuration } from '../utils/formatters';
 import { emitAppEvent, subscribeAppEvent } from '../utils/appEvents';
-import { getVideoIdFromUrl } from '../utils/youtube';
+import { getVideoIdFromUrl, getYouTubeThumbnailUrl } from '../utils/youtube';
 
 interface YouTubePlayer {
   destroy?: () => void;
@@ -53,10 +53,6 @@ const loadYouTubeApi = (() => {
   let promise: Promise<YouTubeApi> | null = null;
 
   return () => {
-    if (typeof window === 'undefined') {
-      return Promise.reject(new Error('YouTube API is only available in the browser'));
-    }
-
     const youtubeWindow = window as YouTubeWindow;
     const existing = youtubeWindow.YT;
     if (existing && existing.Player) {
@@ -163,7 +159,6 @@ export function QueryPage() {
     submitDownload,
     queueDownload,
   } = useDownloadForm({
-    zoomInputId: 'queryCropZoom',
     initialValues: initialDraft.form,
     onSubmitted: () => {
       resetTiming(null);
@@ -395,6 +390,8 @@ export function QueryPage() {
     clearToast();
   };
 
+  const searchIdRef = useRef(0);
+
   const runSearch = async (query: string) => {
     const normalized = query.trim();
     if (!normalized) {
@@ -402,11 +399,13 @@ export function QueryPage() {
       return;
     }
 
+    const searchId = ++searchIdRef.current;
     setSearching(true);
     clearToast();
 
     try {
       const results = await mp3Api.searchYouTube(normalized, 20);
+      if (searchId !== searchIdRef.current) return;
       setSearchResults(results);
 
       if (results.length === 0) {
@@ -416,9 +415,9 @@ export function QueryPage() {
         showError('No videos found. Try another search.');
       }
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'YouTube search failed');
+      if (searchId === searchIdRef.current) showError(errorMessage(err, 'YouTube search failed'));
     } finally {
-      setSearching(false);
+      if (searchId === searchIdRef.current) setSearching(false);
     }
   };
 
@@ -549,7 +548,7 @@ export function QueryPage() {
                 <button
                   key={`${result.video_id}-${result.url}`}
                   type="button"
-                  className={`query-result-item ${isActive ? 'active' : ''}`}
+                  className={`query-result-item ${isActive ? 'is-active' : ''}`}
                   style={{ '--row': index } as CSSProperties}
                   onClick={() => applySelectedResult(result)}
                 >
@@ -561,7 +560,7 @@ export function QueryPage() {
                         alt={`${result.title} thumbnail`}
                       />
                     ) : (
-                      <div className="query-result-thumb query-result-thumb-placeholder">🎵</div>
+                      <div className="query-result-thumb query-result-thumb-placeholder"><MonitorPlay aria-hidden="true" /></div>
                     )}
                   </div>
                   <div className="query-result-text">
@@ -590,7 +589,7 @@ export function QueryPage() {
                       className="query-player-thumb-overlay"
                       src={
                         selectedResult?.thumbnail_url ||
-                        `https://i.ytimg.com/vi/${selectedVideoId}/hqdefault.jpg`
+                        getYouTubeThumbnailUrl(selectedVideoId)
                       }
                       alt=""
                     />
@@ -624,10 +623,14 @@ export function QueryPage() {
               disabled={downloading}
               action={(
                 <>
-                  <button type="submit" disabled={downloading} className="btn-primary">
-                    {submitting === 'download' ? <Spinner inline /> : <Download aria-hidden="true" />}
-                    Download
-                  </button>
+                  <IconButton
+                    type="submit"
+                    icon={Download}
+                    label="Download"
+                    variant="primary"
+                    busy={submitting === 'download'}
+                    disabled={downloading}
+                  />
                   <IconButton
                     icon={ListPlus}
                     label="Add to queue"

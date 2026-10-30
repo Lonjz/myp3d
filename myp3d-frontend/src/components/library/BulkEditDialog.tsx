@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useRef, useState } from 'react';
 import { DiscAlbum, ImagePlus, MicVocal, Music, Save, X } from 'lucide-react';
 import { mp3Api } from '../../api/mp3Api';
 import type { BulkResult, BulkTagUpdate, MP3Info } from '../../api/mp3Api';
@@ -8,7 +7,9 @@ import { CoverCropModal } from '../cover/CoverCropModal';
 import { useCoverImageCrop } from '../cover/useCoverImageCrop';
 import { useToast } from '../messages/toastContext';
 import { IconField } from '../ui/IconField';
-import { Spinner } from '../ui/Spinner';
+import { errorMessage, trackCount } from '../../utils/formatters';
+import { IconButton } from '../ui/IconButton';
+import { Modal } from '../ui/Modal';
 
 interface BulkEditDialogProps {
   tracks: MP3Info[];
@@ -35,19 +36,11 @@ export function BulkEditDialog({ tracks: selectedTracks, closing, onClose, onSav
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
+    cropModalProps,
     coverFile,
     coverPreview,
-    cropSource,
-    crop,
-    zoom,
     isCropModalOpen,
-    isApplyingCrop,
-    setCrop,
-    setZoom,
-    handleCropComplete,
     handleCoverChange,
-    handleApplyCrop,
-    handleCancelCrop,
   } = useCoverImageCrop({ onError: showError, onClearError: clearToast });
 
   const tags: BulkTagUpdate = {};
@@ -55,21 +48,6 @@ export function BulkEditDialog({ tracks: selectedTracks, closing, onClose, onSav
   if (album !== initial.album) tags.album = album;
   const hasTagChanges = Object.keys(tags).length > 0;
   const isDirty = hasTagChanges || coverFile !== null;
-
-  useEffect(() => {
-    if (isCropModalOpen || saving || closing) return undefined;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        event.stopPropagation();
-        onClose();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown, true);
-    return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [isCropModalOpen, saving, closing, onClose]);
 
   const handleSave = async () => {
     const filenames = tracks.map((track) => track.filename);
@@ -86,11 +64,11 @@ export function BulkEditDialog({ tracks: selectedTracks, closing, onClose, onSav
       if (failed.size > 0) {
         showError(`${failed.size} of ${filenames.length} tracks failed to update`);
       } else {
-        showSuccess(`Updated ${filenames.length} track${filenames.length === 1 ? '' : 's'}`);
+        showSuccess(`Updated ${trackCount(filenames.length)}`);
       }
       onSaved();
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Bulk update failed');
+      showError(errorMessage(err, 'Bulk update failed'));
       setSaving(false);
     }
   };
@@ -98,16 +76,15 @@ export function BulkEditDialog({ tracks: selectedTracks, closing, onClose, onSav
   const sharedCoverTrack = initial.album && tracks[0].has_cover ? tracks[0] : null;
   const preview = coverPreview || (sharedCoverTrack ? mp3Api.getCoverUrl(sharedCoverTrack.filename, 'medium') : null);
 
-  return createPortal(
+  return (
     <>
-      <div className="confirm-layer" data-state={closing ? 'closed' : 'open'}>
-        <div className="confirm-scrim motion-fade" onMouseDown={saving ? undefined : onClose} />
-        <div
-          className="bulk-edit-dialog glass motion-pop"
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Edit ${tracks.length} tracks`}
-        >
+      <Modal
+        className="bulk-edit-dialog"
+        closing={closing}
+        locked={saving || isCropModalOpen}
+        onClose={onClose}
+        label={`Edit ${trackCount(tracks.length)}`}
+      >
           <input
             type="file"
             accept="image/*"
@@ -155,36 +132,18 @@ export function BulkEditDialog({ tracks: selectedTracks, closing, onClose, onSav
           </div>
 
           <div className="confirm-dialog__actions">
-            <button type="button" className="confirm-btn" onClick={onClose} disabled={saving}>
-              <X aria-hidden="true" />
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="btn-primary bulk-edit-dialog__save"
+            <IconButton icon={X} label="Cancel" onClick={onClose} disabled={saving} />
+            <IconButton
+              icon={Save}
+              label="Save"
+              variant="primary"
               onClick={() => void handleSave()}
+              busy={saving}
               disabled={!isDirty || saving}
-            >
-              {saving ? <Spinner inline /> : <Save aria-hidden="true" />}
-              Save
-            </button>
+            />
           </div>
-        </div>
-      </div>
-      <CoverCropModal
-        isOpen={isCropModalOpen}
-        cropSource={cropSource}
-        crop={crop}
-        zoom={zoom}
-        isApplyingCrop={isApplyingCrop}
-        zoomInputId="bulkCropZoom"
-        onCropChange={setCrop}
-        onZoomChange={setZoom}
-        onCropComplete={handleCropComplete}
-        onCancel={handleCancelCrop}
-        onApply={handleApplyCrop}
-      />
-    </>,
-    document.body,
+      </Modal>
+      <CoverCropModal {...cropModalProps} />
+    </>
   );
 }

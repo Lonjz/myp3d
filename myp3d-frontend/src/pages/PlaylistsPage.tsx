@@ -10,11 +10,12 @@ import { usePlaylists } from '../components/playlists/usePlaylists';
 import { DataTable } from '../components/table/DataTable';
 import type { DataTableColumn } from '../components/table/DataTable';
 import { HeaderIcon } from '../components/table/HeaderIcon';
+import { LoadFailed } from '../components/ui/EmptyState';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { usePersistentState } from '../hooks/usePersistentState';
 import { emitAppEvent } from '../utils/appEvents';
-import { formatDate, formatDateTime } from '../utils/formatters';
+import { errorMessage, formatDate, formatDateTime } from '../utils/formatters';
 
 const getPlaylistKey = (playlist: PlaylistInfo) => playlist.id;
 
@@ -22,7 +23,7 @@ export function PlaylistsPage() {
   const navigate = useNavigate();
   const player = usePlayer();
   const { showError } = useToast();
-  const { playlists, loading, error, refresh } = usePlaylists();
+  const { playlists, loading, failed, refresh } = usePlaylists();
   const [searchQuery, setSearchQuery] = usePersistentState('playlists:search', '');
   const [creating, setCreating] = useState(false);
 
@@ -40,7 +41,7 @@ export function PlaylistsPage() {
       emitAppEvent('playlists-changed');
       openPlaylist(playlist.id);
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Failed to create playlist');
+      showError(errorMessage(err, 'Failed to create playlist'));
     } finally {
       setCreating(false);
     }
@@ -51,7 +52,7 @@ export function PlaylistsPage() {
       const detail = await playlistApi.get(id);
       if (detail.tracks.length > 0) player.playTracks(detail.tracks, 0);
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Failed to load playlist');
+      showError(errorMessage(err, 'Failed to load playlist'));
     }
   };
 
@@ -65,6 +66,7 @@ export function PlaylistsPage() {
           <CoverPlayButton
             src={playlist.has_cover ? playlistApi.coverUrl(playlist, 'thumb') : undefined}
             label={`Play ${playlist.name}`}
+            icon={ListMusic}
             isCurrent={false}
             isPlaying={player.state.isPlaying}
             onPlay={() => void playPlaylist(playlist.id)}
@@ -107,31 +109,33 @@ export function PlaylistsPage() {
 
   return (
     <div className="page page--fill">
-      {error && <p className="error">{error}</p>}
-
-      <DataTable
-        fill
-        columns={columns}
-        items={visiblePlaylists}
-        getRowKey={getPlaylistKey}
-        onRowOpen={(playlist) => openPlaylist(playlist.id)}
-        emptyMessage={searchQuery.trim() ? 'No matches' : 'No playlists yet'}
-        loading={loading}
-        toolbar={(
-          <>
-            <IconField
-              icon={Search}
-              label="Search"
-              className="library-search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            <IconButton icon={Plus} label="New playlist" onClick={() => void createPlaylist()} disabled={creating} />
-            <IconButton icon={RefreshCw} label="Refresh" onClick={() => void refresh()} />
-            <span className="library-count">{visiblePlaylists.length} / {playlists.length}</span>
-          </>
-        )}
-      />
+      {failed ? (
+        <LoadFailed label="Couldn't load playlists" onRetry={() => void refresh()} />
+      ) : (
+        <DataTable
+          fill
+          columns={columns}
+          items={visiblePlaylists}
+          getRowKey={getPlaylistKey}
+          onRowOpen={(playlist) => openPlaylist(playlist.id)}
+          emptyMessage={searchQuery.trim() ? 'No matches' : 'No playlists yet'}
+          loading={loading}
+          toolbar={(
+            <>
+              <IconField
+                icon={Search}
+                label="Search"
+                className="library-search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <IconButton icon={Plus} label="New playlist" onClick={() => void createPlaylist()} disabled={creating} />
+              <IconButton icon={RefreshCw} label="Refresh" onClick={() => void refresh()} />
+              <span className="library-count">{visiblePlaylists.length} / {playlists.length}</span>
+            </>
+          )}
+        />
+      )}
     </div>
   );
 }

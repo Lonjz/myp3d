@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { createPortal } from 'react-dom';
 import { Save, Scissors, X } from 'lucide-react';
 import { queueApi } from '../../api/queueApi';
 import type { QueueItem, QueueItemUpdate } from '../../api/queueApi';
@@ -10,8 +9,9 @@ import { CoverCropModal } from '../cover/CoverCropModal';
 import { DownloadConfigSection } from '../download/DownloadConfigSection';
 import { useToast } from '../messages/toastContext';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
-import { Spinner } from '../ui/Spinner';
 import { useDownloadQueue } from './downloadQueueContext';
+import { IconButton } from '../ui/IconButton';
+import { Modal } from '../ui/Modal';
 
 interface QueueItemDialogProps {
   item: QueueItem;
@@ -46,7 +46,6 @@ export function QueueItemDialog({ item, closing, onClose, onSaved }: QueueItemDi
     overwriteDialogProps,
     checkOverwrite,
   } = useDownloadForm({
-    zoomInputId: 'queueCropZoom',
     initialValues: {
       url: item.url,
       customFilename: item.custom_filename ?? '',
@@ -59,21 +58,6 @@ export function QueueItemDialog({ item, closing, onClose, onSaved }: QueueItemDi
 
   const confirming = overwriteDialogProps.open;
   const isTrimmed = item.start_time !== null && item.end_time !== null;
-
-  useEffect(() => {
-    if (cropModalProps.isOpen || confirming || saving || closing) return undefined;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        event.stopPropagation();
-        onClose();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown, true);
-    return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [cropModalProps.isOpen, confirming, saving, closing, onClose]);
 
   const handleSave = async (event: FormEvent) => {
     event.preventDefault();
@@ -105,17 +89,14 @@ export function QueueItemDialog({ item, closing, onClose, onSaved }: QueueItemDi
 
   return (
     <>
-      {createPortal(
-        <>
-          <div className="confirm-layer" data-state={closing ? 'closed' : 'open'}>
-            <div className="confirm-scrim motion-fade" onMouseDown={saving ? undefined : onClose} />
-            <form
-              className="downloads-dialog glass motion-pop"
-              role="dialog"
-              aria-modal="true"
-              aria-label="Edit download"
-              onSubmit={(event) => void handleSave(event)}
-            >
+      <Modal
+        className="downloads-dialog"
+        closing={closing}
+        locked={saving || confirming || cropModalProps.isOpen}
+        onClose={onClose}
+        label="Edit download"
+      >
+            <form className="modal-form" onSubmit={(event) => void handleSave(event)}>
               <DownloadConfigSection
                 idPrefix="queue"
                 url={url}
@@ -142,21 +123,12 @@ export function QueueItemDialog({ item, closing, onClose, onSaved }: QueueItemDi
                     {formatDuration(item.start_time)} – {formatDuration(item.end_time)}
                   </span>
                 )}
-                <button type="button" className="confirm-btn" onClick={onClose} disabled={saving}>
-                  <X aria-hidden="true" />
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary downloads-dialog__save" disabled={saving}>
-                  {saving ? <Spinner inline /> : <Save aria-hidden="true" />}
-                  Save
-                </button>
+                <IconButton icon={X} label="Cancel" onClick={onClose} disabled={saving} />
+                <IconButton type="submit" icon={Save} label="Save" variant="primary" busy={saving} disabled={saving} />
               </div>
             </form>
-          </div>
-          <CoverCropModal {...cropModalProps} />
-        </>,
-        document.body,
-      )}
+      </Modal>
+      <CoverCropModal {...cropModalProps} />
       <ConfirmDialog {...overwriteDialogProps} />
     </>
   );
