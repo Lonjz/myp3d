@@ -14,17 +14,19 @@ A YouTube-to-MP3 downloader and music library that runs on your own machine. Fas
 
 ## Features
 
-- Search YouTube, trim, tag and crop cover art, then queue downloads
-- Import Spotify playlists and albums, matched against YouTube Music
-- Edit tags and covers one at a time or in bulk, and find duplicates or missing tags
+- Search YouTube, trim, tag and crop cover art, then download now or add to the download queue
+- Import Spotify tracks, albums and playlists, matched against YouTube Music (explicit versions first)
+- Edit tags and covers one song, one album or many songs at a time
 - Albums, playlists, favourites and a player with a queue
+- A dashboard of library stats and a Health page that finds silent endings, untidy file names and songs with several artists
+- Spotlight search across pages, songs, albums, playlists, YouTube and Spotify
 - Sync two libraries over your local network
 - Sync songs, playlists and favourites with Apple Music (macOS)
-- Export tracks or album art as a zip
+- Export every song, or every album cover, as a zip
 
 ## Setup
 
-You need Python 3.10+, [Node](https://nodejs.org) 20.19+ and [ffmpeg](https://ffmpeg.org/download.html).
+You need Python 3.10+, [Node](https://nodejs.org) 20.19+ or 22.12+ and [ffmpeg](https://ffmpeg.org/download.html).
 
 ```bash
 git clone https://github.com/Lonjz/myp3d.git
@@ -32,39 +34,94 @@ cd myp3d
 
 cd myp3d-backend
 python -m venv venv
-venv\Scripts\activate          # macOS/Linux: source venv/bin/activate
-pip install -r requirements.txt
+venv/bin/pip install -r requirements.txt        # Windows: venv\Scripts\pip install -r requirements.txt
 
 cd ../myp3d-frontend
 npm install
 ```
 
-On Windows, put `ffmpeg.exe` in `myp3d-backend/`. Everywhere else, install ffmpeg and set `USE_SYSTEM_FFMPEG=true`.
+On Windows you can put `ffmpeg.exe` in `myp3d-backend/`. Otherwise install ffmpeg so it's on your `PATH`.
 
-Start both servers from the repo root and open http://localhost:5173:
+## Running
 
-```bash
-run\dev-win.ps1                # macOS/Linux: ./run/dev-mac.sh
-```
+Start both servers from the repo root, then open http://localhost:5173.
+
+| | |
+| --- | --- |
+| macOS / Linux | `./scripts/dev-mac.sh` |
+| Windows (PowerShell) | `powershell -ExecutionPolicy Bypass -File scripts\dev-win.ps1` |
+| Windows (Windows Terminal) | `scripts\dev-win.bat` |
+
+`scripts/update-ytdlp-mac.sh` and `scripts\update-ytdlp-win.bat` update yt-dlp. When downloads start failing, YouTube has usually changed something and an update fixes it.
+
+### Shortcuts
+
+| Keys | |
+| --- | --- |
+| Ctrl/⌘ K or `/` | Search |
+| Space | Play or pause |
+| Ctrl/⌘ S | Save on an edit page |
+| `?` | All shortcuts |
 
 ## Config
 
-Backend settings go in `myp3d-backend/.env` (see `.env.example`):
+Backend settings go in `myp3d-backend/.env`. Copy `.env.example` to start.
 
 | Variable | Default | |
 | --- | --- | --- |
 | `MYP3D_LIBRARY_DIR` | `myp3d-backend/downloads` | Where your MP3s live |
+| `MYP3D_DB_PATH` | `myp3d-backend/myp3d.db` | Playlists, favourites, the download queue and sync state |
 | `API_PORT` | `8000` | Backend port |
-| `USE_SYSTEM_FFMPEG` | `false` | Use ffmpeg from `PATH` instead of `ffmpeg.exe` |
-| `YTDLP_COOKIES_BROWSER` | `firefox` | Browser to borrow YouTube cookies from, blank to turn off ([why](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp)) |
+| `API_RELOAD` | `false` | Restart the backend when its code changes |
+| `USE_SYSTEM_FFMPEG` | `false` | Ignore `ffmpeg.exe` and use ffmpeg from `PATH` |
+| `YTDLP_COOKIES_BROWSER` | | Browser to borrow YouTube cookies from when YouTube asks to sign in, such as `firefox` ([why](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp)) |
 | `YTDLP_COOKIES_PROFILE` | | Browser profile name or path |
 | `YTDLP_PLAYER_CLIENTS` | `default,tv,ios` | YouTube clients yt-dlp tries, in order ([details](https://github.com/yt-dlp/yt-dlp#youtube)) |
 
-If you change the port, update `VITE_API_BASE_URL` in `myp3d-frontend/.env` to match.
+If you change the port, copy `myp3d-frontend/.env.example` to `myp3d-frontend/.env` and update `VITE_API_BASE_URL` to match.
+
+## Spotify
+
+Paste track, album or playlist links on the Spotify page. Spotify only shows the first 100 songs of a playlist, so for longer or private playlists export a CSV at [exportify.net](https://exportify.net) and drop it on the page. No Spotify account or API key is needed.
+
+## Apple Music (macOS)
+
+The Apple Music page syncs songs, playlists and favourites with the Music app.
+
+- The first sync asks to control Music. If you said no, allow it in System Settings → Privacy & Security → Automation.
+- Point the page at your Apple Music media folder. It's usually found for you.
+
+## LAN sync
+
+The Sync page finds other computers running myp3d on the same network and syncs both ways once both sides accept.
+
+- Both computers need the Sync page open, on the same discovery port (47817 unless you change it).
+- Discovery uses UDP on that port. Songs travel over the backend port (`API_PORT`). Allow Python through the firewall on private networks when asked.
+- Songs are only ever added, never deleted. Playlists, favourites and the download queue follow the most recent change, including deletions.
+- Deletions are remembered for 180 days. A computer that hasn't synced in longer may bring them back.
+- Both computers need the same major version of myp3d.
+
+## Development
+
+```bash
+cd myp3d-backend && venv/bin/python -m pytest tests     # Windows: venv\Scripts\python -m pytest tests
+cd myp3d-frontend && npm test -- --run && npm run lint && npm run build
+```
+
+The tests never touch your library. To click around without it, run the sandbox, which starts the app at http://localhost:5174 on a sample library: real song names over generated tones, with no cover art:
+
+```bash
+./scripts/dev-sandbox.sh   # Windows: powershell -ExecutionPolicy Bypass -File scripts\dev-sandbox.ps1
+```
+
+The first run generates about 160 MB of audio in `myp3d-backend/tests/.sandbox/`. Add `--reset` to rebuild it.
 
 ## Notes
 
-- The API only answers requests from the same machine. LAN sync talks to the other device over its own `/peer` routes.
+- The API only answers requests from the app on the same machine. Other computers can only reach the sync routes under `/peer`.
 - Interactive API docs are at http://localhost:8000/docs.
-- When downloads start failing, YouTube has usually changed something. `run/update-ytdlp-win.bat` or `run/update-ytdlp-mac.sh` updates yt-dlp.
 - Only download things you have the right to.
+
+## License
+
+[MIT](LICENSE)
