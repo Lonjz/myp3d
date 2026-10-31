@@ -12,9 +12,14 @@ if [[ ! -x "$PYTHON_BIN" ]]; then
     exit 1
 fi
 
+if [[ ! -d "$FRONTEND_DIR/node_modules" ]]; then
+    echo "Frontend packages not installed. Run npm install in myp3d-frontend first."
+    exit 1
+fi
+
 (
     cd "$BACKEND_DIR"
-    "$PYTHON_BIN" main.py
+    exec "$PYTHON_BIN" main.py
 ) &
 BACKEND_PID=$!
 

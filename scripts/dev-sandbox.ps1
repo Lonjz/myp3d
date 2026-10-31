@@ -9,8 +9,12 @@ if (-not (Test-Path $pythonExe)) {
     throw "Backend Python executable not found at $pythonExe"
 }
 
-$backendCommand = "Set-Location '$backendDir'; & '$pythonExe' main.py"
-$frontendCommand = "Set-Location '$frontendDir'; npm run dev"
+if (-not (Test-Path (Join-Path $frontendDir "node_modules"))) {
+    throw "Frontend packages not installed. Run npm install in myp3d-frontend first."
+}
+
+$backendCommand = "Set-Location '$backendDir'; & '$pythonExe' tests\sandbox.py $args"
+$frontendCommand = "Set-Location '$frontendDir'; npm run dev -- --mode sandbox --port 5174 --strictPort"
 
 Start-Process -FilePath "powershell.exe" -ArgumentList @(
     "-NoExit",
@@ -24,4 +28,4 @@ Start-Process -FilePath "powershell.exe" -ArgumentList @(
     "-Command", $frontendCommand
 ) | Out-Null
 
-Write-Host "Started backend and frontend in separate PowerShell windows."
+Write-Host "Started the sandbox: http://localhost:5174 (API on 8001)"

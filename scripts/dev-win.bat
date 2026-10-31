@@ -12,4 +12,9 @@ if not exist "%PYTHON%" (
     exit /b 1
 )
 
+if not exist "%FRONTEND%\node_modules" (
+    echo Frontend packages not installed. Run npm install in myp3d-frontend first.
+    exit /b 1
+)
+
 wt --window new new-tab --title "Backend" --suppressApplicationTitle -d "%BACKEND%" cmd /k "%PYTHON% main.py" ; new-tab --title "Frontend" --suppressApplicationTitle -d "%FRONTEND%" cmd /k "npm run dev"
