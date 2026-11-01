@@ -32,6 +32,7 @@ Object.defineProperty(window, 'matchMedia', {
 
 window.scrollTo = () => undefined;
 Element.prototype.scrollIntoView = () => undefined;
+Element.prototype.getAnimations = () => [];
 HTMLMediaElement.prototype.play = function play() {
   return Promise.resolve();
 };

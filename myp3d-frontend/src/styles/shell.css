@@ -241,6 +241,10 @@
   flex: 1;
 }
 
+.keep-alive-page {
+  display: contents;
+}
+
 .app-content--fill {
   height: 100vh;
   height: 100dvh;

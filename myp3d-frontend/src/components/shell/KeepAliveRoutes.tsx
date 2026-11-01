@@ -19,6 +19,8 @@ export function KeepAliveRoutes({ pages, children }: KeepAliveRoutesProps) {
   const [visited, setVisited] = useState<string[]>(() => (activePath ? [activePath] : []));
   const scrollPositions = useRef(new Map<string, number>());
   const currentPathRef = useRef(pathname);
+  const pageNodes = useRef(new Map<string, HTMLDivElement>());
+  const shownPaths = useRef(new Set<string>());
 
   if (activePath && !visited.includes(activePath)) {
     setVisited([...visited, activePath]);
@@ -44,13 +46,34 @@ export function KeepAliveRoutes({ pages, children }: KeepAliveRoutesProps) {
     window.scrollTo(0, scrollPositions.current.get(pathname) ?? 0);
   }, [pathname]);
 
+  useLayoutEffect(() => {
+    if (!activePath) return;
+    if (!shownPaths.current.has(activePath)) {
+      shownPaths.current.add(activePath);
+      return;
+    }
+    pageNodes.current
+      .get(activePath)
+      ?.getAnimations({ subtree: true })
+      .filter((animation) => animation.effect?.getComputedTiming().endTime !== Infinity)
+      .forEach((animation) => animation.finish());
+  }, [activePath]);
+
   return (
     <>
       {pages
         .filter((page) => visited.includes(page.path))
         .map((page) => (
           <Activity key={page.path} mode={page.path === activePath ? 'visible' : 'hidden'}>
-            {page.element}
+            <div
+              className="keep-alive-page"
+              ref={(node) => {
+                if (node) pageNodes.current.set(page.path, node);
+                else pageNodes.current.delete(page.path);
+              }}
+            >
+              {page.element}
+            </div>
           </Activity>
         ))}
       {activePath ? null : children}
