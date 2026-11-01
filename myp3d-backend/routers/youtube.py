@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query
 
-from models.schemas import SilenceBoundsRequest, TrimRange, YouTubeSearchResponse
-from services import health_service
+from models.schemas import SilenceBoundsRequest, TagSuggestion, TrimRange, YouTubeSearchResponse
+from services import health_service, spotify_service
 from services.errors import AppError
 from services.youtube_service import search_youtube
 
@@ -30,3 +30,11 @@ def youtube_silence(payload: SilenceBoundsRequest):
         raise
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Couldn't read the audio: {exc}") from exc
+
+
+@router.get("/youtube/songs", response_model=list[TagSuggestion])
+def youtube_songs(q: str = Query(..., min_length=1, description="Song search query")):
+    try:
+        return spotify_service.song_suggestions(q)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"YouTube Music search failed: {exc}") from exc

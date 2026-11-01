@@ -131,6 +131,17 @@ class MP3Info(BaseModel):
     date_added: Optional[datetime] = None
 
 
+class LibraryNames(BaseModel):
+    artists: list[str]
+    albums: list[str]
+
+
+class TagSuggestion(BaseModel):
+    title: str
+    artist: Optional[str] = None
+    album: Optional[str] = None
+
+
 class SilentTrack(MP3Info):
     silence: float
 

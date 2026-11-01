@@ -135,3 +135,10 @@ def test_edits_only_reread_changed_files(client, seeded_library, monkeypatch):
     assert reads == ["the chain.mp3"]
     assert tracks["the chain.mp3"]["title"] == "The Chain II"
     assert tracks["the chain.mp3"]["album_key"] == make_album_key("Rumours")
+
+
+def test_names_are_distinct_and_sorted(client, seeded_library):
+    names = client.get("/mp3s/names").json()
+    expected = {field: sorted({getattr(track, field) for track in DEFAULT_LIBRARY if getattr(track, field)}, key=str.casefold) for field in ("artist", "album")}
+    assert names == {"artists": expected["artist"], "albums": expected["album"]}
+    assert names["artists"].count("Fleetwood Mac") == 1

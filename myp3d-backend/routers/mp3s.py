@@ -9,6 +9,7 @@ from models.schemas import (
     BulkMetadataUpdate,
     BulkResult,
     BulkTracksRequest,
+    LibraryNames,
     MP3Info,
     MetadataUpdate,
     PaginatedMP3Response,
@@ -29,6 +30,7 @@ from services.mp3_service import (
     query_mp3_infos,
     set_album_cover,
     set_track_tags,
+    tag_names,
     with_real_dates,
 )
 
@@ -75,6 +77,11 @@ def list_all_mp3s(
     only = favorite_service.list_filenames() if favorites else None
     listed = playlist_service.listed_filenames() if issue == "playlist" else None
     return filter_sort_mp3_infos(search, filter_by, sort_by, sort_direction, duration, only, issue, listed)
+
+
+@router.get("/names", response_model=LibraryNames)
+def list_tag_names():
+    return tag_names()
 
 
 def _resolve_bulk_paths(filenames: list[str]) -> tuple[list[Path], list[BulkFailure]]:

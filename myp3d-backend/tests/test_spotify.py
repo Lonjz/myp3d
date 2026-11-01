@@ -97,3 +97,23 @@ def test_match_knows_songs_already_in_the_library(client, library, web, ytmusic)
 
 def test_match_rejects_bad_ids(client):
     assert client.get("/spotify/tracks/short").status_code == 400
+
+
+def test_song_suggestions_put_featured_artists_in_the_title(client, ytmusic):
+    ytmusic.results["songs"] = [
+        ytmusic_result("clean000001", "Money Trees (Clean)", ["Kendrick Lamar", "Jay Rock"], "good kid, m.A.A.d city"),
+        ytmusic_result("radio000001", "Money Trees", ["Kendrick Lamar", "Jay Rock"], "good kid, m.A.A.d city"),
+        ytmusic_result("explicit001", "Money Trees", ["Kendrick Lamar", "Jay Rock"], "good kid, m.A.A.d city (Deluxe)", explicit=True),
+        ytmusic_result("swimming001", "Swimming Pools (Drank)", ["Kendrick Lamar"], "good kid, m.A.A.d city", explicit=True),
+    ]
+    suggestions = client.get("/youtube/songs", params={"q": "money trees"}).json()
+    assert suggestions == [
+        {"title": "Money Trees (feat. Jay Rock)", "artist": "Kendrick Lamar", "album": "good kid, m.A.A.d city (Deluxe)"},
+        {"title": "Swimming Pools (Drank)", "artist": "Kendrick Lamar", "album": "good kid, m.A.A.d city"},
+    ]
+    assert ytmusic.searches == [("money trees", "songs")]
+
+
+def test_song_suggestion_failures_are_reported(client, ytmusic):
+    ytmusic.error = RuntimeError("rate limited")
+    assert client.get("/youtube/songs", params={"q": "money trees"}).status_code == 502

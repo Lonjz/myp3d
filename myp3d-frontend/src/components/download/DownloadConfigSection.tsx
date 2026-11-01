@@ -3,7 +3,9 @@ import { CircleAlert, CircleCheck, DiscAlbum, FileAudio, Link, LoaderCircle, Mic
 import type { LucideIcon } from 'lucide-react';
 import { CoverUploadSquare } from '../cover/CoverUploadSquare';
 import { IconField } from '../ui/IconField';
+import { SuggestField } from '../ui/SuggestField';
 import type { FilenameStatus } from '../../hooks/useDownloadForm';
+import { useTagSuggestions } from '../../hooks/useTagSuggestions';
 import { normalizeFilenameInput } from '../../utils/filenames';
 
 const FILENAME_STATUS: Record<Exclude<FilenameStatus, null>, { icon: LucideIcon; label: string }> = {
@@ -61,6 +63,8 @@ export function DownloadConfigSection({
   onCoverClear,
   action,
 }: DownloadConfigSectionProps) {
+  const suggestions = useTagSuggestions({ title, artist, album, onTitleChange, onArtistChange, onAlbumChange });
+
   return (
     <div className="download-config-grid">
       <div className="download-cover">
@@ -84,26 +88,29 @@ export function DownloadConfigSection({
         {action}
       </div>
 
-      <IconField
+      <SuggestField
         icon={Music}
         label="Title"
         value={title}
         onChange={(event) => onTitleChange(event.target.value)}
         disabled={disabled}
+        suggestions={suggestions.title}
       />
-      <IconField
+      <SuggestField
         icon={MicVocal}
         label="Artist"
         value={artist}
         onChange={(event) => onArtistChange(event.target.value)}
         disabled={disabled}
+        suggestions={suggestions.artist}
       />
-      <IconField
+      <SuggestField
         icon={DiscAlbum}
         label="Album"
         value={album}
         onChange={(event) => onAlbumChange(event.target.value)}
         disabled={disabled}
+        suggestions={suggestions.album}
       />
       <IconField
         icon={FileAudio}

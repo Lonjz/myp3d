@@ -5,11 +5,11 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterator, Literal, Optional
+from typing import Iterable, Iterator, Literal, Optional
 
 import eyed3
 
-from models.schemas import AlbumInfo, MP3Info
+from models.schemas import AlbumInfo, LibraryNames, MP3Info
 from services import date_service
 from services.config import OUTPUT_DIR
 from services.cover_service import set_cover_images
@@ -153,6 +153,23 @@ def list_mp3_infos() -> list[MP3Info]:
                 _library_cache.dirty = False
 
     return list(mp3_infos)
+
+
+def _distinct(values: Iterable[Optional[str]]) -> list[str]:
+    seen: dict[str, str] = {}
+    for value in values:
+        text = (value or "").strip()
+        if text:
+            seen.setdefault(text.casefold(), text)
+    return sorted(seen.values(), key=str.casefold)
+
+
+def tag_names() -> LibraryNames:
+    infos = list_mp3_infos()
+    return LibraryNames(
+        artists=_distinct(info.artist for info in infos),
+        albums=_distinct(info.album for info in infos),
+    )
 
 
 def build_album_groups() -> dict[str, AlbumGroup]:

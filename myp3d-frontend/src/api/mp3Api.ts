@@ -73,6 +73,17 @@ export interface YouTubeSearchResult {
   duration: number | null;
 }
 
+export interface LibraryNames {
+  artists: string[];
+  albums: string[];
+}
+
+export interface TagSuggestion {
+  title: string;
+  artist: string | null;
+  album: string | null;
+}
+
 export interface TrimRange {
   start: number;
   end: number;
@@ -292,6 +303,14 @@ export const mp3Api = {
       'Failed to search YouTube',
     );
     return payload.results || [];
+  },
+
+  libraryNames(): Promise<LibraryNames> {
+    return apiFetch('/mp3s/names', undefined, 'Failed to load library names');
+  },
+
+  songSuggestions(query: string): Promise<TagSuggestion[]> {
+    return apiFetch(`/youtube/songs?${new URLSearchParams({ q: query }).toString()}`, undefined, 'Failed to search YouTube Music');
   },
 
   silenceBounds(url: string): Promise<TrimRange> {

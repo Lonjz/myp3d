@@ -18,6 +18,7 @@ from models.schemas import (
     SpotifyTrack,
     SpotifyTrackMatch,
     SpotifyTrackRef,
+    TagSuggestion,
 )
 from services.mp3_service import list_mp3_infos
 from services.youtube_service import search_youtube
@@ -27,6 +28,7 @@ USER_AGENT = "Mozilla/5.0"
 FETCH_TIMEOUT_S = 15
 EMBED_TRACK_LIMIT = 100
 SEARCH_LIMIT = 10
+SUGGESTION_LIMIT = 5
 MATCH_LIMIT = 5
 GOOD_SCORE = 0.7
 RETRY_STATUSES = {429, 500, 502, 503, 504}
@@ -243,6 +245,21 @@ def _ytmusic_results(query: str, kind: str) -> list[dict]:
             }
         )
     return results
+
+
+def song_suggestions(query: str) -> list[TagSuggestion]:
+    wanted = _normalize(query)
+    songs = sorted(_ytmusic_results(query, "songs"), key=lambda song: not song["explicit"])
+    suggestions: dict[tuple[str, str], TagSuggestion] = {}
+    for song in songs:
+        title = _normalize(song["title"])
+        if not title or not song["artists"]:
+            continue
+        if any(_has_phrase(title, phrase) and not _has_phrase(wanted, phrase) for phrase in CLEAN_PHRASES):
+            continue
+        key = (_normalize(base_title(song["title"])), _normalize(song["artists"][0]))
+        suggestions.setdefault(key, TagSuggestion(title=format_title(song["title"], song["artists"]), artist=song["artists"][0], album=song["album"]))
+    return list(suggestions.values())[:SUGGESTION_LIMIT]
 
 
 def _youtube_results(query: str) -> list[dict]:

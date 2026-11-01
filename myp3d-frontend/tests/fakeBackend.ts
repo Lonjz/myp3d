@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import type { JsonBodyType } from 'msw';
 import { setupServer } from 'msw/node';
 import { API_BASE } from '../src/api/mp3Api';
-import type { AlbumInfo, LibraryStats, MP3Info, YouTubeSearchResult } from '../src/api/mp3Api';
+import type { AlbumInfo, LibraryStats, MP3Info, TagSuggestion, YouTubeSearchResult } from '../src/api/mp3Api';
 import type { PlaylistDetail, PlaylistInfo } from '../src/api/playlistApi';
 import type { QueueItem } from '../src/api/queueApi';
 import type { ArtistTrack, NamingTrack, SilentTrack } from '../src/api/healthApi';
@@ -31,12 +31,13 @@ interface Store {
   playlists: PlaylistRecord[];
   queue: QueueItem[];
   youtube: YouTubeSearchResult[];
+  songs: TagSuggestion[];
   silent: SilentTrack[];
   naming: NamingTrack[];
   artists: ArtistTrack[];
 }
 
-const emptyStore = (): Store => ({ tracks: [], favorites: [], playlists: [], queue: [], youtube: [], silent: [], naming: [], artists: [] });
+const emptyStore = (): Store => ({ tracks: [], favorites: [], playlists: [], queue: [], youtube: [], songs: [], silent: [], naming: [], artists: [] });
 
 let store = emptyStore();
 let isDown = false;
@@ -49,6 +50,7 @@ const unhandled: string[] = [];
 const error = (status: number, detail: string) => HttpResponse.json({ detail }, { status });
 const findTrack = (filename: string) => store.tracks.find((track) => track.filename === filename);
 const blank = (value: string | null | undefined) => !(value ?? '').trim();
+const names = (field: 'artist' | 'album') => [...new Set(store.tracks.map((track) => track[field]).filter((value): value is string => !blank(value)))].sort();
 
 function bulk(filenames: string[], apply: (track: MP3Info) => void) {
   const updated: string[] = [];
@@ -192,6 +194,7 @@ const handlers = [
 
   route('get', '/mp3s/paged', ({ url }) => paged(filtered(url), url)),
   route('get', '/mp3s/all', ({ url }) => filtered(url)),
+  route('get', '/mp3s/names', () => ({ artists: names('artist'), albums: names('album') })),
   route('post', '/mp3s/bulk/metadata', ({ body }) => {
     const { filenames, artist, album } = body as { filenames: string[]; artist?: string; album?: string };
     return bulk(filenames, (track) => {
@@ -282,6 +285,7 @@ const handlers = [
     return { tracks: tracks.slice(0, limit), albums: albums().filter((album) => album.album_name.toLowerCase().includes(query)).slice(0, limit) };
   }),
   route('get', '/youtube/search', ({ url }) => ({ query: url.searchParams.get('query'), results: store.youtube })),
+  route('get', '/youtube/songs', () => store.songs),
   route('post', '/youtube/silence', () => ({ start: 1.5, end: 197.5, duration: 200 })),
   route('post', '/download', ({ body }) => {
     const request = body as { url: string; custom_filename?: string; title?: string; artist?: string; album?: string };
