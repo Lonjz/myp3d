@@ -24,8 +24,6 @@ import { SegmentedControl } from '../components/ui/SegmentedControl';
 type CheckName = 'silence' | 'naming' | 'artists';
 
 const SCAN_POLL_MS = 750;
-const THRESHOLDS = [0.5, 1.5, 3, 5, 10];
-const DEFAULT_THRESHOLD = 1.5;
 const CHECKS: { value: CheckName; label: string; icon: LucideIcon }[] = [
   { value: 'silence', label: 'Silent endings', icon: VolumeX },
   { value: 'naming', label: 'File names', icon: FileAudio },
@@ -96,7 +94,6 @@ function CheckToolbar({
   fixLabel,
   fixTitle,
   onFix,
-  children,
 }: {
   picker: ReactNode;
   selection: Selection;
@@ -106,13 +103,11 @@ function CheckToolbar({
   fixLabel: string;
   fixTitle: string;
   onFix: () => void;
-  children?: ReactNode;
 }) {
   const count = selection.chosen.length;
   return (
     <div className="sync-toolbar glass">
       {picker}
-      {children}
       <span className="health-select-all">
         <Checkbox
           label={selection.allChosen ? 'Deselect all' : 'Select all'}
@@ -185,7 +180,6 @@ function SilenceCheck({ picker }: { picker: ReactNode }) {
   const [scan, setScan] = useState<SilenceScan | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [threshold, setThreshold] = usePersistentState('health:threshold', DEFAULT_THRESHOLD);
   const startedRef = useRef(false);
   const fix = useFix('trim', 'trimmed', 'Failed to trim the silence');
 
@@ -227,7 +221,7 @@ function SilenceCheck({ picker }: { picker: ReactNode }) {
 
   usePoll(refreshScan, SCAN_POLL_MS, scanning && !failed);
 
-  const visible: SilentTrack[] = (scan?.tracks ?? []).filter((track) => track.silence >= threshold);
+  const visible: SilentTrack[] = scan?.tracks ?? [];
   const selection = useSelection(visible.map((track) => track.filename));
 
   const trim = () => {
@@ -280,15 +274,7 @@ function SilenceCheck({ picker }: { picker: ReactNode }) {
         fixLabel="Trim silence from"
         fixTitle="Trim silence"
         onFix={trim}
-      >
-        <SegmentedControl
-          label="Minimum silence"
-          className="health-thresholds"
-          options={THRESHOLDS.map((value) => ({ value, label: `At least ${value}s of silence`, text: `${value}s` }))}
-          value={threshold}
-          onChange={setThreshold}
-        />
-      </CheckToolbar>
+      />
       {renderBody()}
     </>
   );

@@ -10,15 +10,6 @@
   display: none;
 }
 
-.health-thresholds .segmented__option {
-  width: auto;
-  min-width: 2.75rem;
-  padding-inline: var(--space-3);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
-  font-variant-numeric: tabular-nums;
-}
-
 .health-select-all {
   display: inline-flex;
   align-items: center;
