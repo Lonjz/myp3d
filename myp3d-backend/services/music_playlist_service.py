@@ -199,18 +199,17 @@ def _without(order: list[str], counts: Counter) -> list[str]:
 
 
 def _edit(track_ids: list[str], file_of: dict[str, str], target: list[str]) -> tuple[list[tuple[int, str]], list[str]]:
-    matched = len(target)
+    matched = 0
     removals: list[tuple[int, str]] = []
-    for index in range(len(track_ids), 0, -1):
-        track_id = track_ids[index - 1]
+    for index, track_id in enumerate(track_ids, 1):
         filename = file_of.get(track_id)
         if filename is None:
             continue
-        if matched > 0 and filename == target[matched - 1]:
-            matched -= 1
+        if matched < len(target) and filename == target[matched]:
+            matched += 1
             continue
         removals.append((index, track_id))
-    return removals, target[:matched][::-1]
+    return removals[::-1], target[matched:]
 
 
 def plan_sync(
@@ -356,7 +355,7 @@ def plan_sync(
                 playlist_id=state.id,
                 local=state.filenames,
                 apple=target,
-                apple_add=target[::-1],
+                apple_add=target,
                 write_apple=True,
                 push_cover=state.cover_hash is not None,
                 left_out=local_only(state.filenames),

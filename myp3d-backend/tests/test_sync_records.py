@@ -1,9 +1,10 @@
 from datetime import datetime, timedelta, timezone
 
 from models.schemas import SyncPlaylistRecord, SyncQueueRecord
-from services import database_sync, favorite_playlist, playlist_service, queue_service
+from services import database_sync, favorite_playlist, music_playlist_service, playlist_service, queue_service
 from services.db import connect
 from services.music_playlist_service import ApplePlaylist, Snapshot, plan_sync
+from services.music_service import FIELD_SEP
 from services.playlist_service import PlaylistState
 
 NOW = datetime(2026, 10, 1, tzinfo=timezone.utc)
@@ -101,9 +102,16 @@ def paired(local: list[str], track_ids: list[str], synced_local: list[str], sync
     return plan
 
 
-def test_a_song_pushed_onto_the_stack_is_one_add():
-    plan = paired(["d.mp3", "c.mp3", "b.mp3", "a.mp3"], ["P3", "P2", "P1"], ["c.mp3", "b.mp3", "a.mp3"], ["c.mp3", "b.mp3", "a.mp3"])
+def test_a_song_added_at_the_bottom_is_one_add():
+    plan = paired(["c.mp3", "b.mp3", "a.mp3", "d.mp3"], ["P3", "P2", "P1"], ["c.mp3", "b.mp3", "a.mp3"], ["c.mp3", "b.mp3", "a.mp3"])
     assert (plan.action, plan.apple_remove, plan.apple_add) == ("push", [], ["d.mp3"])
+
+
+def test_a_song_pushed_onto_the_stack_rebuilds_the_apple_playlist_below_it():
+    plan = paired(["d.mp3", "c.mp3", "b.mp3", "a.mp3"], ["P3", "P2", "P1"], ["c.mp3", "b.mp3", "a.mp3"], ["c.mp3", "b.mp3", "a.mp3"])
+    assert plan.action == "push"
+    assert plan.apple_remove == [(3, "P1"), (2, "P2"), (1, "P3")]
+    assert plan.apple_add == ["d.mp3", "c.mp3", "b.mp3", "a.mp3"]
     assert plan.apple == ["d.mp3", "c.mp3", "b.mp3", "a.mp3"]
 
 
@@ -112,12 +120,12 @@ def test_a_song_removed_from_the_middle_is_one_delete():
     assert (plan.action, plan.apple_remove, plan.apple_add) == ("push", [(2, "P2")], [])
 
 
-def test_a_myp3d_reorder_keeps_the_longest_matching_run_at_the_bottom():
-    plan = paired(["a.mp3", "c.mp3", "b.mp3"], ["P3", "P2", "P1"], ["c.mp3", "b.mp3", "a.mp3"], ["c.mp3", "b.mp3", "a.mp3"])
-    assert (plan.apple_remove, plan.apple_add) == ([(3, "P1")], ["a.mp3"])
-
+def test_a_myp3d_reorder_keeps_the_longest_matching_run_at_the_top():
     plan = paired(["b.mp3", "a.mp3", "c.mp3"], ["P3", "P2", "P1"], ["c.mp3", "b.mp3", "a.mp3"], ["c.mp3", "b.mp3", "a.mp3"])
-    assert (plan.apple_remove, plan.apple_add) == ([(3, "P1"), (2, "P2")], ["a.mp3", "b.mp3"])
+    assert (plan.apple_remove, plan.apple_add) == ([(1, "P3")], ["c.mp3"])
+
+    plan = paired(["a.mp3", "c.mp3", "b.mp3"], ["P3", "P2", "P1"], ["c.mp3", "b.mp3", "a.mp3"], ["c.mp3", "b.mp3", "a.mp3"])
+    assert (plan.apple_remove, plan.apple_add) == ([(2, "P2"), (1, "P3")], ["c.mp3", "b.mp3"])
 
 
 def test_an_apple_reorder_pulls_into_myp3d():
@@ -136,8 +144,21 @@ def test_a_flipped_view_is_not_an_apple_edit():
     assert (plan.action, plan.local) == ("push", ["c.mp3", "b.mp3", "a.mp3"])
 
 
+def test_removals_are_sent_from_the_bottom_up_before_the_additions(monkeypatch):
+    sent: list[str] = []
+
+    def write(name, *args, timeout=0):
+        sent.extend(args[4:])
+        return f"APL{FIELD_SEP}noart"
+
+    monkeypatch.setattr(music_playlist_service, "run_script", write)
+    plan = paired(["a.mp3", "c.mp3", "b.mp3"], ["P3", "P2", "P1"], ["c.mp3", "b.mp3", "a.mp3"], ["c.mp3", "b.mp3", "a.mp3"])
+    music_playlist_service._write_apple(plan, "APL", {"b.mp3": "P2", "c.mp3": "P3"})
+    assert sent == ["-2:P2", "-1:P3", "+P3", "+P2"]
+
+
 def test_songs_only_in_apple_music_are_never_removed():
-    plan = paired(["c.mp3", "b.mp3", "a.mp3"], ["P2", "X9", "P1", "X8"], ["b.mp3", "a.mp3"], ["b.mp3", "a.mp3"])
+    plan = paired(["b.mp3", "a.mp3", "c.mp3"], ["P2", "X9", "P1", "X8"], ["b.mp3", "a.mp3"], ["b.mp3", "a.mp3"])
     assert (plan.apple_remove, plan.apple_add) == ([], ["c.mp3"])
 
     plan = paired(["b.mp3", "a.mp3"], ["P2", "X9", "P1", "X8"], ["b.mp3", "a.mp3"], ["b.mp3", "a.mp3"])
@@ -146,13 +167,13 @@ def test_songs_only_in_apple_music_are_never_removed():
 
 def test_copies_are_removed_by_position():
     plan = paired(["a.mp3", "b.mp3", "a.mp3"], ["P2", "P1", "P1"], ["b.mp3", "a.mp3", "a.mp3"], ["b.mp3", "a.mp3", "a.mp3"])
-    assert (plan.apple_remove, plan.apple_add) == ([(2, "P1")], ["a.mp3"])
+    assert (plan.apple_remove, plan.apple_add) == ([(3, "P1"), (1, "P2")], ["b.mp3", "a.mp3"])
 
 
 def test_an_old_link_ignores_apple_order_and_keeps_myp3d_order():
     plan = paired(["c.mp3", "b.mp3", "a.mp3"], ["P1", "P2", "P3"], ["c.mp3", "b.mp3", "a.mp3"], ["c.mp3", "b.mp3", "a.mp3"], ordered=False)
     assert (plan.action, plan.local) == ("push", ["c.mp3", "b.mp3", "a.mp3"])
-    assert (plan.apple_remove, plan.apple_add) == ([(3, "P3"), (2, "P2")], ["b.mp3", "c.mp3"])
+    assert (plan.apple_remove, plan.apple_add) == ([(2, "P2"), (1, "P1")], ["b.mp3", "a.mp3"])
 
 
 def test_an_old_link_pulls_apple_additions_without_reordering_myp3d():
@@ -164,12 +185,12 @@ def test_an_old_link_pulls_apple_additions_without_reordering_myp3d():
 def test_an_interrupted_apple_write_is_retried_instead_of_pulled():
     plan = paired(["c.mp3", "b.mp3", "a.mp3"], ["P1"], ["c.mp3", "b.mp3", "a.mp3"], ["c.mp3", "b.mp3", "a.mp3"], pending=True)
     assert (plan.action, plan.local) == ("push", ["c.mp3", "b.mp3", "a.mp3"])
-    assert (plan.apple_remove, plan.apple_add) == ([], ["b.mp3", "c.mp3"])
+    assert (plan.apple_remove, plan.apple_add) == ([(1, "P1")], ["c.mp3", "b.mp3", "a.mp3"])
 
 
-def test_exports_add_bottom_up_and_imports_keep_the_shown_order():
+def test_exports_add_top_down_and_imports_keep_the_shown_order():
     [export] = plan_sync([], [local_state(["c.mp3", "b.mp3", "a.mp3"])], {}, FILE_OF, set(FILE_OF.values()))
-    assert (export.action, export.apple, export.apple_add) == ("export", ["c.mp3", "b.mp3", "a.mp3"], ["a.mp3", "b.mp3", "c.mp3"])
+    assert (export.action, export.apple, export.apple_add) == ("export", ["c.mp3", "b.mp3", "a.mp3"], ["c.mp3", "b.mp3", "a.mp3"])
 
     [imported] = plan_sync([apple_playlist(["P3", "P2", "P1"])], [], {}, FILE_OF, set(FILE_OF.values()))
     assert (imported.action, imported.local) == ("import", ["c.mp3", "b.mp3", "a.mp3"])
@@ -178,4 +199,4 @@ def test_exports_add_bottom_up_and_imports_keep_the_shown_order():
 def test_a_first_link_puts_apple_only_songs_on_top():
     [plan] = plan_sync([apple_playlist(["P4", "P1"])], [local_state(["b.mp3", "a.mp3"])], {}, FILE_OF, set(FILE_OF.values()))
     assert (plan.action, plan.local) == ("link", ["d.mp3", "b.mp3", "a.mp3"])
-    assert (plan.apple_remove, plan.apple_add) == ([(1, "P4")], ["b.mp3", "d.mp3"])
+    assert (plan.apple_remove, plan.apple_add) == ([(2, "P1")], ["b.mp3", "a.mp3"])

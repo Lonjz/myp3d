@@ -46,23 +46,21 @@ on run argv
 			if persistent ID of track trackIndex of targetPlaylist is not (item 2 of removal) then error "The playlist changed in Apple Music, check again" number 1
 		end repeat
 
-		set shift to 0
 		set firstAddition to 1
 		if playlistId is not "" and (count of additions) > 0 and trackCount > 0 then
 			set probeId to (item 1 of additions) as text
-			set oldLast to persistent ID of track trackCount of targetPlaylist
+			set oldFirst to persistent ID of track 1 of targetPlaylist
 			duplicate (first track of library playlist 1 whose persistent ID is probeId) to targetPlaylist
 			set newCount to count of tracks of targetPlaylist
-			if (persistent ID of track 1 of targetPlaylist is not probeId) or (persistent ID of track newCount of targetPlaylist is not oldLast) then
-				if persistent ID of track newCount of targetPlaylist is probeId then delete track newCount of targetPlaylist
-				error "Set this playlist to Playlist Order, Descending in Apple Music" number 1
+			if (persistent ID of track newCount of targetPlaylist is not probeId) or (persistent ID of track 1 of targetPlaylist is not oldFirst) then
+				if persistent ID of track 1 of targetPlaylist is probeId then delete track 1 of targetPlaylist
+				error "Set this playlist to Playlist Order, Ascending in Apple Music" number 1
 			end if
-			set shift to 1
 			set firstAddition to 2
 		end if
 
 		repeat with removal in removals
-			delete track ((item 1 of removal) + shift) of targetPlaylist
+			delete track (item 1 of removal) of targetPlaylist
 		end repeat
 
 		repeat with i from firstAddition to count of additions
