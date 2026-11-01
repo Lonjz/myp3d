@@ -313,6 +313,14 @@ export function MusicPage() {
         onClick={() => void active.scan()}
         disabled={active.scanning || folderMissing || jobOpen}
       />
+      {step === 'songs' && (
+        <IconButton
+          icon={ImageOff}
+          label="Find missing covers in Apple Music"
+          onClick={() => void songs.checkArt()}
+          disabled={songs.scanning || folderMissing || jobOpen || anySyncing}
+        />
+      )}
       <button
         type="button"
         className="btn-primary music-add"

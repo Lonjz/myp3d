@@ -56,5 +56,7 @@ export function useMusicSync() {
     void load();
   };
 
-  return { available, loadFailed, retry, folder, setFolder, scan, ...job };
+  const checkArt = () => scan(musicApi.checkArt, 'Failed to check the covers in Apple Music');
+
+  return { available, loadFailed, retry, folder, setFolder, scan, checkArt, ...job };
 }

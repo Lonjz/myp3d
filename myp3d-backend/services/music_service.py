@@ -24,6 +24,7 @@ from services import favorite_playlist, favorite_service
 from services.audio_fingerprint import audio_fingerprint, cover_hash, covers_match
 from services.config import BASE_DIR, OUTPUT_DIR
 from services.cover_service import get_album_cover, make_square_cover
+from services.db import connect as _connect
 from services.filenames import safe_path_part
 from services.mp3_service import list_mp3_infos
 from services.errors import AppError
@@ -43,6 +44,12 @@ GROUP_SEP = "\x1d"
 NOT_AUTHORIZED_CODE = "-1743"
 PUSH_CHANGES = ("title", "artist", "album", "art", "audio")
 FAVORITE_PUSHES = {"favorite_music": True, "unfavorite_music": False}
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS apple_missing_art (
+    persistent_id TEXT PRIMARY KEY
+)
+"""
 
 
 
@@ -92,6 +99,11 @@ class _SyncJob:
 
 _sync_lock = threading.Lock()
 _sync: Optional[_SyncJob] = None
+
+
+def init() -> None:
+    with _connect() as conn:
+        conn.execute(SCHEMA)
 
 
 def is_available() -> bool:
@@ -359,8 +371,33 @@ def _push_favorites(pairs: list[_Pair]) -> dict[str, str]:
     return problems
 
 
+def _missing_art() -> set[str]:
+    with _connect() as conn:
+        return {row["persistent_id"] for row in conn.execute("SELECT persistent_id FROM apple_missing_art")}
+
+
+def _note_art(persistent_id: str, problem: Optional[str]) -> None:
+    with _connect() as conn:
+        if problem:
+            conn.execute("INSERT OR IGNORE INTO apple_missing_art (persistent_id) VALUES (?)", (persistent_id,))
+            return
+        conn.execute("DELETE FROM apple_missing_art WHERE persistent_id = ?", (persistent_id,))
+
+
+def _mark_missing_art(pairs: list[_Pair], missing: set[str]) -> None:
+    seen: set[str] = set()
+    for pair in pairs:
+        persistent_id = pair.music.info.persistent_id
+        if persistent_id in seen:
+            continue
+        seen.add(persistent_id)
+        if pair.track.has_cover and persistent_id in missing and "art" not in pair.changes:
+            pair.changes.append("art")
+
+
 def _compare(root: Path) -> _Match:
     matched = _match(root, _read_library(), list_mp3_infos())
+    _mark_missing_art(matched.pairs, _missing_art())
     _mark_favorites(matched.pairs, favorite_service.list_filenames(), favorite_service.apple_snapshot())
     return matched
 
@@ -392,6 +429,18 @@ def diff(folder: str) -> MusicDiff:
         ),
         only_in_library=sorted(matched.unpaired, key=_track_sort_key),
     )
+
+
+def check_art(folder: str) -> MusicDiff:
+    require_folder(folder)
+    output = run_script("export_missing_art", timeout=EXPORT_TIMEOUT_S)
+    with _connect() as conn:
+        conn.execute("DELETE FROM apple_missing_art")
+        conn.executemany(
+            "INSERT OR IGNORE INTO apple_missing_art (persistent_id) VALUES (?)",
+            [(persistent_id,) for persistent_id in output.split(FIELD_SEP) if persistent_id],
+        )
+    return diff(folder)
 
 
 def _album_artist_tracks() -> dict[str, list[MusicTrack]]:
@@ -495,16 +544,16 @@ def _add_one(root: Path, source: Path, track: MP3Info, existing: Optional[Path])
             Path(art_path).unlink(missing_ok=True)
 
 
-def _readd_one(root: Path, source: Path, pair: _Pair) -> Optional[str]:
+def _readd_one(root: Path, source: Path, pair: _Pair) -> tuple[str, Optional[str]]:
     old_file = _music_file(pair.music)
     persistent_id, target, art_problem = _add_one(root, source, pair.track, None)
     run_script("replace_track", pair.music.info.persistent_id, persistent_id, timeout=EXPORT_TIMEOUT_S)
     try:
         if old_file is None or not _is_within(old_file, root):
-            return art_problem
+            return persistent_id, art_problem
         target.replace(old_file)
     except OSError:
-        return art_problem
+        return persistent_id, art_problem
     try:
         run_script("relocate_track", persistent_id, str(old_file), timeout=TRACK_TIMEOUT_S)
     except AppError:
@@ -512,7 +561,7 @@ def _readd_one(root: Path, source: Path, pair: _Pair) -> Optional[str]:
             old_file.replace(target)
         except OSError:
             pass
-    return art_problem
+    return persistent_id, art_problem
 
 
 def _update_one(source: Path, pair: _Pair) -> Optional[str]:
@@ -594,7 +643,12 @@ def _run_sync(job: _SyncJob, root: Path) -> None:
     for pair in updates:
         source = OUTPUT_DIR / pair.track.filename
         try:
-            art_problem = _readd_one(root, source, pair) if "audio" in pair.changes else _update_one(source, pair)
+            if "audio" in pair.changes:
+                persistent_id, art_problem = _readd_one(root, source, pair)
+                _note_art(pair.music.info.persistent_id, None)
+            else:
+                persistent_id, art_problem = pair.music.info.persistent_id, _update_one(source, pair)
+            _note_art(persistent_id, art_problem)
         except Exception as exc:
             _record_failure(job, source.name, exc)
             continue
@@ -606,7 +660,8 @@ def _run_sync(job: _SyncJob, root: Path) -> None:
     for track in adds:
         source = OUTPUT_DIR / track.filename
         try:
-            _, _, art_problem = _add_one(root, source, track, matched.loose.get(track.filename))
+            persistent_id, _, art_problem = _add_one(root, source, track, matched.loose.get(track.filename))
+            _note_art(persistent_id, art_problem)
         except Exception as exc:
             _record_failure(job, source.name, exc)
             continue

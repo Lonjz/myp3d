@@ -103,6 +103,7 @@ def _reset_state() -> None:
     favorite_service.init()
     date_service.init()
     music_playlist_service.init()
+    music_service.init()
     mp3_service.invalidate_library_cache()
     mp3_service._file_infos.clear()
     youtube_service._download_locks.clear()

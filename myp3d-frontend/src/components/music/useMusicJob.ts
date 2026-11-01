@@ -27,14 +27,14 @@ export function useMusicJob<D, J extends { status: string }>(folder: string, api
     folderRef.current = folder;
   }, [folder]);
 
-  const scan = useCallback(async () => {
+  const scan = useCallback(async (load: (folder: string) => Promise<D> = api.diff, failure = api.errors.diff) => {
     const target = folderRef.current.trim();
     if (!target) return;
     setScanning(true);
     try {
-      setDiff(await api.diff(target));
+      setDiff(await load(target));
     } catch (err) {
-      showError(errorMessage(err, api.errors.diff));
+      showError(errorMessage(err, failure));
     } finally {
       setScanning(false);
     }

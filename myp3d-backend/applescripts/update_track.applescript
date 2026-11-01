@@ -21,11 +21,11 @@ on run argv
 		end if
 		set artState to "noart"
 		if artData is not missing value then
-			set artState to my setArtwork(targetTrack, artData)
-			if artState is not "art" then
-				delay 1
+			repeat with attempt from 1 to 5
 				set artState to my setArtwork(targetTrack, artData)
-			end if
+				if artState is "art" or attempt is 5 then exit repeat
+				delay 1
+			end repeat
 		end if
 		return artState
 	end tell

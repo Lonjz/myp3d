@@ -13,11 +13,11 @@ on run argv
 			if my hasReadableArtwork(newTrack) then
 				set artState to "art"
 			else
-				set artState to my setArtwork(newTrack, artData)
-				if artState is not "art" then
-					delay 1
+				repeat with attempt from 1 to 5
 					set artState to my setArtwork(newTrack, artData)
-				end if
+					if artState is "art" or attempt is 5 then exit repeat
+					delay 1
+				end repeat
 			end if
 		end if
 		return (persistent ID of newTrack) & fieldSep & artState

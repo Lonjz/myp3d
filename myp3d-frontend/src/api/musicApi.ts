@@ -103,6 +103,10 @@ export const musicApi = {
     return apiFetch('/music/diff', jsonInit('POST', { folder }), 'Failed to compare with Apple Music');
   },
 
+  checkArt(folder: string): Promise<MusicDiff> {
+    return apiFetch('/music/art/check', jsonInit('POST', { folder }), 'Failed to check the covers in Apple Music');
+  },
+
   startSync(folder: string): Promise<MusicSync> {
     return apiFetch('/music/sync', jsonInit('POST', { folder }), 'Failed to sync with Apple Music');
   },

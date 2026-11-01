@@ -48,6 +48,13 @@ def start_music_sync(payload: MusicFolderRequest):
     return music_service.start_sync(payload.folder)
 
 
+@router.post("/art/check", response_model=MusicDiff)
+def check_music_art(payload: MusicFolderRequest):
+    if _is_syncing(music_service.get_sync()) or _is_syncing(music_playlist_service.get_sync()):
+        raise HTTPException(status_code=409, detail="Wait for the sync to finish")
+    return music_service.check_art(payload.folder)
+
+
 @router.get("/sync", response_model=Optional[MusicSyncInfo])
 def get_music_sync():
     return music_service.get_sync()
