@@ -151,7 +151,7 @@ def test_rename_reaches_queue_history_and_apple_snapshots(client, seeded_library
     from services.db import connect, now
 
     playlist_id = make_playlist("Mix", ["the chain.mp3"])
-    music_playlist_service._save_link(playlist_id, "PID", music_playlist_service.Snapshot(local=["the chain.mp3"]))
+    music_playlist_service._save_link(playlist_id, "PID", music_playlist_service.Snapshot(local=["the chain.mp3"], apple=["the chain.mp3"]))
     with connect() as conn:
         conn.execute(
             "INSERT INTO queue_items (uid, position, url, status, filename, created_at, updated_at) VALUES (?, 1, 'x', 'done', 'the chain.mp3', ?, ?)",
@@ -160,4 +160,5 @@ def test_rename_reaches_queue_history_and_apple_snapshots(client, seeded_library
 
     client.put("/mp3s/the chain.mp3/metadata", json={"new_filename": "deep water"})
     assert [item.filename for item in queue_service.list_items()] == ["deep water.mp3"]
-    assert music_playlist_service._read_links()[playlist_id][1].local == ["deep water.mp3"]
+    snapshot = music_playlist_service._read_links()[playlist_id][1]
+    assert (snapshot.local, snapshot.apple) == (["deep water.mp3"], ["deep water.mp3"])

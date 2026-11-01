@@ -58,6 +58,8 @@ class Snapshot:
     local: list[str] = field(default_factory=list)
     apple: list[str] = field(default_factory=list)
     cover: Optional[str] = None
+    ordered: bool = False
+    pending: bool = False
 
 
 @dataclass
@@ -71,7 +73,7 @@ class Plan:
     local: list[str] = field(default_factory=list)
     apple: list[str] = field(default_factory=list)
     apple_add: list[str] = field(default_factory=list)
-    apple_remove: list[str] = field(default_factory=list)
+    apple_remove: list[tuple[int, str]] = field(default_factory=list)
     write_local: bool = False
     write_apple: bool = False
     push_cover: bool = False
@@ -137,9 +139,19 @@ def _save_link(playlist_id: str, persistent_id: str, snapshot: Snapshot) -> None
 
 def rename_track(old: str, new: str) -> None:
     for playlist_id, (persistent_id, snapshot) in _read_links().items():
-        if old in snapshot.local:
+        if old in snapshot.local or old in snapshot.apple:
             snapshot.local = [new if filename == old else filename for filename in snapshot.local]
+            snapshot.apple = [new if filename == old else filename for filename in snapshot.apple]
             _save_link(playlist_id, persistent_id, snapshot)
+
+
+def _mark_pending(playlist_id: str) -> None:
+    link = _read_links().get(playlist_id)
+    if link is None:
+        return
+    persistent_id, snapshot = link
+    snapshot.pending = True
+    _save_link(playlist_id, persistent_id, snapshot)
 
 
 def _drop_link(playlist_id: str) -> None:
@@ -186,6 +198,21 @@ def _without(order: list[str], counts: Counter) -> list[str]:
     return kept[::-1]
 
 
+def _edit(track_ids: list[str], file_of: dict[str, str], target: list[str]) -> tuple[list[tuple[int, str]], list[str]]:
+    matched = len(target)
+    removals: list[tuple[int, str]] = []
+    for index in range(len(track_ids), 0, -1):
+        track_id = track_ids[index - 1]
+        filename = file_of.get(track_id)
+        if filename is None:
+            continue
+        if matched > 0 and filename == target[matched - 1]:
+            matched -= 1
+            continue
+        removals.append((index, track_id))
+    return removals, target[:matched][::-1]
+
+
 def plan_sync(
     apple_playlists: list[ApplePlaylist],
     states: list[PlaylistState],
@@ -210,16 +237,6 @@ def plan_sync(
     def local_only(filenames: list[str]) -> int:
         return sum(1 for filename in filenames if filename not in mappable and filename in library)
 
-    def entries_of(apple: ApplePlaylist, counts: Counter) -> list[str]:
-        remaining = Counter(counts)
-        chosen: list[str] = []
-        for track_id in apple.track_ids:
-            filename = file_of.get(track_id)
-            if filename is not None and remaining[filename] > 0:
-                remaining[filename] -= 1
-                chosen.append(track_id)
-        return chosen
-
     apple_by_id = {playlist.persistent_id: playlist for playlist in apple_playlists}
     linked_ids = {persistent_id for persistent_id, _ in links.values()}
     unlinked_apple: dict[str, list[ApplePlaylist]] = {}
@@ -231,40 +248,41 @@ def plan_sync(
 
     def paired_plan(state: PlaylistState, apple: ApplePlaylist, snapshot: Optional[Snapshot]) -> Plan:
         apple_files = mapped(apple.track_ids)
-        local_counts, apple_counts = Counter(desired(state.filenames)), Counter(apple_files)
-        missing_in_apple, extra_in_apple = local_counts - apple_counts, apple_counts - local_counts
         push_cover = state.cover_hash is not None and state.cover_hash != (snapshot.cover if snapshot else None)
-        apple_add: list[str] = []
-        apple_remove: list[str] = []
 
         if snapshot is None:
+            extra_in_apple = Counter(apple_files) - Counter(desired(state.filenames))
             local_result = _take(apple_files, extra_in_apple) + state.filenames
-            apple_add = _take(state.filenames, missing_in_apple)
-            apple_result = apple_files + apple_add
             name = state.name
             description = state.description or apple.description
         else:
             local_changed = (
-                Counter(state.filenames) != Counter(snapshot.local)
+                state.filenames != snapshot.local
                 or state.name != snapshot.name
                 or state.description != snapshot.description
             )
-            apple_changed = (
-                apple_counts != Counter(snapshot.apple)
+            if snapshot.ordered:
+                apple_edited = apple_files not in (snapshot.apple, snapshot.apple[::-1])
+            else:
+                apple_edited = Counter(apple_files) != Counter(snapshot.apple)
+            apple_changed = not snapshot.pending and (
+                apple_edited
                 or apple.name != snapshot.name
                 or apple.description != snapshot.description
             )
-            if apple_changed and not local_changed:
-                local_result = _take(apple_files, extra_in_apple) + _without(state.filenames, missing_in_apple)
-                apple_result = apple_files
+            if apple_changed and not local_changed and snapshot.ordered:
+                local_result = apple_files + [filename for filename in state.filenames if filename not in mappable]
+                name, description = apple.name, apple.description
+            elif apple_changed and not local_changed:
+                local_counts, apple_counts = Counter(desired(state.filenames)), Counter(apple_files)
+                local_result = _take(apple_files, apple_counts - local_counts) + _without(state.filenames, local_counts - apple_counts)
                 name, description = apple.name, apple.description
             else:
-                apple_add = _take(state.filenames, missing_in_apple)
-                apple_remove = entries_of(apple, extra_in_apple)
                 local_result = state.filenames
-                apple_result = _without(apple_files, extra_in_apple) + apple_add
                 name, description = state.name, state.description
 
+        apple_result = desired(local_result)
+        apple_remove, apple_add = _edit(apple.track_ids, file_of, apple_result)
         write_local = local_result != state.filenames or name != state.name or description != state.description
         write_apple = bool(apple_add or apple_remove) or name != apple.name or description != apple.description or push_cover
         if snapshot is None:
@@ -275,7 +293,7 @@ def plan_sync(
             action = "push"
         else:
             action = "in_sync"
-        current = Snapshot(name=name, description=description, local=local_result, apple=apple_result, cover=state.cover_hash)
+        current = Snapshot(name=name, description=description, local=local_result, apple=apple_result, cover=state.cover_hash, ordered=True)
         refreshed = current if action == "in_sync" and current != snapshot else None
         return Plan(
             key=state.id,
@@ -338,7 +356,7 @@ def plan_sync(
                 playlist_id=state.id,
                 local=state.filenames,
                 apple=target,
-                apple_add=target,
+                apple_add=target[::-1],
                 write_apple=True,
                 push_cover=state.cover_hash is not None,
                 left_out=local_only(state.filenames),
@@ -413,7 +431,8 @@ def _write_cover_file(playlist_id: str) -> Optional[str]:
 def _write_apple(plan: Plan, persistent_id: Optional[str], file_of_pid: dict[str, str]) -> tuple[str, Optional[str]]:
     art_path = _write_cover_file(plan.playlist_id) if plan.push_cover and plan.playlist_id else None
     try:
-        changes = [f"-{track_id}" for track_id in plan.apple_remove] + [f"+{file_of_pid[filename]}" for filename in plan.apple_add]
+        removals = [f"-{index}:{track_id}" for index, track_id in plan.apple_remove]
+        changes = removals + [f"+{file_of_pid[filename]}" for filename in plan.apple_add]
         result = run_script(
             "write_playlist",
             persistent_id or "",
@@ -455,6 +474,7 @@ def _snapshot(playlist_id: str, plan: Plan) -> Snapshot:
         local=playlist_service.stored_filenames(playlist_id),
         apple=plan.apple,
         cover=state.cover_hash if state is not None else None,
+        ordered=True,
     )
 
 
@@ -491,6 +511,7 @@ def _apply(plan: Plan, file_of_pid: dict[str, str]) -> tuple[str, Optional[str]]
     art_problem = None
     persistent_id = plan.persistent_id
     if plan.write_apple:
+        _mark_pending(plan.playlist_id)
         persistent_id, art_problem = _write_apple(plan, plan.persistent_id, file_of_pid)
     _save_link(plan.playlist_id, persistent_id, _snapshot(plan.playlist_id, plan))
     return "updated", art_problem

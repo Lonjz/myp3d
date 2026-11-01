@@ -3,6 +3,8 @@ from datetime import datetime, timedelta, timezone
 from models.schemas import SyncPlaylistRecord, SyncQueueRecord
 from services import database_sync, favorite_playlist, playlist_service, queue_service
 from services.db import connect
+from services.music_playlist_service import ApplePlaylist, Snapshot, plan_sync
+from services.playlist_service import PlaylistState
 
 NOW = datetime(2026, 10, 1, tzinfo=timezone.utc)
 
@@ -75,3 +77,105 @@ def test_a_playlist_named_faves_is_only_adopted_once(library, make_playlist):
     make_playlist("Faves")
     favorite_playlist.ensure()
     assert playlist_service.favorites_id() is None
+
+
+FILE_OF = {"P1": "a.mp3", "P2": "b.mp3", "P3": "c.mp3", "P4": "d.mp3"}
+
+
+def local_state(filenames: list[str]) -> PlaylistState:
+    stamp = NOW.isoformat()
+    return PlaylistState(
+        id="local", name="mix", description="", filenames=filenames, cover_hash=None,
+        is_favorites=False, created_at=stamp, updated_at=stamp, deleted_at=None,
+    )
+
+
+def apple_playlist(track_ids: list[str]) -> ApplePlaylist:
+    return ApplePlaylist(persistent_id="APL", name="mix", description="", track_ids=track_ids)
+
+
+def paired(local: list[str], track_ids: list[str], synced_local: list[str], synced_apple: list[str], **flags):
+    flags.setdefault("ordered", True)
+    links = {"local": ("APL", Snapshot(name="mix", local=synced_local, apple=synced_apple, **flags))}
+    [plan] = plan_sync([apple_playlist(track_ids)], [local_state(local)], links, FILE_OF, set(FILE_OF.values()))
+    return plan
+
+
+def test_a_song_pushed_onto_the_stack_is_one_add():
+    plan = paired(["d.mp3", "c.mp3", "b.mp3", "a.mp3"], ["P3", "P2", "P1"], ["c.mp3", "b.mp3", "a.mp3"], ["c.mp3", "b.mp3", "a.mp3"])
+    assert (plan.action, plan.apple_remove, plan.apple_add) == ("push", [], ["d.mp3"])
+    assert plan.apple == ["d.mp3", "c.mp3", "b.mp3", "a.mp3"]
+
+
+def test_a_song_removed_from_the_middle_is_one_delete():
+    plan = paired(["c.mp3", "a.mp3"], ["P3", "P2", "P1"], ["c.mp3", "b.mp3", "a.mp3"], ["c.mp3", "b.mp3", "a.mp3"])
+    assert (plan.action, plan.apple_remove, plan.apple_add) == ("push", [(2, "P2")], [])
+
+
+def test_a_myp3d_reorder_keeps_the_longest_matching_run_at_the_bottom():
+    plan = paired(["a.mp3", "c.mp3", "b.mp3"], ["P3", "P2", "P1"], ["c.mp3", "b.mp3", "a.mp3"], ["c.mp3", "b.mp3", "a.mp3"])
+    assert (plan.apple_remove, plan.apple_add) == ([(3, "P1")], ["a.mp3"])
+
+    plan = paired(["b.mp3", "a.mp3", "c.mp3"], ["P3", "P2", "P1"], ["c.mp3", "b.mp3", "a.mp3"], ["c.mp3", "b.mp3", "a.mp3"])
+    assert (plan.apple_remove, plan.apple_add) == ([(3, "P1"), (2, "P2")], ["a.mp3", "b.mp3"])
+
+
+def test_an_apple_reorder_pulls_into_myp3d():
+    plan = paired(["c.mp3", "b.mp3", "a.mp3", "gone.mp3"], ["P1", "P3", "P2"], ["c.mp3", "b.mp3", "a.mp3", "gone.mp3"], ["c.mp3", "b.mp3", "a.mp3"])
+    assert plan.action == "pull"
+    assert plan.local == ["a.mp3", "c.mp3", "b.mp3", "gone.mp3"]
+    assert (plan.apple_remove, plan.apple_add, plan.write_apple) == ([], [], False)
+
+
+def test_a_flipped_view_is_not_an_apple_edit():
+    plan = paired(["c.mp3", "b.mp3", "a.mp3"], ["P3", "P2", "P1"], ["c.mp3", "b.mp3", "a.mp3"], ["a.mp3", "b.mp3", "c.mp3"])
+    assert plan.action == "in_sync"
+    assert plan.refreshed.apple == ["c.mp3", "b.mp3", "a.mp3"]
+
+    plan = paired(["c.mp3", "b.mp3", "a.mp3"], ["P1", "P2", "P3"], ["c.mp3", "b.mp3", "a.mp3"], ["c.mp3", "b.mp3", "a.mp3"])
+    assert (plan.action, plan.local) == ("push", ["c.mp3", "b.mp3", "a.mp3"])
+
+
+def test_songs_only_in_apple_music_are_never_removed():
+    plan = paired(["c.mp3", "b.mp3", "a.mp3"], ["P2", "X9", "P1", "X8"], ["b.mp3", "a.mp3"], ["b.mp3", "a.mp3"])
+    assert (plan.apple_remove, plan.apple_add) == ([], ["c.mp3"])
+
+    plan = paired(["b.mp3", "a.mp3"], ["P2", "X9", "P1", "X8"], ["b.mp3", "a.mp3"], ["b.mp3", "a.mp3"])
+    assert plan.action == "in_sync"
+
+
+def test_copies_are_removed_by_position():
+    plan = paired(["a.mp3", "b.mp3", "a.mp3"], ["P2", "P1", "P1"], ["b.mp3", "a.mp3", "a.mp3"], ["b.mp3", "a.mp3", "a.mp3"])
+    assert (plan.apple_remove, plan.apple_add) == ([(2, "P1")], ["a.mp3"])
+
+
+def test_an_old_link_ignores_apple_order_and_keeps_myp3d_order():
+    plan = paired(["c.mp3", "b.mp3", "a.mp3"], ["P1", "P2", "P3"], ["c.mp3", "b.mp3", "a.mp3"], ["c.mp3", "b.mp3", "a.mp3"], ordered=False)
+    assert (plan.action, plan.local) == ("push", ["c.mp3", "b.mp3", "a.mp3"])
+    assert (plan.apple_remove, plan.apple_add) == ([(3, "P3"), (2, "P2")], ["b.mp3", "c.mp3"])
+
+
+def test_an_old_link_pulls_apple_additions_without_reordering_myp3d():
+    plan = paired(["c.mp3", "b.mp3", "a.mp3"], ["P4", "P3", "P2", "P1"], ["c.mp3", "b.mp3", "a.mp3"], ["a.mp3", "b.mp3", "c.mp3"], ordered=False)
+    assert (plan.action, plan.local) == ("pull", ["d.mp3", "c.mp3", "b.mp3", "a.mp3"])
+    assert (plan.apple_remove, plan.apple_add) == ([], [])
+
+
+def test_an_interrupted_apple_write_is_retried_instead_of_pulled():
+    plan = paired(["c.mp3", "b.mp3", "a.mp3"], ["P1"], ["c.mp3", "b.mp3", "a.mp3"], ["c.mp3", "b.mp3", "a.mp3"], pending=True)
+    assert (plan.action, plan.local) == ("push", ["c.mp3", "b.mp3", "a.mp3"])
+    assert (plan.apple_remove, plan.apple_add) == ([], ["b.mp3", "c.mp3"])
+
+
+def test_exports_add_bottom_up_and_imports_keep_the_shown_order():
+    [export] = plan_sync([], [local_state(["c.mp3", "b.mp3", "a.mp3"])], {}, FILE_OF, set(FILE_OF.values()))
+    assert (export.action, export.apple, export.apple_add) == ("export", ["c.mp3", "b.mp3", "a.mp3"], ["a.mp3", "b.mp3", "c.mp3"])
+
+    [imported] = plan_sync([apple_playlist(["P3", "P2", "P1"])], [], {}, FILE_OF, set(FILE_OF.values()))
+    assert (imported.action, imported.local) == ("import", ["c.mp3", "b.mp3", "a.mp3"])
+
+
+def test_a_first_link_puts_apple_only_songs_on_top():
+    [plan] = plan_sync([apple_playlist(["P4", "P1"])], [local_state(["b.mp3", "a.mp3"])], {}, FILE_OF, set(FILE_OF.values()))
+    assert (plan.action, plan.local) == ("link", ["d.mp3", "b.mp3", "a.mp3"])
+    assert (plan.apple_remove, plan.apple_add) == ([(1, "P4")], ["b.mp3", "d.mp3"])

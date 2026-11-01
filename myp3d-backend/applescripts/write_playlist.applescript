@@ -26,15 +26,48 @@ on run argv
 		if currentDescription is missing value then set currentDescription to ""
 		if currentDescription is not newDescription then set description of targetPlaylist to newDescription
 
+		set removals to {}
+		set additions to {}
+		set AppleScript's text item delimiters to ":"
 		repeat with change in changes
 			set changeText to change as text
-			set trackId to text 2 thru -1 of changeText
+			if changeText starts with "-" then
+				set end of removals to {(text item 1 of (text 2 thru -1 of changeText)) as integer, text item 2 of changeText}
+			else
+				set end of additions to text 2 thru -1 of changeText
+			end if
+		end repeat
+		set AppleScript's text item delimiters to ""
+
+		set trackCount to count of tracks of targetPlaylist
+		repeat with removal in removals
+			set trackIndex to item 1 of removal
+			if trackIndex > trackCount then error "The playlist changed in Apple Music, check again" number 1
+			if persistent ID of track trackIndex of targetPlaylist is not (item 2 of removal) then error "The playlist changed in Apple Music, check again" number 1
+		end repeat
+
+		set shift to 0
+		set firstAddition to 1
+		if playlistId is not "" and (count of additions) > 0 and trackCount > 0 then
+			set probeId to (item 1 of additions) as text
+			set oldLast to persistent ID of track trackCount of targetPlaylist
+			duplicate (first track of library playlist 1 whose persistent ID is probeId) to targetPlaylist
+			set newCount to count of tracks of targetPlaylist
+			if (persistent ID of track 1 of targetPlaylist is not probeId) or (persistent ID of track newCount of targetPlaylist is not oldLast) then
+				if persistent ID of track newCount of targetPlaylist is probeId then delete track newCount of targetPlaylist
+				error "Set this playlist to Playlist Order, Descending in Apple Music" number 1
+			end if
+			set shift to 1
+			set firstAddition to 2
+		end if
+
+		repeat with removal in removals
+			delete track ((item 1 of removal) + shift) of targetPlaylist
+		end repeat
+
+		repeat with i from firstAddition to count of additions
 			try
-				if changeText starts with "-" then
-					delete (first track of targetPlaylist whose persistent ID is trackId)
-				else
-					duplicate (first track of library playlist 1 whose persistent ID is trackId) to targetPlaylist
-				end if
+				duplicate (first track of library playlist 1 whose persistent ID is ((item i of additions) as text)) to targetPlaylist
 			end try
 		end repeat
 
