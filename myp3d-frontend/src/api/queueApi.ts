@@ -35,6 +35,8 @@ export interface QueueItemUpdate {
   artist?: string;
   album?: string;
   cover_image_base64?: string | null;
+  start_time?: number | null;
+  end_time?: number | null;
   overwrite?: boolean;
 }
 

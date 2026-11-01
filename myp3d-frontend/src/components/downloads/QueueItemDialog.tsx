@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { Save, Scissors, X } from 'lucide-react';
+import { Save, X } from 'lucide-react';
 import { queueApi } from '../../api/queueApi';
 import type { QueueItem, QueueItemUpdate } from '../../api/queueApi';
 import { useDownloadForm } from '../../hooks/useDownloadForm';
-import { formatDuration } from '../../utils/formatters';
+import { useTrimPreview } from '../../hooks/useTrimPreview';
+import { getVideoIdFromUrl } from '../../utils/youtube';
 import { CoverCropModal } from '../cover/CoverCropModal';
 import { DownloadConfigSection } from '../download/DownloadConfigSection';
+import { TrimRangeSection } from '../download/TrimRangeSection';
 import { useToast } from '../messages/toastContext';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { useDownloadQueue } from './downloadQueueContext';
@@ -56,13 +58,23 @@ export function QueueItemDialog({ item, closing, onClose, onSaved }: QueueItemDi
     },
   });
 
+  const videoId = getVideoIdFromUrl(url);
+  const { containerRef: playerRef, ...trim } = useTrimPreview(videoId, { start: item.start_time ?? 0, end: item.end_time ?? 0 });
   const confirming = overwriteDialogProps.open;
-  const isTrimmed = item.start_time !== null && item.end_time !== null;
+
+  const handleUrlChange = (nextUrl: string) => {
+    if (getVideoIdFromUrl(nextUrl) !== videoId) trim.reset(null);
+    setUrl(nextUrl);
+  };
 
   const handleSave = async (event: FormEvent) => {
     event.preventDefault();
     if (!url.trim()) {
       showError('Please enter a YouTube URL');
+      return;
+    }
+    if (trim.hasDuration && !trim.hasTrimRange) {
+      showError('Trim end must be after start');
       return;
     }
 
@@ -80,6 +92,12 @@ export function QueueItemDialog({ item, closing, onClose, onSaved }: QueueItemDi
       overwrite,
     };
     if (coverImageBase64 !== initialCover) changes.cover_image_base64 = coverImageBase64 ?? null;
+    if (trim.hasDuration) {
+      changes.start_time = trim.shouldTrim ? trim.start : null;
+      changes.end_time = trim.shouldTrim ? trim.end : null;
+    }
+
+    trim.pause();
 
     setSaving(true);
     const saved = await update(item.id, changes);
@@ -100,7 +118,7 @@ export function QueueItemDialog({ item, closing, onClose, onSaved }: QueueItemDi
               <DownloadConfigSection
                 idPrefix="queue"
                 url={url}
-                onUrlChange={setUrl}
+                onUrlChange={handleUrlChange}
                 customFilename={customFilename}
                 onCustomFilenameChange={setCustomFilename}
                 filenameStatus={filenameStatus}
@@ -116,13 +134,10 @@ export function QueueItemDialog({ item, closing, onClose, onSaved }: QueueItemDi
                 disabled={saving}
               />
 
+              {videoId && <div ref={playerRef} className="downloads-dialog__player" aria-hidden="true" />}
+              <TrimRangeSection {...trim.trimRangeProps} disabled={saving || !trim.hasDuration} />
+
               <div className="downloads-dialog__actions">
-                {isTrimmed && (
-                  <span className="album-chip downloads-dialog__trim" title="Trim">
-                    <Scissors aria-hidden="true" />
-                    {formatDuration(item.start_time)} – {formatDuration(item.end_time)}
-                  </span>
-                )}
                 <IconButton icon={X} label="Cancel" onClick={onClose} disabled={saving} />
                 <IconButton type="submit" icon={Save} label="Save" variant="primary" busy={saving} disabled={saving} />
               </div>

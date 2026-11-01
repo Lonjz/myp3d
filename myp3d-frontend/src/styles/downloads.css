@@ -105,9 +105,15 @@
   gap: var(--space-2);
 }
 
-.downloads-dialog__trim {
-  margin-right: auto;
-  font-variant-numeric: tabular-nums;
+.downloads-dialog__player {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 200px;
+  height: 200px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .sidebar-link__activity {

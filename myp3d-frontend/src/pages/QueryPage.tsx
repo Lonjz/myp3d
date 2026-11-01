@@ -7,6 +7,7 @@ import type { DownloadRequest, YouTubeSearchResult } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
 import { DownloadConfigSection } from '../components/download/DownloadConfigSection';
 import { TrimRangeSection } from '../components/download/TrimRangeSection';
+import { YouTubePreview } from '../components/download/YouTubePreview';
 import { useToast } from '../components/messages/toastContext';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { IconButton } from '../components/ui/IconButton';
@@ -15,82 +16,10 @@ import { Spinner } from '../components/ui/Spinner';
 import { useDownloadForm } from '../hooks/useDownloadForm';
 import type { DownloadFormValues } from '../hooks/useDownloadForm';
 import { readStoredValue, useStoredValueWriter } from '../hooks/usePersistentState';
+import { useTrimPreview } from '../hooks/useTrimPreview';
+import type { TrimMode } from '../hooks/useTrimPreview';
 import { errorMessage, formatDuration } from '../utils/formatters';
-import { emitAppEvent, subscribeAppEvent } from '../utils/appEvents';
-import { getVideoIdFromUrl, getYouTubeThumbnailUrl } from '../utils/youtube';
-
-interface YouTubePlayer {
-  destroy?: () => void;
-  getCurrentTime?: () => number;
-  getDuration?: () => number;
-  seekTo?: (seconds: number, allowSeekAhead: boolean) => void;
-  playVideo?: () => void;
-  pauseVideo?: () => void;
-}
-
-interface YouTubePlayerOptions {
-  videoId: string;
-  height: string;
-  width: string;
-  playerVars: Record<string, string | number>;
-  events: {
-    onReady: () => void;
-    onStateChange: (event: { data: number }) => void;
-    onError: () => void;
-  };
-}
-
-interface YouTubeApi {
-  Player: new (element: HTMLElement, options: YouTubePlayerOptions) => YouTubePlayer;
-}
-
-type YouTubeWindow = Window & {
-  YT?: YouTubeApi;
-  onYouTubeIframeAPIReady?: () => void;
-};
-
-const loadYouTubeApi = (() => {
-  let promise: Promise<YouTubeApi> | null = null;
-
-  return () => {
-    const youtubeWindow = window as YouTubeWindow;
-    const existing = youtubeWindow.YT;
-    if (existing && existing.Player) {
-      return Promise.resolve(existing);
-    }
-
-    if (promise) {
-      return promise;
-    }
-
-    promise = new Promise<YouTubeApi>((resolve, reject) => {
-      const scriptId = 'youtube-iframe-api';
-      const existingScript = document.getElementById(scriptId) as HTMLScriptElement | null;
-
-      if (!existingScript) {
-        const script = document.createElement('script');
-        script.id = scriptId;
-        script.src = 'https://www.youtube.com/iframe_api';
-        script.async = true;
-        script.onerror = () => reject(new Error('Failed to load YouTube preview'));
-        document.body.appendChild(script);
-      }
-
-      const previousReady = youtubeWindow.onYouTubeIframeAPIReady;
-      youtubeWindow.onYouTubeIframeAPIReady = () => {
-        previousReady?.();
-        const ready = youtubeWindow.YT;
-        if (ready && ready.Player) {
-          resolve(ready);
-        } else {
-          reject(new Error('YouTube preview unavailable'));
-        }
-      };
-    });
-
-    return promise;
-  };
-})();
+import { getVideoIdFromUrl } from '../utils/youtube';
 
 const QUERY_DRAFT_KEY = 'query:draft';
 
@@ -101,7 +30,7 @@ interface QueryDraft {
   videoDuration: number | null;
   trimStart: number;
   trimEnd: number;
-  sliderMode: 'range' | 'playhead';
+  sliderMode: TrimMode;
   loopEnabled: boolean;
   form: DownloadFormValues;
 }
@@ -115,24 +44,13 @@ export function QueryPage() {
   const [selectedResult, setSelectedResult] = useState<YouTubeSearchResult | null>(initialDraft.selectedResult ?? null);
   const [selectedVideoId, setSelectedVideoId] = useState(initialDraft.selectedVideoId ?? '');
 
-  const [videoDuration, setVideoDuration] = useState<number | null>(initialDraft.videoDuration ?? null);
-  const [trimStart, setTrimStart] = useState(initialDraft.trimStart ?? 0);
-  const [trimEnd, setTrimEnd] = useState(initialDraft.trimEnd ?? 0);
-  const [isPlayerReady, setIsPlayerReady] = useState(false);
-  const [isSamplePlaying, setIsSamplePlaying] = useState(false);
-  const [previewError, setPreviewError] = useState<string | null>(null);
-  const [playheadTime, setPlayheadTime] = useState(0);
-  const [sliderMode, setSliderMode] = useState<'range' | 'playhead'>(initialDraft.sliderMode ?? 'range');
-  const [loopEnabled, setLoopEnabled] = useState(initialDraft.loopEnabled ?? true);
-
-  const playerContainerRef = useRef<HTMLDivElement | null>(null);
-  const playerRef = useRef<YouTubePlayer | null>(null);
-  const monitorRef = useRef<number | null>(null);
-  const trimStartRef = useRef(trimStart);
-  const trimEndRef = useRef(trimEnd);
-  const isSamplePlayingRef = useRef(isSamplePlaying);
-  const loopEnabledRef = useRef(loopEnabled);
-  const videoDurationRef = useRef(videoDuration);
+  const trim = useTrimPreview(selectedVideoId, {
+    duration: initialDraft.videoDuration,
+    start: initialDraft.trimStart,
+    end: initialDraft.trimEnd,
+    mode: initialDraft.sliderMode,
+    loop: initialDraft.loopEnabled,
+  });
 
   const { showError, clearToast } = useToast();
 
@@ -161,7 +79,7 @@ export function QueryPage() {
   } = useDownloadForm({
     initialValues: initialDraft.form,
     onSubmitted: () => {
-      resetTiming(null);
+      trim.reset(null);
       setSelectedResult(null);
       setSelectedVideoId('');
     },
@@ -172,22 +90,22 @@ export function QueryPage() {
       searchQuery,
       selectedResult,
       selectedVideoId,
-      videoDuration,
-      trimStart,
-      trimEnd,
-      sliderMode,
-      loopEnabled,
+      videoDuration: trim.duration,
+      trimStart: trim.start,
+      trimEnd: trim.end,
+      sliderMode: trim.mode,
+      loopEnabled: trim.loop,
       form: { url, customFilename, title, artist, album, cover: coverImageBase64 },
     }),
     [
       searchQuery,
       selectedResult,
       selectedVideoId,
-      videoDuration,
-      trimStart,
-      trimEnd,
-      sliderMode,
-      loopEnabled,
+      trim.duration,
+      trim.start,
+      trim.end,
+      trim.mode,
+      trim.loop,
       url,
       customFilename,
       title,
@@ -199,182 +117,6 @@ export function QueryPage() {
 
   useStoredValueWriter(QUERY_DRAFT_KEY, draft);
 
-  const hasDuration = Boolean(videoDuration && videoDuration > 0);
-  const hasTrimRange = hasDuration && trimEnd > trimStart;
-  const isFullRange =
-    hasDuration && trimStart <= 0.01 && trimEnd >= (videoDuration ?? 0) - 0.01;
-  const shouldTrim = hasTrimRange && !isFullRange;
-
-  useEffect(() => {
-    trimStartRef.current = trimStart;
-    trimEndRef.current = trimEnd;
-  }, [trimStart, trimEnd]);
-
-  useEffect(() => {
-    isSamplePlayingRef.current = isSamplePlaying;
-  }, [isSamplePlaying]);
-
-  useEffect(() => {
-    loopEnabledRef.current = loopEnabled;
-  }, [loopEnabled]);
-
-  useEffect(() => {
-    videoDurationRef.current = videoDuration;
-  }, [videoDuration]);
-
-  const resetTiming = (duration: number | null) => {
-    setVideoDuration(duration);
-    setTrimStart(0);
-    setTrimEnd(duration && duration > 0 ? duration : 0);
-    setPlayheadTime(0);
-  };
-
-  const stopMonitor = () => {
-    if (monitorRef.current) {
-      window.clearInterval(monitorRef.current);
-      monitorRef.current = null;
-    }
-  };
-
-  const startMonitor = () => {
-    stopMonitor();
-    monitorRef.current = window.setInterval(() => {
-      if (!playerRef.current) return;
-      const current = playerRef.current.getCurrentTime?.() ?? 0;
-      setPlayheadTime(current);
-      const currentStart = trimStartRef.current;
-      const currentEnd = trimEndRef.current;
-      if (currentEnd > currentStart && current >= currentEnd) {
-        if (loopEnabledRef.current) {
-          playerRef.current.seekTo?.(currentStart, true);
-          if (isSamplePlayingRef.current) {
-            playerRef.current.playVideo?.();
-          }
-          setPlayheadTime(currentStart);
-        } else {
-          playerRef.current.pauseVideo?.();
-          setIsSamplePlaying(false);
-          setPlayheadTime(currentEnd);
-          stopMonitor();
-        }
-      }
-    }, 200);
-  };
-
-  const canScrub = Boolean(selectedVideoId && isPlayerReady && !previewError);
-  const canSamplePlay = Boolean(selectedVideoId && isPlayerReady && hasTrimRange && !previewError);
-  const playHint = previewError
-    ? previewError
-    : !selectedVideoId
-      ? undefined
-      : !isPlayerReady
-        ? 'Loading preview...'
-        : !hasTrimRange
-          ? 'Select a trim range to enable playback.'
-          : undefined;
-
-  const handlePlayerReady = useEffectEvent(() => {
-    setIsPlayerReady(true);
-    const duration = playerRef.current?.getDuration?.() ?? 0;
-    const knownDuration = videoDurationRef.current;
-    if (duration > 0 && !(knownDuration && knownDuration > 0)) {
-      resetTiming(duration);
-    }
-    playerRef.current?.seekTo?.(trimStart || 0, true);
-    playerRef.current?.pauseVideo?.();
-    setPlayheadTime(trimStart);
-  });
-
-  const handlePlayerStateChange = useEffectEvent((state: number) => {
-    if (state === 1) {
-      emitAppEvent('preview-play');
-      setIsSamplePlaying(true);
-      startMonitor();
-    } else if (state === 2 || state === 0) {
-      setIsSamplePlaying(false);
-      stopMonitor();
-    }
-  });
-
-  useEffect(() => {
-    if (!selectedVideoId || !playerContainerRef.current) {
-      if (playerRef.current) {
-        playerRef.current.destroy?.();
-        playerRef.current = null;
-      }
-      stopMonitor();
-      setIsPlayerReady(false);
-      setIsSamplePlaying(false);
-      setPreviewError(null);
-      setPlayheadTime(0);
-      return undefined;
-    }
-
-    let cancelled = false;
-    setPreviewError(null);
-    setIsPlayerReady(false);
-    setIsSamplePlaying(false);
-
-    loadYouTubeApi()
-      .then((YT) => {
-        if (cancelled || !playerContainerRef.current) return;
-
-        if (playerRef.current) {
-          playerRef.current.destroy?.();
-        }
-
-        playerContainerRef.current.innerHTML = '';
-        const playerTarget = document.createElement('div');
-        playerTarget.className = 'query-player-iframe';
-        playerContainerRef.current.appendChild(playerTarget);
-
-        playerRef.current = new YT.Player(playerTarget, {
-          videoId: selectedVideoId,
-          height: '100%',
-          width: '100%',
-          playerVars: {
-            autoplay: 0,
-            controls: 0,
-            modestbranding: 1,
-            rel: 0,
-            playsinline: 1,
-            origin: window.location.origin,
-          },
-          events: {
-            onReady: () => {
-              if (!cancelled) handlePlayerReady();
-            },
-            onStateChange: (event: { data: number }) => {
-              if (!cancelled) handlePlayerStateChange(event.data);
-            },
-            onError: () => {
-              if (cancelled) return;
-              setPreviewError('This video cannot be embedded for preview.');
-            },
-          },
-        });
-      })
-      .catch((err: Error) => {
-        if (cancelled) return;
-        setPreviewError(err.message || 'Preview unavailable');
-      });
-
-    return () => {
-      cancelled = true;
-      stopMonitor();
-      if (playerRef.current) {
-        playerRef.current.destroy?.();
-        playerRef.current = null;
-      }
-      setIsPlayerReady(false);
-      setIsSamplePlaying(false);
-    };
-  }, [selectedVideoId]);
-
-  useEffect(() => () => stopMonitor(), []);
-
-  useEffect(() => subscribeAppEvent('player-play', () => playerRef.current?.pauseVideo?.()), []);
-
   const applySelectedResult = (result: YouTubeSearchResult) => {
     const fallbackVideoId = getVideoIdFromUrl(result.url);
     const nextDuration = result.duration ?? null;
@@ -385,7 +127,7 @@ export function QueryPage() {
     setTitle(result.title || '');
     setArtist(result.artist || '');
     setAlbum(result.album || '');
-    resetTiming(nextDuration);
+    trim.reset(nextDuration);
 
     clearToast();
   };
@@ -411,7 +153,7 @@ export function QueryPage() {
       if (results.length === 0) {
         setSelectedResult(null);
         setSelectedVideoId('');
-        resetTiming(null);
+        trim.reset(null);
         showError('No videos found. Try another search.');
       }
     } catch (err) {
@@ -432,7 +174,7 @@ export function QueryPage() {
     setSelectedVideoId(nextVideoId);
     if (!nextVideoId || nextVideoId !== selectedResult?.video_id) {
       setSelectedResult(null);
-      resetTiming(null);
+      trim.reset(null);
     }
   };
 
@@ -462,20 +204,16 @@ export function QueryPage() {
       showError('Please select a YouTube video or enter a URL');
       return null;
     }
-    if (hasDuration && !hasTrimRange) {
+    if (trim.hasDuration && !trim.hasTrimRange) {
       showError('Trim end must be after start');
       return null;
     }
 
-    if (playerRef.current) {
-      playerRef.current.pauseVideo?.();
-    }
-    stopMonitor();
-    setIsSamplePlaying(false);
+    trim.pause();
 
     return {
-      start_time: shouldTrim ? trimStart : undefined,
-      end_time: shouldTrim ? trimEnd : undefined,
+      start_time: trim.shouldTrim ? trim.start : undefined,
+      end_time: trim.shouldTrim ? trim.end : undefined,
     };
   };
 
@@ -488,37 +226,6 @@ export function QueryPage() {
   const handleQueue = async () => {
     const extra = prepareSubmit();
     if (extra) await queueDownload(extra);
-  };
-
-  const handleToggleSample = () => {
-    if (!playerRef.current || !canSamplePlay) return;
-    if (isSamplePlaying) {
-      playerRef.current.pauseVideo?.();
-      setIsSamplePlaying(false);
-      stopMonitor();
-      return;
-    }
-    const startTarget = sliderMode === 'playhead' ? playheadTime : trimStart;
-    const safeStart = hasTrimRange
-      ? Math.min(Math.max(startTarget, trimStart), Math.max(trimStart, trimEnd - 0.05))
-      : startTarget;
-    playerRef.current.seekTo?.(safeStart || 0, true);
-    setPlayheadTime(safeStart);
-    playerRef.current.playVideo?.();
-    setIsSamplePlaying(true);
-    startMonitor();
-  };
-
-  const handlePlayheadChange = (value: number) => {
-    setPlayheadTime(value);
-    if (!playerRef.current || !canScrub) {
-      return;
-    }
-    playerRef.current.seekTo?.(value, true);
-    if (isSamplePlayingRef.current) {
-      playerRef.current.playVideo?.();
-      startMonitor();
-    }
   };
 
   return (
@@ -578,29 +285,13 @@ export function QueryPage() {
 
         <section className="query-main">
           <div className="query-preview-card glass">
-            {selectedVideoId ? (
-              previewError ? (
-                <div className="query-empty-player">{previewError}</div>
-              ) : (
-                <div className="query-player-outer">
-                  <div className="query-player-wrap" ref={playerContainerRef}></div>
-                  {!isSamplePlaying && (
-                    <img
-                      className="query-player-thumb-overlay"
-                      src={
-                        selectedResult?.thumbnail_url ||
-                        getYouTubeThumbnailUrl(selectedVideoId)
-                      }
-                      alt=""
-                    />
-                  )}
-                </div>
-              )
-            ) : (
-              <div className="query-empty-player" aria-label="No preview">
-                <MonitorPlay aria-hidden="true" />
-              </div>
-            )}
+            <YouTubePreview
+              videoId={selectedVideoId}
+              thumbnailUrl={selectedResult?.thumbnail_url}
+              containerRef={trim.containerRef}
+              isPlaying={trim.isPlaying}
+              previewError={trim.previewError}
+            />
           </div>
 
           <form onSubmit={handleSubmit} className="download-form glass">
@@ -642,24 +333,9 @@ export function QueryPage() {
             />
 
             <TrimRangeSection
-              duration={videoDuration}
-              start={trimStart}
-              end={trimEnd}
-              step={0.1}
-              disabled={downloading || !hasDuration}
-              playhead={playheadTime}
-              isPlaying={isSamplePlaying}
-              canPlay={canSamplePlay && !downloading}
-              playHint={playHint}
-              onTogglePlay={handleToggleSample}
-              loopEnabled={loopEnabled}
-              onToggleLoop={() => setLoopEnabled((value) => !value)}
-              mode={sliderMode}
-              onModeChange={setSliderMode}
-              canScrub={canScrub}
-              onPlayheadChange={handlePlayheadChange}
-              onStartChange={setTrimStart}
-              onEndChange={setTrimEnd}
+              {...trim.trimRangeProps}
+              disabled={downloading || !trim.hasDuration}
+              canPlay={trim.trimRangeProps.canPlay && !downloading}
             />
           </form>
         </section>

@@ -181,6 +181,9 @@ def update_item(item_id: int, update: QueueItemUpdate) -> QueueItem:
             values[name] = _clean(getattr(update, name))
     if "cover_image_base64" in fields:
         values["cover"] = _square_cover(update.cover_image_base64)
+    if fields & {"start_time", "end_time"}:
+        validate_trim_range(update.start_time, update.end_time)
+        values.update(start_time=update.start_time, end_time=update.end_time)
     if update.overwrite is not None:
         values["overwrite"] = int(update.overwrite)
 

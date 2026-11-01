@@ -25,6 +25,28 @@ def test_add_edit_and_delete(client, library, youtube):
     assert queue(client) == []
 
 
+def test_edit_the_trim(client, library, youtube):
+    video = youtube.add_video(seconds=6)
+    [item] = client.post("/queue", json={"items": [{"url": video.url, "custom_filename": "trimmed"}]}).json()
+
+    edited = client.patch(f"/queue/{item['id']}", json={"start_time": 1, "end_time": 3}).json()
+    assert (edited["start_time"], edited["end_time"]) == (1, 3)
+    assert client.patch(f"/queue/{item['id']}", json={"start_time": 3, "end_time": 1}).status_code == 400
+    assert client.patch(f"/queue/{item['id']}", json={"start_time": 2}).status_code == 400
+
+    client.post("/queue/start", json={})
+    settled(client)
+    [download] = youtube.downloads()
+    assert download.opts["download_ranges"].ranges == [(1, 3)]
+
+
+def test_clear_the_trim(client, library, youtube):
+    video = youtube.add_video()
+    [item] = client.post("/queue", json={"items": [{"url": video.url, "start_time": 1, "end_time": 2}]}).json()
+    cleared = client.patch(f"/queue/{item['id']}", json={"start_time": None, "end_time": None}).json()
+    assert (cleared["start_time"], cleared["end_time"]) == (None, None)
+
+
 def test_items_wait_until_started(client, library, youtube):
     videos = [youtube.add_video(f"Song {index}") for index in range(3)]
     client.post("/queue", json={"items": [{"url": video.url, "custom_filename": f"song {index}"} for index, video in enumerate(videos)]})

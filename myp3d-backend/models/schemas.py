@@ -48,6 +48,8 @@ class QueueItemUpdate(BaseModel):
     artist: Optional[str] = None
     album: Optional[str] = None
     cover_image_base64: Optional[str] = None
+    start_time: Optional[float] = None
+    end_time: Optional[float] = None
     overwrite: Optional[bool] = None
 
 
