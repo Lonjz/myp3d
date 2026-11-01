@@ -441,7 +441,7 @@ export function LibraryPage() {
           onClose={() => setEditOpen(false)}
           onSaved={() => {
             setEditOpen(false);
-            selection.clear();
+            mp3Api.listAll().then(selection.refresh, () => undefined);
           }}
         />
       )}
@@ -451,10 +451,7 @@ export function LibraryPage() {
           filenames={selection.filenames}
           closing={playlistPresence.closing}
           onClose={() => setPlaylistOpen(false)}
-          onAdded={() => {
-            setPlaylistOpen(false);
-            selection.clear();
-          }}
+          onAdded={() => setPlaylistOpen(false)}
         />
       )}
     </div>

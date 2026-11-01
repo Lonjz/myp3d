@@ -40,6 +40,16 @@ export function useTrackSelection() {
     });
   }, []);
 
+  const refresh = useCallback((tracks: MP3Info[]) => {
+    setSelected((current) => {
+      const next = new Map(current);
+      tracks.forEach((track) => {
+        if (next.has(track.filename)) next.set(track.filename, track);
+      });
+      return next;
+    });
+  }, []);
+
   const clear = useCallback(() => {
     anchorRef.current = null;
     setSelected((current) => (current.size === 0 ? current : new Map()));
@@ -49,5 +59,5 @@ export function useTrackSelection() {
   const filenames = useMemo(() => [...selected.keys()], [selected]);
   const isSelected = useCallback((filename: string) => selected.has(filename), [selected]);
 
-  return { size: selected.size, tracks, filenames, isSelected, toggle, selectMany, deselect, clear };
+  return { size: selected.size, tracks, filenames, isSelected, toggle, selectMany, deselect, refresh, clear };
 }
