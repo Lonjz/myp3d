@@ -91,12 +91,7 @@ export function useCoverImageCrop({
 
     try {
       const dataUrl = await fileToDataUrl(file);
-      const { naturalWidth: width, naturalHeight: height } = await loadImage(dataUrl);
-      if (width === height && width >= COVER_SIZE) {
-        await applyCover(dataUrl, { x: 0, y: 0, width, height });
-        return;
-      }
-
+      await loadImage(dataUrl);
       setCropSource(dataUrl);
       setCrop({ x: 0, y: 0 });
       setZoom(1);

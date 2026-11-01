@@ -21,13 +21,35 @@ interface CoverCropModalProps {
   onApply: () => void;
 }
 
-function CropDialog({ closing, busy, onCancel, children }: { closing: boolean; busy: boolean; onCancel: () => void; children: ReactNode }) {
+function CropDialog({
+  closing,
+  busy,
+  onCancel,
+  onSettled,
+  children,
+}: {
+  closing: boolean;
+  busy: boolean;
+  onCancel: () => void;
+  onSettled: () => void;
+  children: ReactNode;
+}) {
   const panelRef = useRef<HTMLDivElement>(null);
   useDialog(panelRef, { onClose: onCancel, locked: busy || closing });
 
   return (
     <div className="crop-modal-backdrop motion-fade" data-state={closing ? 'closed' : 'open'}>
-      <div ref={panelRef} className="crop-modal glass motion-pop" role="dialog" aria-modal="true" aria-label="Crop cover" tabIndex={-1}>
+      <div
+        ref={panelRef}
+        className="crop-modal glass motion-pop"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Crop cover"
+        tabIndex={-1}
+        onAnimationEnd={(event) => {
+          if (event.target === event.currentTarget) onSettled();
+        }}
+      >
         {children}
       </div>
     </div>
@@ -47,13 +69,15 @@ export function CoverCropModal({
   onCancel,
   onApply,
 }: CoverCropModalProps) {
+  const cropperRef = useRef<Cropper>(null);
   const { value: source, closing } = useLingering(isOpen ? cropSource : null);
   if (!source) return null;
 
   return (
-    <CropDialog closing={closing} busy={isApplyingCrop} onCancel={onCancel}>
+    <CropDialog closing={closing} busy={isApplyingCrop} onCancel={onCancel} onSettled={() => cropperRef.current?.computeSizes()}>
       <div className="cropper-wrap">
         <Cropper
+          ref={cropperRef}
           image={source}
           crop={crop}
           zoom={zoom}
