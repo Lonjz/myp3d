@@ -135,7 +135,7 @@ export function QueueItemDialog({ item, closing, onClose, onSaved }: QueueItemDi
               />
 
               {videoId && <div ref={playerRef} className="downloads-dialog__player" aria-hidden="true" />}
-              <TrimRangeSection {...trim.trimRangeProps} disabled={saving || !trim.hasDuration} />
+              <TrimRangeSection {...trim.trimRangeProps} disabled={saving} />
 
               <div className="downloads-dialog__actions">
                 <IconButton icon={X} label="Cancel" onClick={onClose} disabled={saving} />

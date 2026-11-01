@@ -334,7 +334,7 @@ export function QueryPage() {
 
             <TrimRangeSection
               {...trim.trimRangeProps}
-              disabled={downloading || !trim.hasDuration}
+              disabled={downloading}
               canPlay={trim.trimRangeProps.canPlay && !downloading}
             />
           </form>

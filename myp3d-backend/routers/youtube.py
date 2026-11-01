@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException, Query
 
-from models.schemas import YouTubeSearchResponse
+from models.schemas import SilenceBoundsRequest, TrimRange, YouTubeSearchResponse
+from services import health_service
+from services.errors import AppError
 from services.youtube_service import search_youtube
 
 router = APIRouter(tags=["YouTube"])
@@ -18,3 +20,13 @@ def youtube_search(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"YouTube search failed: {exc}") from exc
+
+
+@router.post("/youtube/silence", response_model=TrimRange)
+def youtube_silence(payload: SilenceBoundsRequest):
+    try:
+        return health_service.silence_bounds(payload.url)
+    except AppError:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Couldn't read the audio: {exc}") from exc

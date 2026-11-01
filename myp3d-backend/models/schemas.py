@@ -147,6 +147,16 @@ class TrimRequest(BaseModel):
     filenames: list[str] = Field(min_length=1)
 
 
+class SilenceBoundsRequest(BaseModel):
+    url: str = Field(min_length=1)
+
+
+class TrimRange(BaseModel):
+    start: float
+    end: float
+    duration: float
+
+
 class NamingTrack(MP3Info):
     suggested: Optional[str] = None
 

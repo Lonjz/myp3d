@@ -1,5 +1,8 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { mp3Api } from '../api/mp3Api';
+import { useToast } from '../components/messages/toastContext';
 import { emitAppEvent, subscribeAppEvent } from '../utils/appEvents';
+import { errorMessage } from '../utils/formatters';
 
 interface YouTubePlayer {
   destroy?: () => void;
@@ -74,6 +77,8 @@ const loadYouTubeApi = (() => {
   };
 })();
 
+const EDGE_SECONDS = 3;
+
 export type TrimMode = 'range' | 'playhead';
 
 export interface TrimTiming {
@@ -94,6 +99,8 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
   const [playhead, setPlayhead] = useState(0);
   const [mode, setMode] = useState<TrimMode>(initial.mode ?? 'range');
   const [loop, setLoop] = useState(initial.loop ?? true);
+  const [smartTrimming, setSmartTrimming] = useState(false);
+  const { showError } = useToast();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<YouTubePlayer | null>(null);
@@ -102,6 +109,8 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
   const endRef = useRef(end);
   const isPlayingRef = useRef(isPlaying);
   const loopRef = useRef(loop);
+  const edgeRef = useRef<'head' | 'tail' | null>(null);
+  const videoIdRef = useRef(videoId);
 
   const previewError = failure?.videoId === videoId ? failure.message : null;
   const hasDuration = Boolean(duration && duration > 0);
@@ -121,6 +130,10 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
   useEffect(() => {
     loopRef.current = loop;
   }, [loop]);
+
+  useEffect(() => {
+    videoIdRef.current = videoId;
+  }, [videoId]);
 
   const reset = (nextDuration: number | null) => {
     setDuration(nextDuration);
@@ -144,6 +157,20 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
       setPlayhead(current);
       const currentStart = startRef.current;
       const currentEnd = endRef.current;
+      if (edgeRef.current === 'head' && current >= currentStart + EDGE_SECONDS) {
+        edgeRef.current = 'tail';
+        playerRef.current.seekTo?.(currentEnd - EDGE_SECONDS, true);
+        setPlayhead(currentEnd - EDGE_SECONDS);
+        return;
+      }
+      if (edgeRef.current === 'tail' && current >= currentEnd) {
+        edgeRef.current = null;
+        playerRef.current.pauseVideo?.();
+        setIsPlaying(false);
+        setPlayhead(currentEnd);
+        stopMonitor();
+        return;
+      }
       if (currentEnd > currentStart && current >= currentEnd) {
         if (loopRef.current) {
           playerRef.current.seekTo?.(currentStart, true);
@@ -162,6 +189,7 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
   };
 
   const pause = () => {
+    edgeRef.current = null;
     playerRef.current?.pauseVideo?.();
     stopMonitor();
     setIsPlaying(false);
@@ -280,6 +308,7 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
       pause();
       return;
     }
+    edgeRef.current = null;
     const startTarget = mode === 'playhead' ? playhead : start;
     const safeStart = Math.min(Math.max(startTarget, start), Math.max(start, end - 0.05));
     playerRef.current.seekTo?.(safeStart || 0, true);
@@ -290,6 +319,7 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
   };
 
   const changePlayhead = (value: number) => {
+    edgeRef.current = null;
     setPlayhead(value);
     if (!playerRef.current || !canScrub) {
       return;
@@ -298,6 +328,36 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
     if (isPlayingRef.current) {
       playerRef.current.playVideo?.();
       startMonitor();
+    }
+  };
+
+  const playEdges = () => {
+    if (!playerRef.current || !canPlay) return;
+    edgeRef.current = end - start > EDGE_SECONDS * 2 ? 'head' : 'tail';
+    playerRef.current.seekTo?.(start, true);
+    setPlayhead(start);
+    playerRef.current.playVideo?.();
+    setIsPlaying(true);
+    startMonitor();
+  };
+
+  const smartTrim = async () => {
+    if (!videoId) return;
+    const requested = videoId;
+    pause();
+    setSmartTrimming(true);
+    try {
+      const range = await mp3Api.silenceBounds(`https://www.youtube.com/watch?v=${requested}`);
+      if (requested !== videoIdRef.current) return;
+      const total = hasDuration && duration ? duration : range.duration;
+      const nextEnd = Math.min(range.end, total);
+      setDuration(total);
+      setStart(range.start);
+      setEnd(nextEnd);
+    } catch (err) {
+      showError(errorMessage(err, "Couldn't find the silence"));
+    } finally {
+      setSmartTrimming(false);
     }
   };
 
@@ -333,6 +393,9 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
       onPlayheadChange: changePlayhead,
       onStartChange: setStart,
       onEndChange: setEnd,
+      onSmartTrim: videoId ? () => void smartTrim() : undefined,
+      smartTrimming,
+      onPlayEdges: playEdges,
     },
   };
 }

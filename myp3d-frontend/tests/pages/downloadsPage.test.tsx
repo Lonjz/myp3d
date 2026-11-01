@@ -4,6 +4,8 @@ import { backend } from '../fakeBackend';
 import { makeQueueItem } from '../factories';
 import { renderApp } from '../render';
 
+let plays = 0;
+
 class FakePlayer {
   constructor(_: HTMLElement, options: { events: { onReady: () => void } }) {
     queueMicrotask(() => options.events.onReady());
@@ -12,13 +14,16 @@ class FakePlayer {
   getCurrentTime = () => 0;
   seekTo = () => undefined;
   pauseVideo = () => undefined;
-  playVideo = () => undefined;
+  playVideo = () => {
+    plays += 1;
+  };
   destroy = () => undefined;
 }
 
 describe('DownloadsPage', () => {
   afterEach(() => {
     delete (window as { YT?: unknown }).YT;
+    plays = 0;
   });
 
   it('saves a new trim for a queued download', async () => {
@@ -55,5 +60,26 @@ describe('DownloadsPage', () => {
     await waitFor(() => expect(backend.requestsTo('PATCH', `/queue/${item.id}`)).toHaveLength(1));
     const [patch] = backend.requestsTo('PATCH', `/queue/${item.id}`);
     expect(patch.body).toMatchObject({ start_time: null, end_time: null });
+  });
+
+  it('trims the silence without playing', async () => {
+    Object.assign(window, { YT: { Player: FakePlayer } });
+    const item = makeQueueItem({ title: 'Landslide' });
+    backend.seed({ queue: [item] });
+    const { user } = renderApp('/downloads');
+
+    await user.click(await screen.findByText('Landslide'));
+    const start = await screen.findByRole('slider', { name: 'Trim start time' });
+    await waitFor(() => expect(start).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Trim silence' }));
+
+    await waitFor(() => expect(start).toHaveValue('1.5'));
+    expect(screen.getByRole('slider', { name: 'Trim end time' })).toHaveValue('197.5');
+    expect(plays).toBe(0);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(backend.requestsTo('PATCH', `/queue/${item.id}`)).toHaveLength(1));
+    const [patch] = backend.requestsTo('PATCH', `/queue/${item.id}`);
+    expect(patch.body).toMatchObject({ start_time: 1.5, end_time: 197.5 });
   });
 });

@@ -48,19 +48,21 @@ def ffmpeg_path() -> Optional[str]:
     return shutil.which("ffmpeg")
 
 
-def _audio_key(seconds: float, freq: int, silence_tail: float, mono: bool) -> str:
-    return f"{seconds:g}s-{freq}hz-{silence_tail:g}pad{'-mono' if mono else ''}.mp3"
+def _audio_key(seconds: float, freq: int, silence_tail: float, mono: bool, silence_head: float) -> str:
+    head = f"{silence_head:g}lead-" if silence_head else ""
+    return f"{head}{seconds:g}s-{freq}hz-{silence_tail:g}pad{'-mono' if mono else ''}.mp3"
 
 
-def make_audio(cache_dir: Path, seconds: float, freq: int, silence_tail: float = 0, mono: bool = False) -> Path:
+def make_audio(cache_dir: Path, seconds: float, freq: int, silence_tail: float = 0, mono: bool = False, silence_head: float = 0) -> Path:
     cache_dir.mkdir(parents=True, exist_ok=True)
-    path = cache_dir / _audio_key(seconds, freq, silence_tail, mono)
+    path = cache_dir / _audio_key(seconds, freq, silence_tail, mono, silence_head)
     if path.exists():
         return path
     ffmpeg = ffmpeg_path()
     if ffmpeg is None:
         raise RuntimeError("ffmpeg isn't installed")
-    pad = ["-af", f"apad=pad_dur={silence_tail:g}"] if silence_tail else []
+    filters = ([f"adelay={silence_head * 1000:g}:all=1"] if silence_head else []) + ([f"apad=pad_dur={silence_tail:g}"] if silence_tail else [])
+    pad = ["-af", ",".join(filters)] if filters else []
     layout = ["-ac", "1" if mono else "2", "-ar", "44100", "-b:a", "64k"]
     partial = path.with_suffix(".part.mp3")
     subprocess.run(

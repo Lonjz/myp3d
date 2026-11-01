@@ -1,3 +1,5 @@
+import pytest
+
 from services import favorite_service, playlist_service
 from tests.conftest import wait_for
 
@@ -60,3 +62,22 @@ def test_artist_issues_and_fix(client, seeded_library):
     tags = seeded_library.tags("doves in the wind.mp3")
     assert (tags["title"], tags["artist"]) == ("Doves in the Wind (feat. Kendrick Lamar)", "SZA")
     assert client.get("/health/artists").json() == []
+
+
+def test_silence_bounds_skip_quiet_edges(client, library, youtube):
+    video = youtube.add_video(seconds=3, silence_head=1, silence_tail=1.5)
+    bounds = client.post("/youtube/silence", json={"url": video.url}).json()
+    assert bounds["start"] == pytest.approx(0.9, abs=0.1)
+    assert bounds["end"] == pytest.approx(bounds["duration"] - 1.4, abs=0.1)
+    assert bounds["duration"] == pytest.approx(5.5, abs=0.15)
+    assert library.names() == []
+
+
+def test_silent_video_has_no_bounds(client, library, youtube):
+    video = youtube.add_video(freq=0)
+    assert client.post("/youtube/silence", json={"url": video.url}).status_code == 422
+
+
+def test_silence_bounds_report_download_errors(client, library, youtube):
+    youtube.fail_next()
+    assert client.post("/youtube/silence", json={"url": "https://youtu.be/missing"}).status_code == 502

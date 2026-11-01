@@ -156,7 +156,7 @@ def web(network_guard, monkeypatch) -> FakeWeb:
 
 @pytest.fixture(autouse=True)
 def youtube(monkeypatch) -> FakeYoutube:
-    fake = FakeYoutube(lambda seconds, freq: seed.make_audio(AUDIO_CACHE, seconds, freq))
+    fake = FakeYoutube(lambda seconds, freq, head=0, tail=0: seed.make_audio(AUDIO_CACHE, seconds, freq, tail, silence_head=head))
     monkeypatch.setattr(youtube_service, "YoutubeDL", fake.ydl)
     return fake
 

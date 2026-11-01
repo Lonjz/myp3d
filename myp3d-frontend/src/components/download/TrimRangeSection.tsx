@@ -1,5 +1,5 @@
 import type { ChangeEvent, CSSProperties } from 'react';
-import { ArrowLeftToLine, ArrowRightToLine, Clock, Crosshair, Pause, Play, Repeat, Scissors } from 'lucide-react';
+import { ArrowLeftToLine, ArrowRightToLine, Clock, Crosshair, FoldHorizontal, Pause, Play, Repeat, Scissors, WandSparkles } from 'lucide-react';
 import { IconButton } from '../ui/IconButton';
 import { formatDuration } from '../../utils/formatters';
 
@@ -22,6 +22,9 @@ interface TrimRangeSectionProps {
   onPlayheadChange?: (value: number) => void;
   onStartChange: (value: number) => void;
   onEndChange: (value: number) => void;
+  onSmartTrim?: () => void;
+  smartTrimming?: boolean;
+  onPlayEdges?: () => void;
 }
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
@@ -45,6 +48,9 @@ export function TrimRangeSection({
   onPlayheadChange,
   onStartChange,
   onEndChange,
+  onSmartTrim,
+  smartTrimming = false,
+  onPlayEdges,
 }: TrimRangeSectionProps) {
   const isDisabled = disabled || !duration || duration <= 0;
   const isScrubDisabled = disabled || !duration || duration <= 0 || !canScrub;
@@ -104,7 +110,20 @@ export function TrimRangeSection({
               active={loopEnabled}
               aria-pressed={loopEnabled}
               onClick={onToggleLoop}
-              disabled={disabled}
+              disabled={isDisabled}
+            />
+          ) : null}
+          {onPlayEdges ? (
+            <IconButton icon={FoldHorizontal} label="Play edges" size="sm" onClick={onPlayEdges} disabled={!canPlay} />
+          ) : null}
+          {onSmartTrim ? (
+            <IconButton
+              icon={WandSparkles}
+              label="Trim silence"
+              size="sm"
+              busy={smartTrimming}
+              onClick={onSmartTrim}
+              disabled={disabled || smartTrimming}
             />
           ) : null}
           <IconButton
@@ -112,7 +131,7 @@ export function TrimRangeSection({
             label={mode === 'range' ? 'Trim mode' : 'Scrub mode'}
             size="sm"
             onClick={() => onModeChange(mode === 'range' ? 'playhead' : 'range')}
-            disabled={disabled}
+            disabled={isDisabled}
           />
         </div>
         <span className="trim-range-duration" title="Video length">

@@ -73,6 +73,12 @@ export interface YouTubeSearchResult {
   duration: number | null;
 }
 
+export interface TrimRange {
+  start: number;
+  end: number;
+  duration: number;
+}
+
 interface MetadataUpdate {
   title?: string;
   artist?: string;
@@ -286,6 +292,10 @@ export const mp3Api = {
       'Failed to search YouTube',
     );
     return payload.results || [];
+  },
+
+  silenceBounds(url: string): Promise<TrimRange> {
+    return apiFetch('/youtube/silence', jsonInit('POST', { url }), "Couldn't find the silence");
   },
 
   getInfo(filename: string): Promise<MP3Info> {

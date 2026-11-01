@@ -2,6 +2,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 import threading
 from array import array
 from concurrent.futures import ThreadPoolExecutor
@@ -21,12 +22,14 @@ from models.schemas import (
     RenameItem,
     SilenceScanInfo,
     SilentTrack,
+    TrimRange,
 )
 from services import track_records
 from services.audio_fingerprint import splice_audio
 from services.config import OUTPUT_DIR, get_ffmpeg_path
 from services.mp3_service import IN_USE, invalidate_library_cache, list_mp3_infos
 from services.spotify_service import default_filename, format_title
+from services.youtube_service import audio_opts, extract_info
 from services.errors import AppError
 from services.filenames import is_track_name
 
@@ -39,6 +42,8 @@ CHANNELS = 2
 SCAN_BLOCK = 4410
 SILENCE_LEVEL = 1
 KEEP_PAD_S = 0.25
+SMART_SILENCE_LEVEL = 33
+SMART_PAD_S = 0.1
 SCAN_WORKERS = 4
 FFMPEG_TIMEOUT_S = 120.0
 
@@ -99,18 +104,51 @@ def _decode(path: Path, window: Optional[int]) -> array:
     return samples
 
 
-def _trailing_silence(samples: array) -> Optional[float]:
+def _trailing_silence(samples: array, level: int = SILENCE_LEVEL) -> Optional[float]:
     frames = len(samples) // CHANNELS
     end = frames * CHANNELS
     while end > 0:
         start = max(0, end - SCAN_BLOCK)
         block = samples[start:end]
-        if max(block) > SILENCE_LEVEL or min(block) < -SILENCE_LEVEL:
+        if max(block) > level or min(block) < -level:
             for index in range(end - 1, start - 1, -1):
-                if abs(samples[index]) > SILENCE_LEVEL:
+                if abs(samples[index]) > level:
                     return (frames - 1 - index // CHANNELS) / SAMPLE_RATE
         end = start
     return None
+
+
+def _leading_silence(samples: array, level: int) -> Optional[float]:
+    total = len(samples) // CHANNELS * CHANNELS
+    start = 0
+    while start < total:
+        end = min(total, start + SCAN_BLOCK)
+        block = samples[start:end]
+        if max(block) > level or min(block) < -level:
+            for index in range(start, end):
+                if abs(samples[index]) > level:
+                    return index // CHANNELS / SAMPLE_RATE
+        start = end
+    return None
+
+
+def silence_bounds(url: str) -> TrimRange:
+    with tempfile.TemporaryDirectory() as folder:
+        extract_info(audio_opts(str(Path(folder) / "audio.%(ext)s")), url, download=True)
+        downloaded = [path for path in Path(folder).iterdir() if path.is_file()]
+        if len(downloaded) != 1:
+            raise AppError(502, "Couldn't download the audio")
+        samples = _decode(downloaded[0], None)
+    lead = _leading_silence(samples, SMART_SILENCE_LEVEL)
+    tail = _trailing_silence(samples, SMART_SILENCE_LEVEL)
+    if lead is None or tail is None:
+        raise AppError(422, "The video is silent")
+    duration = len(samples) // CHANNELS / SAMPLE_RATE
+    return TrimRange(
+        start=round(max(0.0, lead - SMART_PAD_S), 2),
+        end=round(min(duration, duration - tail + SMART_PAD_S), 2),
+        duration=round(duration, 2),
+    )
 
 
 def _measure_tail(path: Path, duration: float) -> Optional[float]:

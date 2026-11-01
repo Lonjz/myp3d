@@ -110,6 +110,25 @@ def validate_trim_range(start_time: Optional[float], end_time: Optional[float]) 
             raise ValueError("Trim end must be greater than start")
 
 
+def audio_opts(outtmpl: str) -> dict:
+    opts: dict = {
+        "format": "bestaudio/best",
+        "outtmpl": outtmpl,
+        "js_runtimes": {
+            "node": {},
+        },
+        "quiet": True,
+        "noplaylist": True,
+    }
+    player_client_args = get_player_client_args()
+    if player_client_args:
+        opts["extractor_args"] = player_client_args
+    ffmpeg_path = get_ffmpeg_path()
+    if ffmpeg_path:
+        opts["ffmpeg_location"] = ffmpeg_path
+    return opts
+
+
 def download_as_mp3(
     url: str,
     metadata: Optional[dict] = None,
@@ -134,19 +153,13 @@ def _download_as_mp3(
     end_time: Optional[float],
     progress_hook: Optional[Callable[[dict], None]],
 ) -> str:
-    ffmpeg_path = get_ffmpeg_path()
-
     if custom_name:
         outtmpl = str(OUTPUT_DIR / f"{custom_name.replace('%', '%%')}.%(ext)s")
     else:
         outtmpl = str(OUTPUT_DIR / "%(title)s.%(ext)s")
 
     ydl_opts = {
-        "format": "bestaudio/best",
-        "outtmpl": outtmpl,
-        "js_runtimes": {
-            "node": {},
-        },
+        **audio_opts(outtmpl),
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
@@ -154,20 +167,11 @@ def _download_as_mp3(
                 "preferredquality": "320",
             }
         ],
-        "quiet": True,
-        "noplaylist": True,
     }
-
-    player_client_args = get_player_client_args()
-    if player_client_args:
-        ydl_opts["extractor_args"] = player_client_args
 
     if start_time is not None and end_time is not None:
         ydl_opts["download_ranges"] = download_range_func(None, [(start_time, end_time)])
         ydl_opts["force_keyframes_at_cuts"] = True
-
-    if ffmpeg_path:
-        ydl_opts["ffmpeg_location"] = ffmpeg_path
 
     if progress_hook:
         ydl_opts["progress_hooks"] = [progress_hook]

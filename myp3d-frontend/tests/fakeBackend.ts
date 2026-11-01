@@ -282,6 +282,7 @@ const handlers = [
     return { tracks: tracks.slice(0, limit), albums: albums().filter((album) => album.album_name.toLowerCase().includes(query)).slice(0, limit) };
   }),
   route('get', '/youtube/search', ({ url }) => ({ query: url.searchParams.get('query'), results: store.youtube })),
+  route('post', '/youtube/silence', () => ({ start: 1.5, end: 197.5, duration: 200 })),
   route('post', '/download', ({ body }) => {
     const request = body as { url: string; custom_filename?: string; title?: string; artist?: string; album?: string };
     const filename = `${(request.custom_filename || request.title || 'download').toLowerCase()}.mp3`;

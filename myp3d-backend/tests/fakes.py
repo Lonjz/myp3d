@@ -22,6 +22,8 @@ class Video:
     uploader: str = "Fake Channel"
     seconds: float = 3
     freq: int = 440
+    silence_head: float = 0
+    silence_tail: float = 0
 
 
 @dataclass
@@ -32,7 +34,7 @@ class YoutubeCall:
 
 
 class FakeYoutube:
-    def __init__(self, make_audio: Callable[[float, int], Path]) -> None:
+    def __init__(self, make_audio: Callable[..., Path]) -> None:
         self._make_audio = make_audio
         self.videos: dict[str, Video] = {}
         self.search_results: list[Video] = []
@@ -49,9 +51,10 @@ class FakeYoutube:
         if self._gate is not None:
             self._gate.set()
 
-    def add_video(self, title: str = "Fake Video", uploader: str = "Fake Channel", seconds: float = 3, freq: int = 440, video_id: Optional[str] = None) -> Video:
+    def add_video(self, title: str = "Fake Video", uploader: str = "Fake Channel", seconds: float = 3, freq: int = 440, video_id: Optional[str] = None,
+                  silence_head: float = 0, silence_tail: float = 0) -> Video:
         video_id = video_id or f"vid{len(self.videos):08d}"[:11]
-        video = Video(f"https://www.youtube.com/watch?v={video_id}", video_id, title, uploader, seconds, freq)
+        video = Video(f"https://www.youtube.com/watch?v={video_id}", video_id, title, uploader, seconds, freq, silence_head, silence_tail)
         self.videos[video.url] = video
         return video
 
@@ -104,13 +107,13 @@ class FakeYoutubeDL:
             raise DownloadError(f"ERROR: [youtube] {url}: Video unavailable")
         info = self._info(video)
         if download:
-            seconds = video.seconds
             ranges = self.opts.get("download_ranges")
-            if ranges is not None:
+            if ranges is None:
+                source = self.youtube._make_audio(video.seconds, video.freq, video.silence_head, video.silence_tail)
+            else:
                 start, end = ranges.ranges[0]
-                seconds = max(1, round(end - start))
+                source = self.youtube._make_audio(max(1, round(end - start)), video.freq)
             target = Path(_render(self.opts["outtmpl"], {**info, "ext": "mp3"}))
-            source = self.youtube._make_audio(seconds, video.freq)
             size = source.stat().st_size
             for hook in self.opts.get("progress_hooks", []):
                 hook({"status": "downloading", "downloaded_bytes": size // 2, "total_bytes": size})
