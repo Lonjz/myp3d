@@ -72,12 +72,12 @@ def compute_library_stats() -> LibraryStats:
     real_albums = [group for group in album_groups.values() if group.album_name != NO_ALBUM_LABEL]
     top_albums = sorted(real_albums, key=lambda group: (-len(group.tracks), group.album_name.lower()))
 
-    month_keys = _month_keys(datetime.now(timezone.utc), MONTHS_OF_HISTORY)
+    month_keys = _month_keys(datetime.now().astimezone(), MONTHS_OF_HISTORY)
     month_counts = {key: [0, 0] for key in month_keys}
     for track in tracks:
         if track.date_added is None:
             continue
-        key = track.date_added.strftime("%Y-%m")
+        key = track.date_added.astimezone().strftime("%Y-%m")
         if key in month_counts:
             month_counts[key][0] += 1
             month_counts[key][1] += track.file_size
