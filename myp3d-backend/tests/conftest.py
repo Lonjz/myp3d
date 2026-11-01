@@ -17,7 +17,7 @@ import pytest
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BACKEND_DIR))
 
-SESSION_DIR = Path(tempfile.mkdtemp(prefix="myp3d-tests-"))
+SESSION_DIR = Path(tempfile.mkdtemp(prefix="myp3d-tests-")).resolve()
 LIBRARY_DIR = SESSION_DIR / "library"
 PEER_DIR = SESSION_DIR / "peer"
 AUDIO_CACHE = SESSION_DIR / "audio"
