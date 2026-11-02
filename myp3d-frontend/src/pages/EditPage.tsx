@@ -172,7 +172,6 @@ export function EditPage({ filename, onBack }: EditPageProps) {
         />
 
         <section className="details-main">
-          <h1 className="details-title">{mp3.title || mp3.filename}</h1>
 
           <div className="edit-container glass">
             <input

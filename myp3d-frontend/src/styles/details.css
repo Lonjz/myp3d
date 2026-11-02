@@ -97,14 +97,6 @@
   min-width: 0;
 }
 
-.details-title {
-  overflow: hidden;
-  font-size: var(--text-xl);
-  font-weight: var(--font-weight-semibold);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .edit-container {
   display: flex;
   gap: var(--space-6);

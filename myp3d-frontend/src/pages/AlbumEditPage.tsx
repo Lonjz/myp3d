@@ -172,7 +172,6 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
         />
 
         <section className="details-main">
-          <h1 className="details-title">{albumDetail.album.album_name}</h1>
 
           <div className="edit-container glass">
             <input

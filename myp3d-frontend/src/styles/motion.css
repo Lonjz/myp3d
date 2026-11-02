@@ -70,14 +70,12 @@
 .query-preview-card,
 .download-form,
 .details-sidebar,
-.details-title,
 .edit-container {
   animation: panel-rise var(--duration-rise) var(--ease-spring) backwards;
 }
 
 .data-table > .library-table-wrap,
-.query-preview-card,
-.details-title {
+.query-preview-card {
   animation-delay: 60ms;
 }
 

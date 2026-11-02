@@ -55,7 +55,7 @@ describe('app shell', () => {
   it('saves the edit page with Ctrl+S', async () => {
     backend.seed({ tracks: [makeTrack({ title: 'The Chain', filename: 'the chain.mp3' })] });
     const { user } = renderApp('/details/the chain.mp3');
-    await screen.findByRole('heading', { name: 'The Chain' });
+    await screen.findByDisplayValue('The Chain');
     await user.keyboard('{Control>}s{/Control}');
     expect(backend.requestsTo('PUT', '/mp3s/the chain.mp3/metadata')).toEqual([]);
 

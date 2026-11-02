@@ -194,7 +194,6 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
         />
 
         <section className="details-main">
-          <h1 className="details-title">{detail.name}</h1>
 
           <div className="edit-container glass">
             <input

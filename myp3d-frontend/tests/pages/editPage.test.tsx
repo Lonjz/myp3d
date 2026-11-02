@@ -12,7 +12,7 @@ describe('EditPage', () => {
     backend.seed({ tracks: [makeTrack({ title: 'The Chain', filename: 'the chain.mp3' })] });
     const { user } = renderApp('/details/the chain.mp3');
 
-    await screen.findByRole('heading', { name: 'The Chain' });
+    await screen.findByDisplayValue('The Chain');
     await user.clear(field('Artist'));
     await user.type(field('Artist'), 'Daft Punk');
     await user.click(saveButton());
@@ -26,7 +26,7 @@ describe('EditPage', () => {
     backend.seed({ tracks: [makeTrack({ title: 'The Chain', filename: 'the chain.mp3' })] });
     const { user, router } = renderApp('/details/the chain.mp3');
 
-    await screen.findByRole('heading', { name: 'The Chain' });
+    await screen.findByDisplayValue('The Chain');
     await user.clear(field('File name'));
     await user.type(field('File name'), 'Deep Water!');
     expect(field('File name').value).toBe('deep water');
@@ -46,7 +46,7 @@ describe('EditPage', () => {
       tracks: [makeTrack({ title: 'First', filename: 'first.mp3' }), makeTrack({ title: 'Second', filename: 'second.mp3' })],
     });
     const { user, router } = renderApp('/details/first.mp3');
-    await screen.findByRole('heading', { name: 'First' });
+    await screen.findByDisplayValue('First');
 
     const release = backend.hold('GET', '/mp3s/second.mp3/info');
     await act(() => router.navigate('/details/second.mp3'));
@@ -56,7 +56,7 @@ describe('EditPage', () => {
     await waitFor(() => expect(backend.requestsTo('GET', '/mp3s/second.mp3/info')).toHaveLength(1));
     expect(backend.requestsTo('PUT', '/mp3s/second.mp3')).toEqual([]);
     expect(backend.store.tracks.map((track) => track.title)).toEqual(['First', 'Second']);
-    expect(await screen.findByRole('heading', { name: 'Second' })).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('Second')).toBeInTheDocument();
   });
 });
 
@@ -64,14 +64,14 @@ describe('AlbumEditPage and PlaylistEditPage', () => {
   it('keep Save off until something changes and save to the right album', async () => {
     backend.seed({ tracks: [makeTrack({ album: 'Rumours' }), makeTrack({ album: 'In Rainbows' })] });
     const { user, router } = renderApp(`/albums/${albumKeyOf('Rumours')}`);
-    await screen.findByRole('heading', { name: 'Rumours' });
+    await screen.findByDisplayValue('Rumours');
     expect(saveButton()).toBeDisabled();
 
     const release = backend.hold('GET', `/albums/${albumKeyOf('In Rainbows')}`);
     await act(() => router.navigate(`/albums/${albumKeyOf('In Rainbows')}`));
     expect(saveButton()).toBeDisabled();
     release();
-    await screen.findByRole('heading', { name: 'In Rainbows' });
+    await screen.findByDisplayValue('In Rainbows');
 
     await user.type(field('Album name'), ' II');
     await user.click(saveButton());
