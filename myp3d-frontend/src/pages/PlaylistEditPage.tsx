@@ -1,7 +1,28 @@
 import { useRef, useState } from 'react';
-import type { KeyboardEvent } from 'react';
+import type { ChangeEvent, KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlignLeft, Clock, DiscAlbum, GripVertical, ImagePlus, ListMinus, ListMusic, Music, Play, Save, Shuffle, Trash2, TriangleAlert, Undo2 } from 'lucide-react';
+import {
+  AlignLeft,
+  ArrowDownToLine,
+  ArrowUpToLine,
+  Clock,
+  DiscAlbum,
+  GripVertical,
+  ImagePlus,
+  ListChecks,
+  ListMinus,
+  ListMusic,
+  ListPlus,
+  Music,
+  Play,
+  Save,
+  Search,
+  Shuffle,
+  Trash2,
+  TriangleAlert,
+  Undo2,
+  X,
+} from 'lucide-react';
 import type { MP3Info } from '../api/mp3Api';
 import { NEW_PLAYLIST_NAME, playlistApi } from '../api/playlistApi';
 import type { PlaylistDetail, PlaylistInfo } from '../api/playlistApi';
@@ -10,17 +31,21 @@ import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
 import { useToast } from '../components/messages/toastContext';
 import { useTrackActions } from '../components/library/trackActionsContext';
 import { usePlayer } from '../components/player/playerContext';
+import { AddToPlaylistDialog } from '../components/playlists/AddToPlaylistDialog';
 import { TrackIndexButton } from '../components/player/TrackIndexButton';
 import { InfiniteSidebarList } from '../components/sidebar/InfiniteSidebarList';
 import { DataTable } from '../components/table/DataTable';
 import { HeaderIcon } from '../components/table/HeaderIcon';
 import { TrackTitleCell } from '../components/table/TrackTitleCell';
+import { Checkbox } from '../components/ui/Checkbox';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { Spinner } from '../components/ui/Spinner';
 import { EmptyState, LoadFailed } from '../components/ui/EmptyState';
 import { useDetail } from '../hooks/useDetail';
+import { usePresence } from '../hooks/usePresence';
+import { useTrackSelection } from '../hooks/useTrackSelection';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { emitAppEvent } from '../utils/appEvents';
 import { errorMessage, formatDuration, trackCount } from '../utils/formatters';
@@ -48,6 +73,12 @@ interface TrackRow {
 
 const toRows = (tracks: MP3Info[]): TrackRow[] => tracks.map((track, index) => ({ key: `${index}:${track.filename}`, track }));
 
+const isShiftClick = (event: ChangeEvent<HTMLInputElement>) =>
+  event.nativeEvent instanceof MouseEvent && event.nativeEvent.shiftKey;
+
+const matchesQuery = (track: MP3Info, query: string) =>
+  [track.title, track.artist, track.album, track.filename].some((value) => value?.toLowerCase().includes(query));
+
 const sameOrder = (left: MP3Info[], right: MP3Info[]) =>
   left.length === right.length && left.every((track, index) => track.filename === right[index].filename);
 
@@ -62,6 +93,10 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
   const [rows, setRows] = useState<TrackRow[]>([]);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [query, setQuery] = useState('');
+  const [addToPlaylistOpen, setAddToPlaylistOpen] = useState(false);
+  const addToPlaylistPresence = usePresence(addToPlaylistOpen);
+  const selection = useTrackSelection();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
@@ -81,6 +116,7 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
     setName(next.name);
     setDescription(next.description);
     setRows(toRows(next.tracks));
+    selection.clear();
   };
 
   const { detail, current, missing, failed, reload, update } = useDetail(playlistId, (id) => playlistApi.get(id), applyFields, (err) =>
@@ -88,6 +124,13 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
   );
 
   const tracks = rows.map((row) => row.track);
+  const positions = new Map(rows.map((row, index) => [row.key, index]));
+  const filterQuery = query.trim().toLowerCase();
+  const filtering = filterQuery !== '';
+  const visibleRows = filtering ? rows.filter((row) => matchesQuery(row.track, filterQuery)) : rows;
+  const visibleTracks = visibleRows.map((row) => row.track);
+  const canEdit = !saving && current;
+  const canDrag = canEdit && !filtering;
   const isNameDirty = detail !== null && name.trim() !== detail.name;
   const isDescriptionDirty = detail !== null && description.trim() !== detail.description;
   const isOrderDirty = detail !== null && !sameOrder(tracks, detail.tracks);
@@ -148,7 +191,41 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
     const kept = (track: MP3Info) => !deleted.has(track.filename);
     setRows((current) => current.filter((row) => kept(row.track)));
     update((loaded) => ({ ...loaded, tracks: loaded.tracks.filter(kept) }));
+    selection.deselect(filenames);
   };
+
+  const hasSelection = selection.size > 0;
+  const allVisibleSelected = visibleRows.length > 0 && visibleRows.every((row) => selection.isSelected(row.track.filename));
+  const someVisibleSelected = visibleRows.some((row) => selection.isSelected(row.track.filename));
+  const isRowSelected = (row: TrackRow) => selection.isSelected(row.track.filename);
+
+  const toggleSelectAll = () => {
+    if (allVisibleSelected) {
+      selection.deselect(visibleTracks.map((track) => track.filename));
+      return;
+    }
+    selection.selectMany([...selection.tracks, ...visibleTracks]);
+  };
+
+  const playSelected = () => player.playTracks(rows.filter(isRowSelected).map((row) => row.track), 0);
+
+  const moveSelected = (toTop: boolean) => {
+    setRows((current) => {
+      const picked = current.filter(isRowSelected);
+      const rest = current.filter((row) => !isRowSelected(row));
+      return toTop ? [...picked, ...rest] : [...rest, ...picked];
+    });
+  };
+
+  const removeSelected = () => {
+    setRows((current) => current.filter((row) => !isRowSelected(row)));
+    selection.clear();
+  };
+
+  const browsePresence = usePresence(!hasSelection);
+  const selectionPresence = usePresence(hasSelection);
+  const showSelection = hasSelection ? !browsePresence.mounted : selectionPresence.mounted;
+  const toolbarState = (showSelection ? selectionPresence.closing : browsePresence.closing) ? 'closed' : 'open';
 
   const handleGripKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     const offset = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0;
@@ -288,11 +365,12 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
           </div>
 
           <DataTable
-            className="album-tracks-table playlist-tracks-table"
-            items={rows}
+            className="album-tracks-table playlist-tracks-table library-table--selectable"
+            items={visibleRows}
             getRowKey={(row) => row.key}
             getRowClassName={({ key, track }) =>
               [
+                selection.isSelected(track.filename) ? 'is-selected' : '',
                 player.isCurrent(track.filename) ? 'is-current' : '',
                 dragIndex !== null && rows[dragIndex]?.key === key ? 'is-dragging' : '',
                 menuFilename === track.filename ? 'is-menu-open' : '',
@@ -300,20 +378,20 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
             }
             onRowMenu={saving ? undefined : ({ key, track }, event) =>
               openMenu(event, track, {
-                play: () => player.playTracks(tracks, rows.findIndex((row) => row.key === key)),
+                play: () => player.playTracks(tracks, positions.get(key) ?? 0),
                 extra: [{ id: 'remove-from-playlist', label: 'Remove from playlist', icon: ListMinus, run: () => removeRow(key) }],
                 onDeleted: dropDeleted,
               })
             }
             getRowProps={({ track }, index) => ({
-              draggable: !saving,
+              draggable: canDrag,
               onDragStart: (event) => {
                 event.dataTransfer.effectAllowed = 'move';
                 event.dataTransfer.setData('text/plain', track.filename);
                 setDragIndex(index);
               },
               onDragOver: (event) => {
-                if (dragIndex === null) return;
+                if (dragIndex === null || !canDrag) return;
                 event.preventDefault();
                 if (dragIndex !== index) {
                   moveTrack(dragIndex, index);
@@ -323,8 +401,56 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
               onDrop: (event) => event.preventDefault(),
               onDragEnd: () => setDragIndex(null),
             })}
-            emptyMessage="No tracks"
+            emptyMessage={filtering ? 'No matches' : 'No tracks'}
+            toolbar={showSelection ? (
+              <div key="selection" className="library-toolbar__set" data-state={toolbarState}>
+                <IconButton icon={X} label="Clear selection" onClick={selection.clear} />
+                <span className="library-selection-count" title="Selected">
+                  <ListChecks aria-hidden="true" />
+                  {selection.size}
+                </span>
+                <IconButton icon={Play} label="Play selected" onClick={playSelected} />
+                <IconButton icon={ArrowUpToLine} label="Move to top" onClick={() => moveSelected(true)} disabled={!canEdit} />
+                <IconButton icon={ArrowDownToLine} label="Move to bottom" onClick={() => moveSelected(false)} disabled={!canEdit} />
+                <IconButton icon={ListPlus} label="Add to playlist" onClick={() => setAddToPlaylistOpen(true)} />
+                <IconButton icon={ListMinus} label="Remove from playlist" variant="danger" onClick={removeSelected} disabled={!canEdit} />
+              </div>
+            ) : (
+              <div key="browse" className="library-toolbar__set" data-state={toolbarState}>
+                <IconField
+                  icon={Search}
+                  label="Filter"
+                  className="library-search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  trailing={query && (
+                    <IconButton icon={X} label="Clear filter" variant="ghost" size="sm" className="motion-fade" onClick={() => setQuery('')} />
+                  )}
+                />
+              </div>
+            )}
             columns={[
+              {
+                key: 'select',
+                header: (
+                  <Checkbox
+                    label={allVisibleSelected ? 'Clear selection' : 'Select all'}
+                    checked={allVisibleSelected}
+                    indeterminate={someVisibleSelected && !allVisibleSelected}
+                    disabled={visibleRows.length === 0}
+                    onChange={toggleSelectAll}
+                  />
+                ),
+                width: '3.25rem',
+                noRowOpen: true,
+                render: ({ track }, index) => (
+                  <Checkbox
+                    label={`Select ${track.title || track.filename}`}
+                    checked={selection.isSelected(track.filename)}
+                    onChange={(event) => selection.toggle(track, index, isShiftClick(event), visibleTracks)}
+                  />
+                ),
+              },
               {
                 key: 'grip',
                 header: <span className="sr-only">Reorder</span>,
@@ -334,9 +460,9 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
                     type="button"
                     className="playlist-grip"
                     aria-label={`Move ${track.title || track.filename}`}
-                    title="Drag or use arrow keys to move"
+                    title={filtering ? 'Clear the filter to move' : 'Drag or use arrow keys to move'}
                     onKeyDown={(event) => handleGripKeyDown(event, index)}
-                    disabled={saving || !current}
+                    disabled={!canDrag}
                   >
                     <GripVertical aria-hidden="true" />
                   </button>
@@ -346,13 +472,13 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
                 key: 'index',
                 header: <span className="sr-only">Play</span>,
                 width: '4rem',
-                render: ({ track }, index) => (
+                render: ({ key, track }) => (
                   <TrackIndexButton
-                    index={index + 1}
+                    index={(positions.get(key) ?? 0) + 1}
                     label={`Play ${track.title || track.filename}`}
                     isCurrent={player.isCurrent(track.filename)}
                     isPlaying={player.state.isPlaying}
-                    onPlay={() => player.playTracks(tracks, index)}
+                    onPlay={() => player.playTracks(tracks, positions.get(key) ?? 0)}
                     onToggle={player.togglePlay}
                   />
                 ),
@@ -402,6 +528,15 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
       />
 
       <CoverCropModal {...cropModalProps} />
+
+      {addToPlaylistPresence.mounted && (
+        <AddToPlaylistDialog
+          filenames={rows.filter(isRowSelected).map((row) => row.track.filename)}
+          closing={addToPlaylistPresence.closing}
+          onClose={() => setAddToPlaylistOpen(false)}
+          onAdded={() => setAddToPlaylistOpen(false)}
+        />
+      )}
     </div>
   );
 }
