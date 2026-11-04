@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from models.schemas import LibraryStats
+from models.stats import LibraryStats
 from services.stats_service import compute_library_stats
 
 router = APIRouter(prefix="/stats", tags=["Stats"])

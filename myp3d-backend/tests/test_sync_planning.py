@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from models.schemas import SyncDatabase, SyncFavoriteRecord, SyncPlaylistRecord, SyncQueueRecord
+from models.sync import SyncDatabase, SyncFavoriteRecord, SyncPlaylistRecord, SyncQueueRecord
 from services import database_sync, sync_service
 
 NOW = datetime(2026, 10, 1, tzinfo=timezone.utc)

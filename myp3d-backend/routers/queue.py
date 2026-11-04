@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Response
 
-from models.schemas import QueueItem, QueueItemsCreate, QueueItemUpdate, QueueStartRequest
+from models.queue import QueueItem, QueueItemUpdate, QueueItemsCreate, QueueStartRequest
 from services import queue_service
 
 router = APIRouter(prefix="/queue", tags=["Queue"])

@@ -5,7 +5,9 @@ import uuid
 from dataclasses import dataclass
 from typing import Iterable, Optional
 
-from models.schemas import MP3Info, PlaylistDetail, PlaylistInfo, SyncPlaylistRecord
+from models.library import MP3Info
+from models.playlists import PlaylistDetail, PlaylistInfo
+from models.sync import SyncPlaylistRecord
 from services.db import connect as _connect
 from services.db import now as _now
 from services.mp3_service import library_names, list_mp3_infos

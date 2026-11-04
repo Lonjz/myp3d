@@ -2,8 +2,8 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
-from models.schemas import (
-    BulkResult,
+from models.library import BulkResult
+from models.music import (
     MusicAlbumFixRequest,
     MusicAlbumIssue,
     MusicDiff,

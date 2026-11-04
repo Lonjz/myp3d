@@ -4,7 +4,7 @@ from typing import Literal, Optional
 from fastapi import APIRouter, File, Form, HTTPException, Query, Response, UploadFile
 from fastapi.responses import FileResponse
 
-from models.schemas import (
+from models.library import (
     BulkFailure,
     BulkMetadataUpdate,
     BulkResult,

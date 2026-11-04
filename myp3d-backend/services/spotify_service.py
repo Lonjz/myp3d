@@ -12,14 +12,8 @@ from typing import Optional
 
 from ytmusicapi import YTMusic
 
-from models.schemas import (
-    SpotifyCandidate,
-    SpotifyResolveResult,
-    SpotifyTrack,
-    SpotifyTrackMatch,
-    SpotifyTrackRef,
-    TagSuggestion,
-)
+from models.library import TagSuggestion
+from models.spotify import SpotifyCandidate, SpotifyResolveResult, SpotifyTrack, SpotifyTrackMatch, SpotifyTrackRef
 from services.mp3_service import list_mp3_infos
 from services.youtube_service import search_youtube
 from services.errors import AppError

@@ -265,7 +265,7 @@ def star():
 @pytest.fixture
 def manifest():
     def build(directory: Path) -> dict[str, dict]:
-        from models.schemas import SyncManifestEntry
+        from models.sync import SyncManifestEntry
 
         entries = {}
         for path in sorted(directory.glob("*.mp3")):

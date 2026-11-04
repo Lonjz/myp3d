@@ -16,7 +16,7 @@ from typing import Any, Literal, Optional
 
 from pydantic import ValidationError
 
-from models.schemas import (
+from models.sync import (
     SyncDatabase,
     SyncDiff,
     SyncDiffRecord,

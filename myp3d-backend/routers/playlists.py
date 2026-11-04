@@ -2,7 +2,7 @@ from typing import Optional
 
 from fastapi import APIRouter, File, HTTPException, Query, Response, UploadFile
 
-from models.schemas import PlaylistCreate, PlaylistDetail, PlaylistInfo, PlaylistTracksRequest, PlaylistUpdate
+from models.playlists import PlaylistCreate, PlaylistDetail, PlaylistInfo, PlaylistTracksRequest, PlaylistUpdate
 from services import favorite_playlist, playlist_service
 from routers.common import IMMUTABLE_CACHE_HEADER, read_cover
 from services.cover_service import CoverSize, get_image_variant

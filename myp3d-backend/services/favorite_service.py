@@ -3,7 +3,7 @@ import sqlite3
 import threading
 from typing import Iterable, Optional
 
-from models.schemas import SyncFavoriteRecord
+from models.sync import SyncFavoriteRecord
 from services.db import connect as _connect
 from services.db import now as _now
 from services.errors import AppError

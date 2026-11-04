@@ -2,7 +2,7 @@ import re
 from pathlib import Path
 from typing import Optional
 
-from models.schemas import AlbumInfo, MP3Info, SearchResults
+from models.library import AlbumInfo, MP3Info, SearchResults
 from services.mp3_service import build_album_groups, list_mp3_infos
 
 

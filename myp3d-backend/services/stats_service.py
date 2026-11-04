@@ -1,15 +1,7 @@
 from collections import Counter
 from datetime import datetime, timezone
 
-from models.schemas import (
-    AlbumStat,
-    ArtistStat,
-    DayBucket,
-    DurationBucket,
-    LibraryHealth,
-    LibraryStats,
-    MonthBucket,
-)
+from models.stats import AlbumStat, ArtistStat, DayBucket, DurationBucket, LibraryHealth, LibraryStats, MonthBucket
 from services import favorite_service, playlist_service
 from services.mp3_service import (
     DURATION_RANGES,

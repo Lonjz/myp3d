@@ -3,7 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse
 
-from models.schemas import SyncDatabase, SyncIncomingRequest, SyncManifestEntry, SyncProgress, SyncSessionInfo
+from models.sync import SyncDatabase, SyncIncomingRequest, SyncManifestEntry, SyncProgress, SyncSessionInfo
 from services import sync_service
 from services.cover_service import CoverSize, get_album_cover, get_cover_variant
 

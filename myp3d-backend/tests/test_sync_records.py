@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from models.schemas import SyncPlaylistRecord, SyncQueueRecord
+from models.sync import SyncPlaylistRecord, SyncQueueRecord
 from services import database_sync, favorite_playlist, music_playlist_service, playlist_service, queue_service
 from services.db import connect
 from services.music_playlist_service import ApplePlaylist, Snapshot, plan_sync

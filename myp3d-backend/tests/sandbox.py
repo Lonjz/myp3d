@@ -62,7 +62,7 @@ def _tracks():
 
 def _seed() -> None:
     from services import date_service, favorite_playlist, favorite_service, mp3_service, playlist_service, queue_service
-    from models.schemas import QueueItemCreate
+    from models.queue import QueueItemCreate
     from tests import seed
 
     shutil.rmtree(LIBRARY_DIR, ignore_errors=True)

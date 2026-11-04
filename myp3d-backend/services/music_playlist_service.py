@@ -7,7 +7,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Literal, Optional
 
-from models.schemas import BulkFailure, MusicPlaylistDiff, MusicPlaylistEntry, MusicPlaylistSyncInfo
+from models.library import BulkFailure
+from models.music import MusicPlaylistDiff, MusicPlaylistEntry, MusicPlaylistSyncInfo
 from services import favorite_playlist, playlist_service
 from services.db import connect as _connect
 from services.db import now as _now

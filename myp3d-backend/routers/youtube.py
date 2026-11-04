@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException, Query
 
-from models.schemas import SilenceBoundsRequest, TagSuggestion, TrimRange, YouTubeSearchResponse
+from models.health import SilenceBoundsRequest, TrimRange
+from models.library import TagSuggestion
+from models.queue import YouTubeSearchResponse
 from services import health_service, spotify_service
 from services.errors import AppError
 from services.youtube_service import search_youtube

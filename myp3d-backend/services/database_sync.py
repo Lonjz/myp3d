@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Literal, Optional, Union
 
-from models.schemas import SyncDatabase, SyncDiffRecord, SyncFavoriteRecord, SyncPlaylistRecord, SyncQueueRecord
+from models.sync import SyncDatabase, SyncDiffRecord, SyncFavoriteRecord, SyncPlaylistRecord, SyncQueueRecord
 from services import favorite_service, playlist_service, queue_service
 from services.db import connect
 

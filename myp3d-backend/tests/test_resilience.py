@@ -1,6 +1,6 @@
 import time
 
-from models.schemas import SyncPeer
+from models.sync import SyncPeer
 from services import db, music_playlist_service, music_service, sync_service
 from tests.conftest import LIBRARY_DIR
 

@@ -2,7 +2,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Query
 
-from models.schemas import SpotifyResolveRequest, SpotifyResolveResult, SpotifyTrackMatch
+from models.spotify import SpotifyResolveRequest, SpotifyResolveResult, SpotifyTrackMatch
 from services import spotify_service
 
 router = APIRouter(prefix="/spotify", tags=["Spotify"])

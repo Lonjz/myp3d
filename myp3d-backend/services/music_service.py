@@ -10,16 +10,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Optional
 
-from models.schemas import (
-    BulkFailure,
-    BulkResult,
-    MP3Info,
-    MusicAlbumIssue,
-    MusicDiff,
-    MusicPair,
-    MusicSyncInfo,
-    MusicTrack,
-)
+from models.library import BulkFailure, BulkResult, MP3Info
+from models.music import MusicAlbumIssue, MusicDiff, MusicPair, MusicSyncInfo, MusicTrack
 from services import favorite_playlist, favorite_service
 from services.audio_fingerprint import audio_fingerprint, cover_hash, covers_match
 from services.config import BASE_DIR, OUTPUT_DIR

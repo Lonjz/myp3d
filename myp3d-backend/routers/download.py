@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
-from models.schemas import DownloadRequest, DownloadResponse
+from models.queue import DownloadRequest, DownloadResponse
 from services.youtube_service import download_as_mp3, validate_trim_range
 
 router = APIRouter(tags=["Download"])

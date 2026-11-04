@@ -8,7 +8,8 @@ from typing import Optional
 
 from yt_dlp.utils import DownloadCancelled
 
-from models.schemas import QueueItem, QueueItemCreate, QueueItemUpdate, SyncQueueRecord
+from models.queue import QueueItem, QueueItemCreate, QueueItemUpdate
+from models.sync import SyncQueueRecord
 from services.db import connect as _connect
 from services.db import now as _now
 from services.cover_service import make_square_cover, square_cover_from_base64

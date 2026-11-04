@@ -2,15 +2,8 @@ from typing import Optional
 
 from fastapi import APIRouter
 
-from models.schemas import (
-    ArtistFixRequest,
-    ArtistTrack,
-    BulkResult,
-    NamingTrack,
-    RenameRequest,
-    SilenceScanInfo,
-    TrimRequest,
-)
+from models.health import ArtistFixRequest, ArtistTrack, NamingTrack, RenameRequest, SilenceScanInfo, TrimRequest
+from models.library import BulkResult
 from services import health_service
 
 router = APIRouter(prefix="/health", tags=["Health"])

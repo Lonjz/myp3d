@@ -2,13 +2,7 @@ from typing import Literal, Optional
 
 from fastapi import APIRouter, File, HTTPException, Query, Response, UploadFile
 
-from models.schemas import (
-    AlbumDetail,
-    AlbumUpdate,
-    AlbumUpdateResponse,
-    PaginatedAlbumResponse,
-    PaginationMeta,
-)
+from models.library import AlbumDetail, AlbumUpdate, AlbumUpdateResponse, PaginatedAlbumResponse, PaginationMeta
 from routers.common import cache_headers, read_cover
 from services.cover_service import CoverSize, get_album_cover, get_cover_variant
 from services.mp3_service import (

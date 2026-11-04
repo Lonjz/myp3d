@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Query
 
-from models.schemas import SearchResults
+from models.library import SearchResults
 from services.search_service import search_library
 
 router = APIRouter(prefix="/search", tags=["Search"])

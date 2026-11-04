@@ -12,18 +12,8 @@ from typing import Literal, Optional
 
 import eyed3
 
-from models.schemas import (
-    ArtistFixItem,
-    ArtistTrack,
-    BulkFailure,
-    BulkResult,
-    MP3Info,
-    NamingTrack,
-    RenameItem,
-    SilenceScanInfo,
-    SilentTrack,
-    TrimRange,
-)
+from models.health import ArtistFixItem, ArtistTrack, NamingTrack, RenameItem, SilenceScanInfo, SilentTrack, TrimRange
+from models.library import BulkFailure, BulkResult, MP3Info
 from services import track_records
 from services.audio_fingerprint import splice_audio
 from services.config import OUTPUT_DIR, get_ffmpeg_path

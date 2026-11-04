@@ -2,14 +2,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, Response
 
-from models.schemas import (
-    SyncDiff,
-    SyncPeer,
-    SyncRequestCreate,
-    SyncSessionInfo,
-    SyncStartRequest,
-    SyncStatus,
-)
+from models.sync import SyncDiff, SyncPeer, SyncRequestCreate, SyncSessionInfo, SyncStartRequest, SyncStatus
 from services import sync_service
 from services.cover_service import CoverSize
 from services.device_service import get_device

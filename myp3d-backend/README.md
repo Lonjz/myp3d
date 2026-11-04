@@ -16,7 +16,7 @@ Endpoints are documented at http://localhost:8000/docs while the server runs.
 - `services/track_records.py` renames and deletes a song everywhere it's referenced
 - `services/filenames.py` the rules for song file names
 - `services/errors.py` `AppError`, which `main.py` turns into an HTTP error
-- `models/schemas.py` request and response models
+- `models/` request and response models, one file per area
 - `applescripts/` scripts the Apple Music sync runs through `osascript`
 - `tests/` pytest suite, fakes for YouTube, Spotify and YouTube Music, and the sandbox (`tests/sandbox.py`)
 

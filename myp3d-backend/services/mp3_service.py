@@ -9,7 +9,7 @@ from typing import Iterable, Iterator, Literal, Optional
 
 import eyed3
 
-from models.schemas import AlbumInfo, LibraryNames, MP3Info
+from models.library import AlbumInfo, LibraryNames, MP3Info
 from services import date_service
 from services.config import OUTPUT_DIR
 from services.cover_service import set_cover_images

@@ -1,6 +1,6 @@
 from typing import Iterable, Optional
 
-from models.schemas import PlaylistDetail, PlaylistInfo
+from models.playlists import PlaylistDetail, PlaylistInfo
 from services import favorite_service, playlist_service
 from services.mp3_service import library_names
 
