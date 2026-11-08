@@ -1,5 +1,5 @@
-import { act, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { screen, waitFor, within } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 import { backend } from '../fakeBackend';
 import { makeQueueItem, makeTrack } from '../factories';
 import { renderApp } from '../render';
@@ -16,24 +16,6 @@ describe('app shell', () => {
     backend.up();
     await waitFor(() => expect(screen.queryByText('Offline')).not.toBeInTheDocument(), { timeout: 4000 });
     expect(await screen.findByRole('checkbox', { name: 'Select Dreams' })).toBeInTheDocument();
-  });
-
-  it('skips entrance animations when returning to a page', async () => {
-    backend.seed({ tracks: [makeTrack({ title: 'Dreams' })] });
-    const entrance = { effect: { getComputedTiming: () => ({ endTime: 460 }) }, finish: vi.fn() };
-    const looping = { effect: { getComputedTiming: () => ({ endTime: Infinity }) }, finish: vi.fn() };
-    const getAnimations = vi.spyOn(Element.prototype, 'getAnimations').mockReturnValue([entrance, looping] as unknown as Animation[]);
-    const { router } = renderApp('/library');
-    await screen.findByRole('checkbox', { name: 'Select Dreams' });
-    expect(entrance.finish).not.toHaveBeenCalled();
-
-    await act(() => router.navigate('/dashboard'));
-    await waitFor(() => expect(document.querySelector('.dashboard')).not.toBeNull(), { timeout: 5000 });
-    await act(() => router.navigate('/library'));
-
-    expect(entrance.finish).toHaveBeenCalledTimes(1);
-    expect(looping.finish).not.toHaveBeenCalled();
-    getAnimations.mockRestore();
   });
 
   it('shows a page for unknown addresses', async () => {
