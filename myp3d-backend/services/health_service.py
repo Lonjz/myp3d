@@ -6,24 +6,23 @@ import tempfile
 import threading
 from array import array
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Callable, Optional, TypeVar
 
 import eyed3
 
 from models.health import ArtistFixItem, ArtistTrack, NamingTrack, RenameItem, SilenceScanInfo, SilentTrack, TrimRange
 from models.library import BulkFailure, BulkResult, MP3Info
 from services import track_records
-from services.audio_fingerprint import splice_audio
+from services.audio_fingerprint import splice_audio, stat_cached
 from services.config import OUTPUT_DIR, get_ffmpeg_path
-from services.mp3_service import IN_USE, invalidate_library_cache, list_mp3_infos
+from services.mp3_service import IN_USE, edit_tags, invalidate_library_cache, list_mp3_infos
 from services.spotify_service import default_filename, format_title
 from services.youtube_service import audio_opts, extract_info
 from services.errors import AppError
 from services.filenames import is_track_name
 
-ScanStatusName = Literal["scanning", "done", "failed"]
+T = TypeVar("T")
 
 MIN_SILENCE_S = 0.5
 TAIL_WINDOW_S = 2
@@ -42,27 +41,8 @@ ARTIST_SPLIT = re.compile(r"\s*,\s*|\s+&\s+")
 FEATURED = re.compile(r"[(\[](?:feat\.?|ft\.?|featuring|with)\s([^)\]]*)[)\]]", re.I)
 
 
-
-@dataclass
-class _ScanJob:
-    status: ScanStatusName
-    total: int = 0
-    done: int = 0
-    tracks: list[SilentTrack] = field(default_factory=list)
-    error: Optional[str] = None
-
-    def info(self) -> SilenceScanInfo:
-        return SilenceScanInfo(
-            status=self.status,
-            total=self.total,
-            done=self.done,
-            tracks=list(self.tracks),
-            error=self.error,
-        )
-
-
 _lock = threading.Lock()
-_scan: Optional[_ScanJob] = None
+_scan: Optional[SilenceScanInfo] = None
 _tails: dict[str, tuple[int, int, Optional[float]]] = {}
 
 
@@ -153,24 +133,12 @@ def _measure_tail(path: Path, duration: float) -> Optional[float]:
 
 def silent_tail(path: Path, duration: Optional[float] = None) -> Optional[float]:
     try:
-        stats = path.stat()
-    except OSError:
-        return None
-    key = str(path)
-    with _lock:
-        cached = _tails.get(key)
-    if cached is not None and cached[0] == stats.st_size and cached[1] == stats.st_mtime_ns:
-        return cached[2]
-    try:
-        value = _measure_tail(path, duration or _stream_length(path))
+        return stat_cached(_tails, path, lambda target, _: _measure_tail(target, duration or _stream_length(target)))
     except (OSError, subprocess.SubprocessError):
         return None
-    with _lock:
-        _tails[key] = (stats.st_size, stats.st_mtime_ns, value)
-    return value
 
 
-def _scan_one(job: _ScanJob, track: MP3Info) -> None:
+def _scan_one(job: SilenceScanInfo, track: MP3Info) -> None:
     silence = silent_tail(OUTPUT_DIR / track.filename, track.duration)
     with _lock:
         job.done += 1
@@ -178,7 +146,7 @@ def _scan_one(job: _ScanJob, track: MP3Info) -> None:
             job.tracks.append(SilentTrack(**track.model_dump(), silence=silence))
 
 
-def _run_scan(job: _ScanJob) -> None:
+def _run_scan(job: SilenceScanInfo) -> None:
     try:
         tracks = list_mp3_infos()
         with _lock:
@@ -201,15 +169,15 @@ def start_scan() -> SilenceScanInfo:
     with _lock:
         if _scan is not None and _scan.status == "scanning":
             raise AppError(409, "A scan is already running")
-        job = _ScanJob(status="scanning")
+        job = SilenceScanInfo(status="scanning")
         _scan = job
     threading.Thread(target=_run_scan, args=(job,), daemon=True).start()
-    return job.info()
+    return job.model_copy(deep=True)
 
 
 def get_scan() -> Optional[SilenceScanInfo]:
     with _lock:
-        return _scan.info() if _scan is not None else None
+        return _scan.model_copy(deep=True) if _scan is not None else None
 
 
 def _stream_length(path: Path) -> float:
@@ -262,38 +230,35 @@ def _ensure_idle() -> None:
             raise AppError(409, "Wait for the scan to finish")
 
 
-def trim(filenames: list[str]) -> BulkResult:
-    _ensure_idle()
-    _ffmpeg()
-
+def _bulk(items: dict[str, T], apply: Callable[[T], None], fallback: str) -> BulkResult:
     updated: list[str] = []
     failed: list[BulkFailure] = []
-    for filename in dict.fromkeys(filenames):
-        path = OUTPUT_DIR / filename
-        if not is_track_name(filename) or not path.is_file():
-            failed.append(BulkFailure(filename=filename, detail="MP3 file not found"))
-            continue
+    for filename, item in items.items():
         try:
-            _trim_one(path)
+            apply(item)
         except subprocess.TimeoutExpired:
             failed.append(BulkFailure(filename=filename, detail="ffmpeg took too long"))
-            continue
         except PermissionError:
             failed.append(BulkFailure(filename=filename, detail=IN_USE))
-            continue
-        except (OSError, ValueError, subprocess.SubprocessError) as exc:
-            failed.append(BulkFailure(filename=filename, detail=str(exc) or "Couldn't trim the song"))
-            continue
-        updated.append(filename)
+        except (OSError, ValueError, eyed3.Error, subprocess.SubprocessError) as exc:
+            failed.append(BulkFailure(filename=filename, detail=str(exc) or fallback))
+        else:
+            updated.append(filename)
 
     if updated:
         invalidate_library_cache()
-        trimmed = set(updated)
-        with _lock:
-            if _scan is not None:
-                _scan.tracks = [track for track in _scan.tracks if track.filename not in trimmed]
-
     return BulkResult(success=not failed, updated=updated, failed=failed)
+
+
+def trim(filenames: list[str]) -> BulkResult:
+    _ensure_idle()
+    _ffmpeg()
+    result = _bulk({filename: filename for filename in filenames}, lambda filename: _trim_one(_track_path(filename)), "Couldn't trim the song")
+    trimmed = set(result.updated)
+    with _lock:
+        if _scan is not None:
+            _scan.tracks = [track for track in _scan.tracks if track.filename not in trimmed]
+    return result
 
 
 def _track_path(filename: str) -> Path:
@@ -331,19 +296,7 @@ def _rename_one(item: RenameItem) -> None:
 
 def rename(items: list[RenameItem]) -> BulkResult:
     _ensure_idle()
-    updated: list[str] = []
-    failed: list[BulkFailure] = []
-    for item in {item.filename: item for item in items}.values():
-        try:
-            _rename_one(item)
-        except (OSError, ValueError) as exc:
-            failed.append(BulkFailure(filename=item.filename, detail=str(exc) or "Couldn't rename the song"))
-            continue
-        updated.append(item.filename)
-
-    if updated:
-        invalidate_library_cache()
-    return BulkResult(success=not failed, updated=updated, failed=failed)
+    return _bulk({item.filename: item for item in items}, _rename_one, "Couldn't rename the song")
 
 
 def _split_artists(value: Optional[str]) -> list[str]:
@@ -372,31 +325,16 @@ def artist_issues() -> list[ArtistTrack]:
 
 def _fix_artist_one(item: ArtistFixItem) -> None:
     path = _track_path(item.filename)
-    audio = eyed3.load(str(path))
-    if audio is None or audio.tag is None:
-        raise ValueError("Couldn't read the tags")
-    artists = _split_artists(audio.tag.artist)
-    if len(artists) < 2:
-        raise ValueError("The song has only one artist")
-    if item.artist not in artists:
-        raise ValueError("That artist isn't on the song")
-    audio.tag.title = _featured_title(audio.tag.title or path.stem, item.artist, artists)
-    audio.tag.artist = item.artist
-    audio.tag.save(version=(2, 3, 0))
+    with edit_tags(path) as tag:
+        artists = _split_artists(tag.artist)
+        if len(artists) < 2:
+            raise ValueError("The song has only one artist")
+        if item.artist not in artists:
+            raise ValueError("That artist isn't on the song")
+        tag.title = _featured_title(tag.title or path.stem, item.artist, artists)
+        tag.artist = item.artist
 
 
 def fix_artists(items: list[ArtistFixItem]) -> BulkResult:
     _ensure_idle()
-    updated: list[str] = []
-    failed: list[BulkFailure] = []
-    for item in {item.filename: item for item in items}.values():
-        try:
-            _fix_artist_one(item)
-        except (OSError, ValueError, eyed3.Error) as exc:
-            failed.append(BulkFailure(filename=item.filename, detail=str(exc) or "Couldn't fix the artist"))
-            continue
-        updated.append(item.filename)
-
-    if updated:
-        invalidate_library_cache()
-    return BulkResult(success=not failed, updated=updated, failed=failed)
+    return _bulk({item.filename: item for item in items}, _fix_artist_one, "Couldn't fix the artist")

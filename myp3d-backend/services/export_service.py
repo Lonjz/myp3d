@@ -1,6 +1,5 @@
-import io
 import zipfile
-from io import BytesIO
+from io import BytesIO, RawIOBase
 from pathlib import Path
 from typing import Iterator
 
@@ -14,7 +13,7 @@ CHUNK_SIZE = 1024 * 1024
 JPEG_MIME_TYPES = {"image/jpeg", "image/jpg"}
 
 
-class _ZipBuffer(io.RawIOBase):
+class _ZipBuffer(RawIOBase):
     def __init__(self) -> None:
         super().__init__()
         self._chunks: list[bytes] = []

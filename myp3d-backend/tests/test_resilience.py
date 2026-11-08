@@ -1,5 +1,6 @@
 import time
 
+from models.music import MusicPlaylistSyncInfo, MusicSyncInfo
 from models.sync import SyncPeer
 from services import db, music_playlist_service, music_service, sync_service
 from tests.conftest import LIBRARY_DIR
@@ -27,14 +28,12 @@ def test_a_crashing_device_sync_fails_instead_of_hanging(library, monkeypatch):
     assert (current.status, current.error) == ("failed", "The sync stopped unexpectedly")
 
 
-def test_a_crashing_apple_music_sync_fails_instead_of_hanging(library, monkeypatch, tmp_path):
-    for module in (music_service, music_playlist_service):
-        def broken(job, root):
-            raise RuntimeError("osascript vanished")
+def test_a_crashing_apple_music_sync_fails_instead_of_hanging(library, tmp_path):
+    def broken(job, root):
+        raise RuntimeError("osascript vanished")
 
-        monkeypatch.setattr(module, "_run_sync", broken)
-        job = module._SyncJob(status="syncing", total=0)
-        module._run_guarded(job, tmp_path)
+    for module, job in ((music_service, MusicSyncInfo(status="syncing")), (music_playlist_service, MusicPlaylistSyncInfo(status="syncing"))):
+        module._slot.run(job, tmp_path, broken)
         assert (job.status, job.error) == ("failed", "The sync stopped unexpectedly")
 
 

@@ -4,8 +4,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 
-class DownloadRequest(BaseModel):
-    url: str
+class DownloadFields(BaseModel):
     custom_filename: Optional[str] = None
     title: Optional[str] = None
     artist: Optional[str] = None
@@ -13,6 +12,10 @@ class DownloadRequest(BaseModel):
     cover_image_base64: Optional[str] = None
     start_time: Optional[float] = None
     end_time: Optional[float] = None
+
+
+class DownloadRequest(DownloadFields):
+    url: str
     overwrite: bool = False
 
 
@@ -25,15 +28,8 @@ class DownloadResponse(BaseModel):
 QueueStatusName = Literal["pending", "queued", "running", "done", "failed"]
 
 
-class QueueItemCreate(BaseModel):
+class QueueItemCreate(DownloadFields):
     url: str = Field(min_length=1)
-    custom_filename: Optional[str] = None
-    title: Optional[str] = None
-    artist: Optional[str] = None
-    album: Optional[str] = None
-    cover_image_base64: Optional[str] = None
-    start_time: Optional[float] = None
-    end_time: Optional[float] = None
     overwrite: bool = False
     cover_url: Optional[str] = None
 
@@ -42,15 +38,8 @@ class QueueItemsCreate(BaseModel):
     items: list[QueueItemCreate] = Field(min_length=1)
 
 
-class QueueItemUpdate(BaseModel):
+class QueueItemUpdate(DownloadFields):
     url: Optional[str] = None
-    custom_filename: Optional[str] = None
-    title: Optional[str] = None
-    artist: Optional[str] = None
-    album: Optional[str] = None
-    cover_image_base64: Optional[str] = None
-    start_time: Optional[float] = None
-    end_time: Optional[float] = None
     overwrite: Optional[bool] = None
 
 

@@ -4,6 +4,10 @@ from pydantic import BaseModel, Field
 
 from models.library import BulkFailure, MP3Info
 
+MusicSyncStatus = Literal["syncing", "done", "failed"]
+MusicChange = Literal["title", "artist", "album", "art", "audio", "favorite", "unfavorite", "favorite_music", "unfavorite_music"]
+MusicPlaylistAction = Literal["import", "export", "pull", "push", "link", "delete_local", "delete_music", "in_sync"]
+
 
 class MusicStatus(BaseModel):
     available: bool
@@ -37,9 +41,7 @@ class MusicAlbumFixRequest(BaseModel):
 class MusicPair(BaseModel):
     track: MP3Info
     music: MusicTrack
-    changes: list[
-        Literal["title", "artist", "album", "art", "audio", "favorite", "unfavorite", "favorite_music", "unfavorite_music"]
-    ] = Field(default_factory=list)
+    changes: list[MusicChange] = Field(default_factory=list)
 
 
 class MusicDiff(BaseModel):
@@ -49,7 +51,7 @@ class MusicDiff(BaseModel):
 
 
 class MusicSyncInfo(BaseModel):
-    status: Literal["syncing", "done", "failed"]
+    status: MusicSyncStatus
     total: int = 0
     added: int = 0
     updated: int = 0
@@ -61,7 +63,7 @@ class MusicSyncInfo(BaseModel):
 class MusicPlaylistEntry(BaseModel):
     key: str
     name: str
-    action: Literal["import", "export", "pull", "push", "link", "delete_local", "delete_music", "in_sync"]
+    action: MusicPlaylistAction
     track_count: int = 0
     left_out: int = 0
     playlist_id: Optional[str] = None
@@ -77,7 +79,7 @@ class MusicPlaylistDiff(BaseModel):
 
 
 class MusicPlaylistSyncInfo(BaseModel):
-    status: Literal["syncing", "done", "failed"]
+    status: MusicSyncStatus
     total: int = 0
     created: int = 0
     updated: int = 0

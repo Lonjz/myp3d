@@ -70,23 +70,8 @@ async def local_only(request: Request, call_next):
     return JSONResponse(status_code=403, content={"detail": "Only this device can use the app"})
 
 
-app.include_router(download.router)
-app.include_router(albums.router)
-app.include_router(mp3s.router)
-app.include_router(youtube.router)
-app.include_router(stats.router)
-app.include_router(search.router)
-app.include_router(cache.router)
-app.include_router(sync.router)
-app.include_router(peer.router)
-app.include_router(music.router)
-app.include_router(queue.router)
-app.include_router(spotify.router)
-app.include_router(export.router)
-app.include_router(health.router)
-app.include_router(playlists.router)
-app.include_router(favorites.router)
-app.include_router(system.router)
+for module in (download, albums, mp3s, youtube, stats, search, cache, sync, peer, music, queue, spotify, export, health, playlists, favorites, system):
+    app.include_router(module.router)
 
 
 @app.get("/")

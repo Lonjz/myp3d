@@ -1,14 +1,13 @@
 import json
 import os
 import tempfile
-import threading
 from collections import Counter
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Optional
 
 from models.library import BulkFailure
-from models.music import MusicPlaylistDiff, MusicPlaylistEntry, MusicPlaylistSyncInfo
+from models.music import MusicPlaylistAction, MusicPlaylistDiff, MusicPlaylistEntry, MusicPlaylistSyncInfo
 from services import favorite_playlist, playlist_service
 from services.db import connect as _connect
 from services.db import now as _now
@@ -19,17 +18,15 @@ from services.music_service import (
     FIELD_SEP,
     RECORD_SEP,
     TRACK_TIMEOUT_S,
-    is_available,
+    JobSlot,
     song_links,
     parse_art_state,
     require_folder,
     run_script,
+    temp_image,
 )
 from services.playlist_service import PlaylistState
 from services.errors import AppError
-
-ActionName = Literal["import", "export", "pull", "push", "link", "delete_local", "delete_music", "in_sync"]
-SyncStatusName = Literal["syncing", "done", "failed"]
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS apple_playlist_links (
@@ -66,7 +63,7 @@ class Snapshot:
 @dataclass
 class Plan:
     key: str
-    action: ActionName
+    action: MusicPlaylistAction
     name: str
     description: str = ""
     playlist_id: Optional[str] = None
@@ -84,41 +81,14 @@ class Plan:
     refreshed: Optional[Snapshot] = None
 
 
-@dataclass
-class _SyncJob:
-    status: SyncStatusName
-    total: int
-    created: int = 0
-    updated: int = 0
-    deleted: int = 0
-    failed: list[BulkFailure] = field(default_factory=list)
-    without_art: list[BulkFailure] = field(default_factory=list)
-    error: Optional[str] = None
-
-    def info(self) -> MusicPlaylistSyncInfo:
-        return MusicPlaylistSyncInfo(
-            status=self.status,
-            total=self.total,
-            created=self.created,
-            updated=self.updated,
-            deleted=self.deleted,
-            failed=list(self.failed),
-            without_art=list(self.without_art),
-            error=self.error,
-        )
-
-
-_sync_lock = threading.Lock()
-_sync: Optional[_SyncJob] = None
+_slot: JobSlot[MusicPlaylistSyncInfo] = JobSlot(
+    "A playlist sync with Apple Music is already running", "The playlist sync with Apple Music is still running"
+)
 
 
 def init() -> None:
     with _connect() as conn:
         conn.execute(SCHEMA)
-
-
-
-
 
 
 def _read_links() -> dict[str, tuple[str, Snapshot]]:
@@ -286,7 +256,7 @@ def plan_sync(
         write_local = local_result != state.filenames or name != state.name or description != state.description
         write_apple = bool(apple_add or apple_remove) or name != apple.name or description != apple.description or push_cover
         if snapshot is None:
-            action: ActionName = "link"
+            action: MusicPlaylistAction = "link"
         elif write_local:
             action = "pull"
         elif write_apple:
@@ -385,8 +355,6 @@ def plan_sync(
     return sorted(plans, key=lambda plan: (normalize_text(plan.name), plan.key))
 
 
-
-
 def _refresh_snapshots(plans: list[Plan]) -> None:
     for plan in plans:
         if plan.refreshed is not None:
@@ -418,19 +386,9 @@ def diff(folder: str) -> MusicPlaylistDiff:
     )
 
 
-def _write_cover_file(playlist_id: str) -> Optional[str]:
-    cover = playlist_service.get_cover(playlist_id)
-    if cover is None:
-        return None
-    handle, path = tempfile.mkstemp(prefix="myp3d-playlist-", suffix=".jpg")
-    with os.fdopen(handle, "wb") as output:
-        output.write(cover[0])
-    return path
-
-
 def _write_apple(plan: Plan, persistent_id: Optional[str], file_of_pid: dict[str, str]) -> tuple[str, Optional[str]]:
-    art_path = _write_cover_file(plan.playlist_id) if plan.push_cover and plan.playlist_id else None
-    try:
+    cover = playlist_service.get_cover(plan.playlist_id) if plan.push_cover and plan.playlist_id else None
+    with temp_image(cover[0] if cover else None) as art_path:
         removals = [f"-{index}:{track_id}" for index, track_id in plan.apple_remove]
         changes = removals + [f"+{file_of_pid[filename]}" for filename in plan.apple_add]
         result = run_script(
@@ -442,9 +400,6 @@ def _write_apple(plan: Plan, persistent_id: Optional[str], file_of_pid: dict[str
             *changes,
             timeout=PLAYLIST_TIMEOUT_S,
         )
-    finally:
-        if art_path:
-            Path(art_path).unlink(missing_ok=True)
     new_id, _, art_state = result.partition(FIELD_SEP)
     return new_id, parse_art_state(art_state) if art_path else None
 
@@ -517,21 +472,15 @@ def _apply(plan: Plan, file_of_pid: dict[str, str]) -> tuple[str, Optional[str]]
     return "updated", art_problem
 
 
-def _finish(job: _SyncJob, status: SyncStatusName, error: Optional[str] = None) -> None:
-    with _sync_lock:
-        job.status = status
-        job.error = error
-
-
-def _run_sync(job: _SyncJob, root: Path) -> None:
+def _run_sync(job: MusicPlaylistSyncInfo, root: Path) -> None:
     try:
         file_of, songs_pending = song_links(root)
         if songs_pending:
-            _finish(job, "failed", "Sync the songs with Apple Music first")
+            _slot.finish(job, "failed", "Sync the songs with Apple Music first")
             return
         plans = plan_sync(_read_playlists(), playlist_service.list_states(), _read_links(), file_of, library_names())
     except Exception as exc:
-        _finish(job, "failed", exc.detail if isinstance(exc, AppError) else "Couldn't read Apple Music playlists")
+        _slot.finish(job, "failed", exc.detail if isinstance(exc, AppError) else "Couldn't read Apple Music playlists")
         return
 
     pid_of: dict[str, str] = {}
@@ -540,7 +489,7 @@ def _run_sync(job: _SyncJob, root: Path) -> None:
 
     _refresh_snapshots(plans)
     chosen = [plan for plan in plans if plan.action != "in_sync"]
-    with _sync_lock:
+    with _slot.lock:
         job.total = len(chosen)
 
     for plan in chosen:
@@ -548,10 +497,10 @@ def _run_sync(job: _SyncJob, root: Path) -> None:
             outcome, art_problem = _apply(plan, pid_of)
         except Exception as exc:
             detail = exc.detail if isinstance(exc, AppError) else str(exc) or "Couldn't sync the playlist"
-            with _sync_lock:
+            with _slot.lock:
                 job.failed.append(BulkFailure(filename=plan.name, detail=detail))
             continue
-        with _sync_lock:
+        with _slot.lock:
             if outcome == "created":
                 job.created += 1
             elif outcome == "deleted":
@@ -562,38 +511,12 @@ def _run_sync(job: _SyncJob, root: Path) -> None:
                 job.without_art.append(BulkFailure(filename=plan.name, detail=art_problem))
 
     favorite_playlist.ensure()
-    _finish(job, "done")
-
-
-def _run_guarded(job: _SyncJob, root: Path) -> None:
-    try:
-        _run_sync(job, root)
-    except Exception as exc:
-        _finish(job, "failed", exc.detail if isinstance(exc, AppError) else "The sync stopped unexpectedly")
+    _slot.finish(job, "done")
 
 
 def start_sync(folder: str) -> MusicPlaylistSyncInfo:
-    global _sync
-    if not is_available():
-        raise AppError(501, "Apple Music sync needs macOS")
-    root = require_folder(folder)
-    with _sync_lock:
-        if _sync is not None and _sync.status == "syncing":
-            raise AppError(409, "A playlist sync with Apple Music is already running")
-        job = _SyncJob(status="syncing", total=0)
-        _sync = job
-    threading.Thread(target=_run_guarded, args=(job, root), daemon=True).start()
-    return job.info()
+    return _slot.start(MusicPlaylistSyncInfo(status="syncing"), folder, _run_sync)
 
 
-def get_sync() -> Optional[MusicPlaylistSyncInfo]:
-    with _sync_lock:
-        return _sync.info() if _sync is not None else None
-
-
-def dismiss_sync() -> None:
-    global _sync
-    with _sync_lock:
-        if _sync is not None and _sync.status == "syncing":
-            raise AppError(409, "The playlist sync with Apple Music is still running")
-        _sync = None
+get_sync = _slot.get
+dismiss_sync = _slot.dismiss

@@ -1,5 +1,6 @@
 import base64
 import binascii
+import hashlib
 import threading
 from collections import OrderedDict
 from io import BytesIO
@@ -30,6 +31,10 @@ _cache_lock = threading.Lock()
 def clear_cover_cache() -> None:
     with _cache_lock:
         _cache.clear()
+
+
+def cover_digest(cover: Optional[bytes]) -> Optional[str]:
+    return hashlib.sha1(cover).hexdigest() if cover is not None else None
 
 
 def _render_variant(image_data: bytes, size: CoverSize) -> bytes:

@@ -1,7 +1,8 @@
 import threading
-from datetime import datetime, timezone
+from datetime import datetime
 
 from services.db import connect as _connect
+from services.db import parse_stamp
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS track_dates (
@@ -11,11 +12,6 @@ CREATE TABLE IF NOT EXISTS track_dates (
 """
 
 _lock = threading.Lock()
-
-
-def _parse(value: str) -> datetime:
-    stamp = datetime.fromisoformat(value)
-    return stamp if stamp.tzinfo is not None else stamp.replace(tzinfo=timezone.utc)
 
 
 def init() -> None:
@@ -32,7 +28,7 @@ def resolve(fallbacks: dict[str, datetime]) -> dict[str, datetime]:
             [(filename, stamp.isoformat()) for filename, stamp in fallbacks.items()],
         )
         rows = conn.execute("SELECT filename, added_at FROM track_dates").fetchall()
-    return {row["filename"]: _parse(row["added_at"]) for row in rows if row["filename"] in fallbacks}
+    return {row["filename"]: parse_stamp(row["added_at"]) for row in rows if row["filename"] in fallbacks}
 
 
 def set_date(filename: str, stamp: datetime) -> None:
@@ -48,15 +44,7 @@ def rename_track(old: str, new: str) -> None:
     if old == new:
         return
     with _lock, _connect() as conn:
-        row = conn.execute("SELECT added_at FROM track_dates WHERE filename = ?", (old,)).fetchone()
-        if row is None:
-            return
-        conn.execute("DELETE FROM track_dates WHERE filename = ?", (old,))
-        conn.execute(
-            "INSERT INTO track_dates (filename, added_at) VALUES (?, ?) "
-            "ON CONFLICT(filename) DO UPDATE SET added_at = excluded.added_at",
-            (new, row["added_at"]),
-        )
+        conn.execute("UPDATE OR REPLACE track_dates SET filename = ? WHERE filename = ?", (new, old))
 
 
 def remove_tracks(filenames: list[str]) -> None:

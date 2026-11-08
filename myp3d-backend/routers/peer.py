@@ -4,8 +4,9 @@ from fastapi import APIRouter, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse
 
 from models.sync import SyncDatabase, SyncIncomingRequest, SyncManifestEntry, SyncProgress, SyncSessionInfo
+from routers.common import cover_response
 from services import sync_service
-from services.cover_service import CoverSize, get_album_cover, get_cover_variant
+from services.cover_service import CoverSize
 
 router = APIRouter(prefix="/peer", tags=["Peer"])
 
@@ -62,11 +63,7 @@ def get_peer_tags(session_id: str, filename: str, request: Request):
 
 @router.get("/sessions/{session_id}/covers/{filename}")
 def get_peer_cover(session_id: str, filename: str, request: Request, size: Optional[CoverSize] = Query(None)):
-    path = sync_service.peer_file(session_id, _client_host(request), filename)
-    cover = get_cover_variant([path], size) if size else get_album_cover([path])
-    if cover is None:
-        raise HTTPException(status_code=404, detail="No cover image found")
-    return Response(content=cover[0], media_type=cover[1])
+    return cover_response([sync_service.peer_file(session_id, _client_host(request), filename)], size)
 
 
 @router.post("/sessions/{session_id}/accepted")

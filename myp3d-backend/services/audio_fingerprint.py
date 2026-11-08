@@ -29,7 +29,7 @@ def id3_tag_length(header: bytes) -> int:
     return 10 + size + footer
 
 
-def _cached(cache: dict, path: Path, compute):
+def stat_cached(cache: dict, path: Path, compute):
     try:
         stats = path.stat()
     except OSError:
@@ -102,7 +102,7 @@ def _compute_fingerprint(path: Path, size: int) -> Optional[str]:
 
 
 def audio_fingerprint(path: Path) -> Optional[str]:
-    return _cached(_fingerprints, path, _compute_fingerprint)
+    return stat_cached(_fingerprints, path, _compute_fingerprint)
 
 
 def _compute_cover_hash(path: Path, _: int) -> Optional[int]:
@@ -128,7 +128,7 @@ def _compute_cover_hash(path: Path, _: int) -> Optional[int]:
 
 
 def cover_hash(path: Path) -> Optional[int]:
-    return _cached(_cover_hashes, path, _compute_cover_hash)
+    return stat_cached(_cover_hashes, path, _compute_cover_hash)
 
 
 def covers_match(first: Optional[int], second: Optional[int]) -> bool:

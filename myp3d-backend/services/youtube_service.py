@@ -93,11 +93,7 @@ _download_locks_guard = threading.Lock()
 
 def _download_lock(key: str) -> threading.Lock:
     with _download_locks_guard:
-        lock = _download_locks.get(key)
-        if lock is None:
-            lock = threading.Lock()
-            _download_locks[key] = lock
-        return lock
+        return _download_locks.setdefault(key, threading.Lock())
 
 
 def validate_trim_range(start_time: Optional[float], end_time: Optional[float]) -> None:

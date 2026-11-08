@@ -1,13 +1,13 @@
-import hashlib
 import sqlite3
 import threading
 import uuid
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Iterable, Optional
 
 from models.library import MP3Info
 from models.playlists import PlaylistDetail, PlaylistInfo
 from models.sync import SyncPlaylistRecord
+from services.cover_service import cover_digest
 from services.db import connect as _connect
 from services.db import now as _now
 from services.mp3_service import library_names, list_mp3_infos
@@ -37,7 +37,6 @@ PLAYLIST_COLUMNS = "id, name, description, cover IS NOT NULL AS has_cover, is_fa
 STATE_COLUMNS = "id, name, description, cover, is_favorites, created_at, updated_at, deleted_at"
 
 
-
 @dataclass
 class PlaylistState:
     id: str
@@ -52,8 +51,6 @@ class PlaylistState:
 
 
 _lock = threading.Lock()
-
-
 
 
 def _clean_name(name: str) -> str:
@@ -72,8 +69,6 @@ def _clean_filenames(filenames: Iterable[str]) -> list[str]:
     return cleaned
 
 
-
-
 def _require(conn: sqlite3.Connection, playlist_id: str) -> sqlite3.Row:
     row = conn.execute(
         f"SELECT {PLAYLIST_COLUMNS} FROM playlists WHERE id = ? AND deleted_at IS NULL", (playlist_id,)
@@ -88,6 +83,20 @@ def _filenames(conn: sqlite3.Connection, playlist_id: str) -> list[str]:
         "SELECT filename FROM playlist_tracks WHERE playlist_id = ? ORDER BY position", (playlist_id,)
     ).fetchall()
     return [row["filename"] for row in rows]
+
+
+def _all_tracks(conn: sqlite3.Connection) -> dict[str, list[str]]:
+    tracks: dict[str, list[str]] = {}
+    for track in conn.execute("SELECT playlist_id, filename FROM playlist_tracks ORDER BY playlist_id, position"):
+        tracks.setdefault(track["playlist_id"], []).append(track["filename"])
+    return tracks
+
+
+def _favorite_ids(conn: sqlite3.Connection) -> list[str]:
+    rows = conn.execute(
+        "SELECT id FROM playlists WHERE is_favorites = 1 AND deleted_at IS NULL ORDER BY created_at, id"
+    ).fetchall()
+    return [row["id"] for row in rows]
 
 
 def _write_tracks(conn: sqlite3.Connection, playlist_id: str, filenames: list[str]) -> None:
@@ -123,17 +132,13 @@ def _to_detail(row: sqlite3.Row, filenames: list[str]) -> PlaylistDetail:
     )
 
 
-def cover_digest(cover: bytes) -> str:
-    return hashlib.sha1(cover).hexdigest()
-
-
 def _to_state(row: sqlite3.Row, filenames: list[str]) -> PlaylistState:
     return PlaylistState(
         id=row["id"],
         name=row["name"],
         description=row["description"],
         filenames=filenames,
-        cover_hash=cover_digest(row["cover"]) if row["cover"] is not None else None,
+        cover_hash=cover_digest(row["cover"]),
         is_favorites=bool(row["is_favorites"]),
         created_at=row["created_at"],
         updated_at=row["updated_at"],
@@ -157,9 +162,7 @@ def list_playlists() -> list[PlaylistInfo]:
         rows = conn.execute(
             f"SELECT {PLAYLIST_COLUMNS} FROM playlists WHERE deleted_at IS NULL ORDER BY name COLLATE NOCASE, id"
         ).fetchall()
-        tracks: dict[str, list[str]] = {}
-        for track in conn.execute("SELECT playlist_id, filename FROM playlist_tracks ORDER BY playlist_id, position"):
-            tracks.setdefault(track["playlist_id"], []).append(track["filename"])
+        tracks = _all_tracks(conn)
     return [_to_info(row, tracks.get(row["id"], []), names) for row in rows]
 
 
@@ -175,9 +178,7 @@ def listed_filenames() -> set[str]:
 def list_states() -> list[PlaylistState]:
     with _connect() as conn:
         rows = conn.execute(f"SELECT {STATE_COLUMNS} FROM playlists ORDER BY id").fetchall()
-        tracks: dict[str, list[str]] = {}
-        for track in conn.execute("SELECT playlist_id, filename FROM playlist_tracks ORDER BY playlist_id, position"):
-            tracks.setdefault(track["playlist_id"], []).append(track["filename"])
+        tracks = _all_tracks(conn)
     return [_to_state(row, tracks.get(row["id"], [])) for row in rows]
 
 
@@ -191,10 +192,8 @@ def get_state(playlist_id: str) -> PlaylistState:
 
 def favorites_id() -> Optional[str]:
     with _connect() as conn:
-        row = conn.execute(
-            "SELECT id FROM playlists WHERE is_favorites = 1 AND deleted_at IS NULL ORDER BY created_at, id"
-        ).fetchone()
-    return row["id"] if row is not None else None
+        ids = _favorite_ids(conn)
+    return ids[0] if ids else None
 
 
 def had_favorites() -> bool:
@@ -204,20 +203,18 @@ def had_favorites() -> bool:
 
 def merge_favorites() -> None:
     with _lock, _connect() as conn:
-        rows = conn.execute(
-            "SELECT id FROM playlists WHERE is_favorites = 1 AND deleted_at IS NULL ORDER BY created_at, id"
-        ).fetchall()
-        if len(rows) < 2:
+        ids = _favorite_ids(conn)
+        if len(ids) < 2:
             return
-        keep = rows[0]["id"]
+        keep, *others = ids
         merged = _filenames(conn, keep)
         now = _now()
-        for row in rows[1:]:
-            merged += [filename for filename in _filenames(conn, row["id"]) if filename not in merged]
-            _write_tracks(conn, row["id"], [])
+        for other in others:
+            merged += [filename for filename in _filenames(conn, other) if filename not in merged]
+            _write_tracks(conn, other, [])
             conn.execute(
                 "UPDATE playlists SET cover = NULL, updated_at = ?, deleted_at = ? WHERE id = ?",
-                (now, now, row["id"]),
+                (now, now, other),
             )
         _write_tracks(conn, keep, merged)
         _touch(conn, keep)
@@ -369,20 +366,7 @@ def remove_tracks(filenames: list[str]) -> None:
 
 
 def sync_records() -> list[SyncPlaylistRecord]:
-    return [
-        SyncPlaylistRecord(
-            id=state.id,
-            name=state.name,
-            description=state.description,
-            filenames=state.filenames,
-            cover_hash=state.cover_hash,
-            is_favorites=state.is_favorites,
-            created_at=state.created_at,
-            updated_at=state.updated_at,
-            deleted_at=state.deleted_at,
-        )
-        for state in list_states()
-    ]
+    return [SyncPlaylistRecord(**asdict(state)) for state in list_states()]
 
 
 def cover_by_id(playlist_id: str) -> Optional[bytes]:
@@ -393,27 +377,12 @@ def cover_by_id(playlist_id: str) -> Optional[bytes]:
 
 def apply_record(record: SyncPlaylistRecord, cover: Optional[bytes]) -> None:
     filenames = _clean_filenames(record.filenames)
-    values = (
-        record.name,
-        record.description,
-        cover,
-        int(record.is_favorites),
-        record.created_at,
-        record.updated_at,
-        record.deleted_at,
-    )
     with _lock, _connect() as conn:
-        exists = conn.execute("SELECT 1 FROM playlists WHERE id = ?", (record.id,)).fetchone() is not None
-        if exists:
-            conn.execute(
-                "UPDATE playlists SET name = ?, description = ?, cover = ?, is_favorites = ?, created_at = ?, "
-                "updated_at = ?, deleted_at = ? WHERE id = ?",
-                (*values, record.id),
-            )
-        else:
-            conn.execute(
-                "INSERT INTO playlists (name, description, cover, is_favorites, created_at, updated_at, deleted_at, id) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (*values, record.id),
-            )
+        conn.execute(
+            "INSERT INTO playlists (id, name, description, cover, is_favorites, created_at, updated_at, deleted_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name, "
+            "description = excluded.description, cover = excluded.cover, is_favorites = excluded.is_favorites, "
+            "created_at = excluded.created_at, updated_at = excluded.updated_at, deleted_at = excluded.deleted_at",
+            (record.id, record.name, record.description, cover, int(record.is_favorites), record.created_at, record.updated_at, record.deleted_at),
+        )
         _write_tracks(conn, record.id, filenames)

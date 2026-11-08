@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable, Iterator, Literal, Optional
+from typing import Callable, Iterable, Iterator, Literal, Optional, TypeVar
 
 import eyed3
 
@@ -275,7 +275,29 @@ MP3FilterBy = Literal["all", "title", "artist", "filename", "album"]
 MP3SortBy = Literal["date_added", "filename", "size", "artist", "title", "album", "duration"]
 MP3DurationRange = Literal["any", "under-2", "2-3", "3-4", "4-5", "5-7", "over-7"]
 MP3Issue = Literal["any", "title", "artist", "album", "cover", "duplicate", "playlist"]
+AlbumSortBy = Literal["album_name", "track_count", "total_size", "date_added"]
 SortDirection = Literal["asc", "desc"]
+T = TypeVar("T")
+
+OLDEST = datetime.min.replace(tzinfo=timezone.utc)
+
+SEARCH_FIELDS: dict[str, tuple[str, ...]] = {
+    "all": ("title", "artist", "album", "filename"),
+    "title": ("title",),
+    "artist": ("artist",),
+    "album": ("album",),
+    "filename": ("filename",),
+}
+
+TRACK_SORT_KEYS: dict[str, Callable[[MP3Info], object]] = {
+    "date_added": lambda track: track.date_added or OLDEST,
+    "filename": lambda track: track.filename.casefold(),
+    "size": lambda track: track.file_size,
+    "artist": lambda track: (track.artist or "").casefold(),
+    "title": lambda track: (track.title or "").casefold(),
+    "album": lambda track: (track.album or "").casefold(),
+    "duration": lambda track: track.duration or 0,
+}
 
 DURATION_RANGES: dict[str, tuple[float, float]] = {
     "under-2": (0, 120),
@@ -333,122 +355,55 @@ def filter_sort_mp3_infos(
         mp3s = [track for track in mp3s if track.filename in only]
     if issue != "any":
         mp3s = [track for track in mp3s if _has_issue(track, issue, duplicates, listed or set())]
-    search_query = search.strip().casefold()
 
     if duration_range in DURATION_RANGES:
         lower, upper = DURATION_RANGES[duration_range]
         mp3s = [track for track in mp3s if track.duration is not None and lower <= track.duration < upper]
 
+    search_query = search.strip().casefold()
     if search_query:
-        def matches_query(track: MP3Info) -> bool:
-            title = (track.title or "").casefold()
-            artist = (track.artist or "").casefold()
-            album = (track.album or "").casefold()
-            filename = track.filename.casefold()
+        fields = SEARCH_FIELDS[filter_by]
+        mp3s = [track for track in mp3s if any(search_query in (getattr(track, field) or "").casefold() for field in fields)]
 
-            if filter_by == "title":
-                return search_query in title
-            if filter_by == "artist":
-                return search_query in artist
-            if filter_by == "album":
-                return search_query in album
-            if filter_by == "filename":
-                return search_query in filename
-            return (
-                search_query in title
-                or search_query in artist
-                or search_query in album
-                or search_query in filename
-            )
-
-        mp3s = [track for track in mp3s if matches_query(track)]
-
-    if sort_by == "date_added":
-        mp3s.sort(
-            key=lambda track: (
-                track.date_added or datetime.min.replace(tzinfo=timezone.utc),
-                track.filename.casefold(),
-            )
-        )
-    elif sort_by == "size":
-        mp3s.sort(key=lambda track: (track.file_size, track.filename.casefold()))
-    elif sort_by == "artist":
-        mp3s.sort(key=lambda track: ((track.artist or "").casefold(), track.filename.casefold()))
-    elif sort_by == "title":
-        mp3s.sort(key=lambda track: ((track.title or "").casefold(), track.filename.casefold()))
-    elif sort_by == "album":
-        mp3s.sort(key=lambda track: ((track.album or "").casefold(), track.filename.casefold()))
-    elif sort_by == "duration":
-        mp3s.sort(key=lambda track: (track.duration or 0, track.filename.casefold()))
-    else:
-        mp3s.sort(key=lambda track: track.filename.casefold())
-
+    mp3s.sort(key=lambda track: (TRACK_SORT_KEYS[sort_by](track), track.filename.casefold()))
     if sort_direction == "desc":
         mp3s.reverse()
-
     return mp3s
 
 
-def query_mp3_infos(
-    page: int,
-    limit: int,
-    search: str,
-    filter_by: MP3FilterBy,
-    sort_by: MP3SortBy,
-    sort_direction: SortDirection,
-    duration_range: MP3DurationRange = "any",
-    only: Optional[set[str]] = None,
-    issue: MP3Issue = "any",
-    listed: Optional[set[str]] = None,
-) -> tuple[list[MP3Info], int]:
-    mp3s = filter_sort_mp3_infos(search, filter_by, sort_by, sort_direction, duration_range, only, issue, listed)
-    total = len(mp3s)
+def paginate(items: list[T], page: int, limit: int) -> tuple[list[T], int]:
     start = (page - 1) * limit
-    end = start + limit
-    return mp3s[start:end], total
+    return items[start:start + limit], len(items)
+
+
+def _album_name(album: AlbumInfo) -> str:
+    return (album.album_name or "").casefold()
+
+
+ALBUM_SORT_KEYS: dict[str, Callable[[AlbumInfo], object]] = {
+    "album_name": _album_name,
+    "track_count": lambda album: album.track_count,
+    "total_size": lambda album: album.total_size,
+    "date_added": lambda album: album.date_added or OLDEST,
+}
 
 
 def query_albums(
     page: int,
     limit: int,
     search: str,
-    sort_by: Literal["album_name", "track_count", "total_size", "date_added"],
-    sort_direction: Literal["asc", "desc"],
+    sort_by: AlbumSortBy,
+    sort_direction: SortDirection,
 ) -> tuple[list[AlbumInfo], int]:
     albums = [group.to_info() for group in build_album_groups().values()]
     search_query = search.strip().casefold()
-
     if search_query:
-        albums = [
-            album
-            for album in albums
-            if (
-                search_query in (album.album_name or "").casefold()
-                or search_query in " ".join(album.artists).casefold()
-            )
-        ]
+        albums = [album for album in albums if search_query in _album_name(album) or search_query in " ".join(album.artists).casefold()]
 
-    if sort_by == "track_count":
-        albums.sort(key=lambda album: (album.track_count, (album.album_name or "").casefold()))
-    elif sort_by == "total_size":
-        albums.sort(key=lambda album: (album.total_size, (album.album_name or "").casefold()))
-    elif sort_by == "date_added":
-        albums.sort(
-            key=lambda album: (
-                album.date_added or datetime.min.replace(tzinfo=timezone.utc),
-                (album.album_name or "").casefold(),
-            )
-        )
-    else:
-        albums.sort(key=lambda album: (album.album_name or "").casefold())
-
+    albums.sort(key=lambda album: (ALBUM_SORT_KEYS[sort_by](album), _album_name(album)))
     if sort_direction == "desc":
         albums.reverse()
-
-    total = len(albums)
-    start = (page - 1) * limit
-    end = start + limit
-    return albums[start:end], total
+    return paginate(albums, page, limit)
 
 
 def get_album_group(album_key: str) -> Optional[AlbumGroup]:
@@ -524,5 +479,3 @@ def get_mp3_info(filepath: Path) -> MP3Info:
     if audio and audio.info:
         info.duration = audio.info.time_secs
     return info
-
-

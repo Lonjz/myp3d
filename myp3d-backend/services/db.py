@@ -10,6 +10,11 @@ def now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def parse_stamp(value: str) -> datetime:
+    stamp = datetime.fromisoformat(value)
+    return stamp if stamp.tzinfo is not None else stamp.replace(tzinfo=timezone.utc)
+
+
 def enable_wal() -> None:
     with connect() as conn:
         conn.execute("PRAGMA journal_mode=WAL")

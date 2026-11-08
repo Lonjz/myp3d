@@ -116,9 +116,10 @@ def _reset_state() -> None:
     queue_service._progress.clear()
     queue_service._worker = None
     sync_service._session = None
-    sync_service._fingerprints.clear()
-    music_service._sync = None
-    music_playlist_service._sync = None
+    sync_service._file_digests.clear()
+    sync_service._tag_digests.clear()
+    music_service._slot.job = None
+    music_playlist_service._slot.job = None
     spotify_service._track_details.cache_clear()
 
 

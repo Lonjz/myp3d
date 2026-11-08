@@ -1,12 +1,14 @@
-from typing import Literal, Optional
+from typing import Optional
 
-from fastapi import APIRouter, File, HTTPException, Query, Response, UploadFile
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 
 from models.library import AlbumDetail, AlbumUpdate, AlbumUpdateResponse, PaginatedAlbumResponse, PaginationMeta
-from routers.common import cache_headers, read_cover
-from services.cover_service import CoverSize, get_album_cover, get_cover_variant
+from routers.common import cache_headers, cover_response, read_cover
+from services.cover_service import CoverSize
 from services.mp3_service import (
     NO_ALBUM_LABEL,
+    AlbumSortBy,
+    SortDirection,
     get_album_group,
     make_album_key,
     query_albums,
@@ -29,8 +31,8 @@ def list_album_groups_paged(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=200),
     search: str = Query(""),
-    sort_by: Literal["album_name", "track_count", "total_size", "date_added"] = Query("album_name"),
-    sort_direction: Literal["asc", "desc"] = Query("asc"),
+    sort_by: AlbumSortBy = Query("album_name"),
+    sort_direction: SortDirection = Query("asc"),
 ):
     items, total = query_albums(
         page=page,
@@ -83,8 +85,4 @@ def get_album_cover_image(
     size: Optional[CoverSize] = Query(None),
     v: Optional[str] = Query(None, max_length=64),
 ):
-    album_group = _get_album_group_or_404(album_key)
-    cover = get_cover_variant(album_group.filepaths, size) if size else get_album_cover(album_group.filepaths)
-    if cover is None:
-        raise HTTPException(status_code=404, detail="No cover image found")
-    return Response(content=cover[0], media_type=cover[1], headers=cache_headers(v))
+    return cover_response(_get_album_group_or_404(album_key).filepaths, size, cache_headers(v))

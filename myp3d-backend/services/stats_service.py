@@ -29,8 +29,6 @@ DURATION_LABELS: dict[str, str] = {
 }
 
 
-
-
 def _month_keys(now: datetime, count: int) -> list[str]:
     year, month = now.year, now.month
     keys: list[str] = []

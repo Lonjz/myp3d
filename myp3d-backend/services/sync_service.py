@@ -10,7 +10,7 @@ import urllib.parse
 import urllib.request
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal, Optional
 
@@ -25,18 +25,19 @@ from models.sync import (
     SyncPeer,
     SyncProgress,
     SyncSessionInfo,
+    SyncSessionStatus,
 )
 from services import database_sync, date_service, favorite_playlist, queue_service, track_records
-from services.audio_fingerprint import audio_bounds, audio_fingerprint, id3_tag_length, splice_audio
+from services.audio_fingerprint import audio_bounds, audio_fingerprint, id3_tag_length, splice_audio, stat_cached
 from services.database_sync import RecordKind, RecordPull
 from services.config import API_PORT, OUTPUT_DIR, VERSION
+from services.db import parse_stamp
 from services.device_service import get_device
 from services.discovery_service import discovery
 from services.mp3_service import invalidate_library_cache, list_mp3_filepaths, list_mp3_infos
 from services.errors import AppError
 from services.filenames import is_track_name
 
-SyncStatusName = Literal["requested", "incoming", "paired", "syncing", "done", "declined", "failed", "cancelled"]
 PullKind = Literal["new", "update"]
 AudioSwap = Literal["theirs", "splice"]
 
@@ -51,14 +52,13 @@ COPY_CHUNK_BYTES = 1024 * 1024
 FINGERPRINT_SAMPLE_BYTES = 64 * 1024
 
 
-
 @dataclass
 class _Session:
     id: str
     peer: SyncPeer
     port: int
     direction: Literal["outgoing", "incoming"]
-    status: SyncStatusName
+    status: SyncSessionStatus
     local: SyncProgress = field(default_factory=SyncProgress)
     remote: SyncProgress = field(default_factory=SyncProgress)
     error: Optional[str] = None
@@ -106,12 +106,20 @@ class _Plan:
 _opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 _lock = threading.Lock()
 _session: Optional[_Session] = None
-_fingerprint_lock = threading.Lock()
-_fingerprints: dict[tuple[str, str, int, int], str] = {}
+_file_digests: dict[str, tuple[int, int, str]] = {}
+_tag_digests: dict[str, tuple[int, int, str]] = {}
 
 
 def _peer_url(session: _Session, path: str) -> str:
     return f"http://{session.peer.host}:{session.port}{path}"
+
+
+def _session_path(session: _Session, *parts: str) -> str:
+    return "/".join([f"/peer/sessions/{session.id}", *(urllib.parse.quote(part) for part in parts)])
+
+
+def _session_url(session: _Session, *parts: str) -> str:
+    return _peer_url(session, _session_path(session, *parts))
 
 
 def _request_json(
@@ -142,9 +150,9 @@ def _request_json(
     return json.loads(body.decode("utf-8")) if body else None
 
 
-def _notify(session: _Session, path: str, payload: Optional[dict] = None) -> None:
+def _notify(session: _Session, action: str) -> None:
     try:
-        _request_json(session, "POST", path, payload or {})
+        _request_json(session, "POST", _session_path(session, action), {})
     except AppError:
         pass
 
@@ -172,6 +180,11 @@ def _require(session_id: str, statuses: set[str], host: str) -> _Session:
     if _session.status not in statuses:
         raise AppError(409, "The sync session is not in a state for that")
     return _session
+
+
+def _check_peer(session_id: str, host: str) -> None:
+    with _lock:
+        _require(session_id, PEER_STATUSES, host)
 
 
 def _maybe_finish(session: _Session) -> None:
@@ -263,7 +276,7 @@ def accept() -> SyncSessionInfo:
         session.status = "paired"
 
     try:
-        _request_json(session, "POST", f"/peer/sessions/{session.id}/accepted", {})
+        _request_json(session, "POST", _session_path(session, "accepted"), {})
     except AppError:
         with _lock:
             if _session is session and session.status == "paired":
@@ -285,7 +298,7 @@ def start() -> SyncSessionInfo:
             raise AppError(409, "No device is paired")
         session = _session
 
-    _request_json(session, "POST", f"/peer/sessions/{session.id}/start", {})
+    _request_json(session, "POST", _session_path(session, "start"), {})
 
     with _lock:
         if _session is session and session.status == "paired":
@@ -306,7 +319,7 @@ def decline() -> None:
             raise AppError(409, "There is no sync request to decline")
         session = _session
         session.status = "declined"
-    _notify(session, f"/peer/sessions/{session.id}/declined")
+    _notify(session, "declined")
 
 
 def on_declined(session_id: str, host: str) -> None:
@@ -320,7 +333,7 @@ def cancel() -> None:
             raise AppError(409, "There is no sync to cancel")
         session = _session
         session.status = "cancelled"
-    _notify(session, f"/peer/sessions/{session.id}/cancelled")
+    _notify(session, "cancelled")
 
 
 def on_cancelled(session_id: str, host: str) -> None:
@@ -365,30 +378,23 @@ def _tag_digest(handle, size: int) -> str:
     return digest.hexdigest()
 
 
-def _cached_digest(path: Path, kind: str, compute) -> Optional[str]:
+def _cached_digest(cache: dict, path: Path, compute) -> Optional[str]:
+    def read(target: Path, size: int) -> str:
+        with open(target, "rb") as handle:
+            return compute(handle, size)
+
     try:
-        stats = path.stat()
-        key = (kind, path.name, stats.st_size, stats.st_mtime_ns)
-        with _fingerprint_lock:
-            cached = _fingerprints.get(key)
-        if cached is not None:
-            return cached
-        with open(path, "rb") as handle:
-            fingerprint = compute(handle, stats.st_size)
+        return stat_cached(cache, path, read)
     except OSError:
         return None
 
-    with _fingerprint_lock:
-        _fingerprints[key] = fingerprint
-    return fingerprint
-
 
 def _fingerprint(path: Path) -> Optional[str]:
-    return _cached_digest(path, "file", _file_digest)
+    return _cached_digest(_file_digests, path, _file_digest)
 
 
 def _tag_fingerprint(path: Path) -> Optional[str]:
-    return _cached_digest(path, "tags", _tag_digest)
+    return _cached_digest(_tag_digests, path, _tag_digest)
 
 
 def _local_manifest() -> list[SyncManifestEntry]:
@@ -419,20 +425,17 @@ def _local_manifest() -> list[SyncManifestEntry]:
 
 
 def manifest(session_id: str, host: str) -> list[SyncManifestEntry]:
-    with _lock:
-        _require(session_id, PEER_STATUSES, host)
+    _check_peer(session_id, host)
     return _local_manifest()
 
 
 def database(session_id: str, host: str) -> SyncDatabase:
-    with _lock:
-        _require(session_id, PEER_STATUSES, host)
+    _check_peer(session_id, host)
     return database_sync.local_database()
 
 
 def record_cover(session_id: str, host: str, kind: str, key: str) -> bytes:
-    with _lock:
-        _require(session_id, PEER_STATUSES, host)
+    _check_peer(session_id, host)
     cover = database_sync.local_cover(kind, key) if kind in ("playlist", "download") else None
     if cover is None:
         raise AppError(404, "No cover image found")
@@ -440,8 +443,7 @@ def record_cover(session_id: str, host: str, kind: str, key: str) -> bytes:
 
 
 def peer_file(session_id: str, host: str, filename: str) -> Path:
-    with _lock:
-        _require(session_id, PEER_STATUSES, host)
+    _check_peer(session_id, host)
     path = OUTPUT_DIR / filename
     if not is_track_name(filename) or not path.is_file():
         raise AppError(404, "MP3 file not found")
@@ -463,12 +465,7 @@ def peer_tags(session_id: str, host: str, filename: str) -> tuple[bytes, bytes]:
 
 
 def _remote_manifest(session: _Session) -> dict[str, dict]:
-    entries = _request_json(
-        session,
-        "GET",
-        f"/peer/sessions/{session.id}/manifest",
-        timeout=TRANSFER_TIMEOUT_S,
-    )
+    entries = _request_json(session, "GET", _session_path(session, "manifest"), timeout=TRANSFER_TIMEOUT_S)
     if not isinstance(entries, list):
         return {}
     return {
@@ -480,7 +477,7 @@ def _remote_manifest(session: _Session) -> dict[str, dict]:
 
 def _remote_database(session: _Session) -> SyncDatabase:
     try:
-        payload = _request_json(session, "GET", f"/peer/sessions/{session.id}/database", timeout=TRANSFER_TIMEOUT_S)
+        payload = _request_json(session, "GET", _session_path(session, "database"), timeout=TRANSFER_TIMEOUT_S)
     except AppError as exc:
         if exc.status_code == 404:
             raise AppError(409, f"Update myp3d on {session.peer.name} to sync playlists and downloads") from exc
@@ -492,8 +489,7 @@ def _remote_database(session: _Session) -> SyncDatabase:
 
 
 def _fetch_record_cover(session: _Session, kind: RecordKind, key: str) -> bytes:
-    url = _peer_url(session, f"/peer/sessions/{session.id}/records/{kind}/{urllib.parse.quote(key)}/cover")
-    with _opener.open(url, timeout=TRANSFER_TIMEOUT_S) as response:
+    with _opener.open(_session_url(session, "records", kind, key, "cover"), timeout=TRANSFER_TIMEOUT_S) as response:
         return response.read()
 
 
@@ -525,10 +521,9 @@ def _added(entry: dict) -> Optional[datetime]:
     if not isinstance(value, str):
         return None
     try:
-        stamp = datetime.fromisoformat(value)
+        return parse_stamp(value)
     except ValueError:
         return None
-    return stamp if stamp.tzinfo is not None else stamp.replace(tzinfo=timezone.utc)
 
 
 def _redates(local: dict, remote: dict) -> bool:
@@ -731,7 +726,7 @@ def peer_cover(filename: str, size: Optional[str]) -> tuple[bytes, str]:
         session = _session
 
     query = f"?size={urllib.parse.quote(size)}" if size else ""
-    url = _peer_url(session, f"/peer/sessions/{session.id}/covers/{urllib.parse.quote(filename)}{query}")
+    url = _session_url(session, "covers", filename) + query
     try:
         with _opener.open(url, timeout=HTTP_TIMEOUT_S) as response:
             return response.read(), response.headers.get_content_type()
@@ -749,18 +744,34 @@ def _fail(session: _Session, message: str) -> None:
         if _session is session and session.status == "syncing":
             session.status = "failed"
             session.error = message
-    _notify(session, f"/peer/sessions/{session.id}/cancelled")
+    _notify(session, "cancelled")
 
 
 def _report(session: _Session) -> bool:
     with _lock:
         payload = session.local.model_dump()
     try:
-        _request_json(session, "POST", f"/peer/sessions/{session.id}/progress", payload)
+        _request_json(session, "POST", _session_path(session, "progress"), payload)
     except AppError as exc:
         _fail(session, exc.detail)
         return False
     return True
+
+
+def _tally(session: _Session, outcome: Literal["done", "failed", "skipped"]) -> bool:
+    with _lock:
+        if outcome == "done":
+            session.local.done += 1
+        elif outcome == "failed":
+            session.local.failed += 1
+        else:
+            session.local.total -= 1
+    return _report(session)
+
+
+def _fetch_file(session: _Session, filename: str, destination: Path) -> None:
+    with _opener.open(_session_url(session, "files", filename), timeout=TRANSFER_TIMEOUT_S) as response, open(destination, "wb") as handle:
+        shutil.copyfileobj(response, handle, COPY_CHUNK_BYTES)
 
 
 def _download(session: _Session, filename: str, target: str, overwrite: bool, size: Any) -> bool:
@@ -768,10 +779,8 @@ def _download(session: _Session, filename: str, target: str, overwrite: bool, si
     if destination.exists() and not overwrite:
         return True
     partial = OUTPUT_DIR / f".{target}.part"
-    url = _peer_url(session, f"/peer/sessions/{session.id}/files/{urllib.parse.quote(filename)}")
     try:
-        with _opener.open(url, timeout=TRANSFER_TIMEOUT_S) as response, open(partial, "wb") as handle:
-            shutil.copyfileobj(response, handle, COPY_CHUNK_BYTES)
+        _fetch_file(session, filename, partial)
         if partial.stat().st_size != size:
             partial.unlink(missing_ok=True)
             return False
@@ -786,8 +795,7 @@ def _download(session: _Session, filename: str, target: str, overwrite: bool, si
 
 
 def _fetch_tags(session: _Session, filename: str) -> tuple[bytes, bytes]:
-    url = _peer_url(session, f"/peer/sessions/{session.id}/tags/{urllib.parse.quote(filename)}")
-    with _opener.open(url, timeout=TRANSFER_TIMEOUT_S) as response:
+    with _opener.open(_session_url(session, "tags", filename), timeout=TRANSFER_TIMEOUT_S) as response:
         body = response.read()
         head_length = int(response.headers.get("X-Head-Length", ""))
     if not 0 <= head_length <= len(body):
@@ -835,10 +843,8 @@ def _swap_audio(session: _Session, pull: _Pull, source: str) -> bool:
     path = OUTPUT_DIR / source
     download = OUTPUT_DIR / f".{source}.audio.part"
     joined = OUTPUT_DIR / f".{source}.joined.part"
-    url = _peer_url(session, f"/peer/sessions/{session.id}/files/{urllib.parse.quote(pull.entry['filename'])}")
     try:
-        with _opener.open(url, timeout=TRANSFER_TIMEOUT_S) as response, open(download, "wb") as handle:
-            shutil.copyfileobj(response, handle, COPY_CHUNK_BYTES)
+        _fetch_file(session, pull.entry["filename"], download)
         if audio_fingerprint(download) != _audio(pull.entry):
             return False
         if pull.swap == "splice":
@@ -892,16 +898,7 @@ def _apply_records(session: _Session, pulls: list[RecordPull]) -> bool:
             outcome = "done" if database_sync.apply_pull(pull, current, lambda kind, key: _fetch_record_cover(session, kind, key)) else "skipped"
         except Exception:
             outcome = "failed"
-        if not database_sync.is_visible(pull):
-            continue
-        with _lock:
-            if outcome == "done":
-                session.local.done += 1
-            elif outcome == "failed":
-                session.local.failed += 1
-            else:
-                session.local.total -= 1
-        if not _report(session):
+        if database_sync.is_visible(pull) and not _tally(session, outcome):
             return False
     return True
 
@@ -940,13 +937,7 @@ def _pull(session: _Session) -> None:
         for pull in pulls:
             if not _still_syncing(session):
                 return
-            succeeded = _apply_pull(session, pull)
-            with _lock:
-                if succeeded:
-                    session.local.done += 1
-                else:
-                    session.local.failed += 1
-            if not _report(session):
+            if not _tally(session, "done" if _apply_pull(session, pull) else "failed"):
                 return
     finally:
         if pulls:

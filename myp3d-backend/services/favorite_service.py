@@ -24,10 +24,7 @@ CREATE TABLE IF NOT EXISTS apple_favorite_snapshot (
 """
 
 
-
 _lock = threading.Lock()
-
-
 
 
 def _clean_filename(filename: str) -> str:

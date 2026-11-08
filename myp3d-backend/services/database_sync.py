@@ -1,4 +1,3 @@
-import hashlib
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -6,7 +5,8 @@ from typing import Callable, Literal, Optional, Union
 
 from models.sync import SyncDatabase, SyncDiffRecord, SyncFavoriteRecord, SyncPlaylistRecord, SyncQueueRecord
 from services import favorite_service, playlist_service, queue_service
-from services.db import connect
+from services.cover_service import cover_digest
+from services.db import connect, parse_stamp
 
 TOMBSTONE_DAYS = 180
 
@@ -39,11 +39,6 @@ def keyed(database: SyncDatabase) -> dict[RecordKey, Record]:
     keyed.update({("download", record.uid): record for record in database.downloads})
     keyed.update({("favorite", record.filename): record for record in database.favorites})
     return keyed
-
-
-def _stamp(record: Record) -> datetime:
-    stamp = datetime.fromisoformat(record.updated_at)
-    return stamp if stamp.tzinfo is not None else stamp.replace(tzinfo=timezone.utc)
 
 
 def local_database() -> SyncDatabase:
@@ -87,7 +82,7 @@ def plan_pulls(
             continue
         if mine.deleted_at is not None and record.deleted_at is not None:
             continue
-        theirs, ours = _stamp(record), _stamp(mine)
+        theirs, ours = parse_stamp(record.updated_at), parse_stamp(mine.updated_at)
         if theirs > ours or (theirs == ours and prefer_remote):
             pulls.append(RecordPull(kind, record, mine.deleted_at is None))
     return pulls
@@ -155,7 +150,7 @@ def apply_pull(
         cover = local_cover(pull.kind, pull.key) if mine is not None and mine.cover_hash == wanted else None
         if cover is None:
             cover = fetch_cover(pull.kind, pull.key)
-        if hashlib.sha1(cover).hexdigest() != wanted:
+        if cover_digest(cover) != wanted:
             raise ValueError("The cover didn't arrive intact")
     if isinstance(pull.record, SyncPlaylistRecord):
         playlist_service.apply_record(pull.record, cover)

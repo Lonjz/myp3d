@@ -1,5 +1,6 @@
 import pytest
 
+from models.music import MusicSyncInfo
 from services import music_service
 from services.music_service import FIELD_SEP, GROUP_SEP, RECORD_SEP
 
@@ -33,8 +34,8 @@ def music(monkeypatch) -> FakeMusic:
     return fake
 
 
-def sync(root) -> music_service._SyncJob:
-    job = music_service._SyncJob(status="syncing", total=0)
+def sync(root) -> MusicSyncInfo:
+    job = MusicSyncInfo(status="syncing")
     music_service._run_sync(job, root)
     return job
 

@@ -1,5 +1,4 @@
 import sqlite3
-import hashlib
 import threading
 import urllib.request
 import uuid
@@ -12,7 +11,7 @@ from models.queue import QueueItem, QueueItemCreate, QueueItemUpdate
 from models.sync import SyncQueueRecord
 from services.db import connect as _connect
 from services.db import now as _now
-from services.cover_service import make_square_cover, square_cover_from_base64
+from services.cover_service import cover_digest, make_square_cover, square_cover_from_base64
 from services.filenames import clean_custom_name
 from services.youtube_service import download_as_mp3, validate_trim_range
 from services.errors import AppError
@@ -56,13 +55,10 @@ ITEM_COLUMNS = (
 )
 
 
-
 _lock = threading.Lock()
 _progress: dict[int, float] = {}
 _cancelled: set[int] = set()
 _worker: Optional[threading.Thread] = None
-
-
 
 
 def _clean(value: Optional[str]) -> Optional[str]:
@@ -345,17 +341,13 @@ def rename_track(old: str, new: str) -> None:
         conn.execute("UPDATE queue_items SET filename = ? WHERE filename = ?", (new, old))
 
 
-def _cover_hash(cover: Optional[bytes]) -> Optional[str]:
-    return hashlib.sha1(cover).hexdigest() if cover is not None else None
-
-
 def sync_records() -> list[SyncQueueRecord]:
     with _connect() as conn:
         rows = conn.execute(f"SELECT {SYNC_COLUMNS} FROM queue_items ORDER BY position, id").fetchall()
     return [
         SyncQueueRecord(
             **{name: row[name] for name in row.keys() if name not in ("cover", "overwrite", "status")},
-            cover_hash=_cover_hash(row["cover"]),
+            cover_hash=cover_digest(row["cover"]),
             overwrite=bool(row["overwrite"]),
             status="pending" if row["status"] in ACTIVE_STATUSES else row["status"],
         )

@@ -3,6 +3,8 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+SyncSessionStatus = Literal["requested", "incoming", "paired", "syncing", "done", "declined", "failed", "cancelled"]
+
 
 class SyncDevice(BaseModel):
     id: str = Field(max_length=64)
@@ -44,7 +46,7 @@ class SyncSessionInfo(BaseModel):
     id: str
     peer: SyncPeer
     direction: Literal["outgoing", "incoming"]
-    status: Literal["requested", "incoming", "paired", "syncing", "done", "declined", "failed", "cancelled"]
+    status: SyncSessionStatus
     local: SyncProgress
     remote: SyncProgress
     error: Optional[str] = None

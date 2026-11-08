@@ -51,7 +51,6 @@ VARIANT_PHRASES = (
 CLEAN_PHRASES = ("clean", "radio edit", "censored")
 
 
-
 _ytmusic = threading.local()
 
 
@@ -121,6 +120,10 @@ def _normalize(value: Optional[str]) -> str:
 
 def _has_phrase(text: str, phrase: str) -> bool:
     return f" {phrase} " in f" {text} "
+
+
+def _adds_phrase(phrases: tuple[str, ...], text: str, original: str) -> bool:
+    return any(_has_phrase(text, phrase) and not _has_phrase(original, phrase) for phrase in phrases)
 
 
 def base_title(name: str) -> str:
@@ -249,7 +252,7 @@ def song_suggestions(query: str) -> list[TagSuggestion]:
         title = _normalize(song["title"])
         if not title or not song["artists"]:
             continue
-        if any(_has_phrase(title, phrase) and not _has_phrase(wanted, phrase) for phrase in CLEAN_PHRASES):
+        if _adds_phrase(CLEAN_PHRASES, title, wanted):
             continue
         key = _song_key(song["title"], song["artists"][0])
         suggestions.setdefault(key, TagSuggestion(title=format_title(song["title"], song["artists"]), artist=song["artists"][0], album=song["album"]))
@@ -332,9 +335,9 @@ def _score(track: SpotifyTrack, candidate: dict) -> float:
 
     spotify_text = _normalize(f"{track.name} {track.album or ''}")
     candidate_text = _normalize(f"{candidate['title']} {candidate['album'] or ''}")
-    if any(_has_phrase(candidate_text, phrase) and not _has_phrase(spotify_text, phrase) for phrase in VARIANT_PHRASES):
+    if _adds_phrase(VARIANT_PHRASES, candidate_text, spotify_text):
         score -= 0.25
-    if any(_has_phrase(candidate_text, phrase) and not _has_phrase(spotify_text, phrase) for phrase in CLEAN_PHRASES):
+    if _adds_phrase(CLEAN_PHRASES, candidate_text, spotify_text):
         score -= 0.15
     return score
 
