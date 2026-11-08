@@ -31,16 +31,20 @@ You need Python 3.10+, [Node](https://nodejs.org) 20.19+ or 22.12+ and [ffmpeg](
 ```bash
 git clone https://github.com/Lonjz/myp3d.git
 cd myp3d
-
-cd myp3d-backend
-python -m venv venv
-venv/bin/pip install -r requirements.txt        # Windows: venv\Scripts\pip install -r requirements.txt
-
-cd ../myp3d-frontend
-npm install
 ```
 
-On Windows you can put `ffmpeg.exe` in `myp3d-backend/`. Otherwise install ffmpeg so it's on your `PATH`.
+| | |
+| --- | --- |
+| macOS / Linux | `./scripts/setup-mac.sh` |
+| Windows (PowerShell) | `powershell -ExecutionPolicy Bypass -File scripts\setup-win.ps1` |
+
+The script checks your Python and Node versions, installs the backend and frontend packages, and tells you what to run next. It's safe to run again.
+
+It won't install ffmpeg for you. On Windows you can put `ffmpeg.exe` in `myp3d-backend/`. Otherwise install ffmpeg so it's on your `PATH`.
+
+### Docker
+
+myp3d talks to your music folder, your LAN and your Music app. It's an MP3 downloader. It can live in a venv like the rest of us.
 
 ## Running
 

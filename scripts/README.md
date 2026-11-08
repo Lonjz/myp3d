@@ -4,6 +4,7 @@ Run these from the repository root. Each one checks that the backend venv and th
 
 | Script | |
 | --- | --- |
+| `setup-mac.sh`, `setup-win.ps1` | First-time setup (macOS or Linux, Windows): check Python and Node, create the venv and install the backend and frontend packages. Safe to rerun |
 | `dev-mac.sh` | Backend and frontend in one terminal (macOS or Linux) |
 | `dev-win.ps1` | Backend and frontend in two PowerShell windows |
 | `dev-win.bat` | Backend and frontend in two Windows Terminal tabs |
