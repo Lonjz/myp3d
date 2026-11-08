@@ -1,9 +1,35 @@
+import pytest
+
+from services import mp3_service, search_service
+from services.db import connect
 from services.mp3_service import make_album_key
-from tests.seed import DEFAULT_LIBRARY
+from tests.seed import DEFAULT_LIBRARY, write_tags
 
 
 def names(items) -> list[str]:
     return [item["filename"] for item in items]
+
+
+def restart() -> None:
+    mp3_service._file_infos.clear()
+    mp3_service.invalidate_library_cache()
+
+
+def stored_tags() -> list[str]:
+    with connect() as conn:
+        return [row["filename"] for row in conn.execute("SELECT filename FROM track_tags ORDER BY filename")]
+
+
+def titles() -> list[str]:
+    return [track.title for track in mp3_service.list_mp3_infos()]
+
+
+@pytest.fixture
+def reads(monkeypatch) -> list[str]:
+    seen: list[str] = []
+    original = mp3_service.get_mp3_info
+    monkeypatch.setattr(mp3_service, "get_mp3_info", lambda path: seen.append(path.name) or original(path))
+    return seen
 
 
 def test_empty_library_lists_nothing(client, library):
@@ -123,13 +149,9 @@ def test_stats(client, seeded_library, star):
     assert stats["tracks_with_cover"] == 10
 
 
-def test_edits_only_reread_changed_files(client, seeded_library, monkeypatch):
-    from services import mp3_service
-
+def test_edits_only_reread_changed_files(client, seeded_library, reads):
     client.get("/mp3s/all")
-    reads: list[str] = []
-    original = mp3_service.get_mp3_info
-    monkeypatch.setattr(mp3_service, "get_mp3_info", lambda path: reads.append(path.name) or original(path))
+    reads.clear()
     client.put("/mp3s/the chain.mp3/metadata", json={"title": "The Chain II"})
     tracks = {track["filename"]: track for track in client.get("/mp3s/all").json()}
     assert reads == ["the chain.mp3"]
@@ -142,3 +164,77 @@ def test_names_are_distinct_and_sorted(client, seeded_library):
     expected = {field: sorted({getattr(track, field) for track in DEFAULT_LIBRARY if getattr(track, field)}, key=str.casefold) for field in ("artist", "album")}
     assert names == {"artists": expected["artist"], "albums": expected["album"]}
     assert names["artists"].count("Fleetwood Mac") == 1
+
+
+def test_a_restart_reuses_the_stored_tags(library, reads):
+    library.add("song.mp3", "Song", "Band")
+    assert titles() == ["Song"]
+    assert reads == ["song.mp3"]
+
+    restart()
+    assert titles() == ["Song"]
+    assert reads == ["song.mp3"]
+
+
+def test_a_song_changed_while_stopped_is_read_again(library, reads):
+    library.add("song.mp3", "Old", "Band")
+    titles()
+    write_tags(library.path("song.mp3"), "New", "Band")
+
+    restart()
+    assert titles() == ["New"]
+    assert reads == ["song.mp3", "song.mp3"]
+
+
+def test_a_deleted_song_leaves_no_stored_tags(library):
+    library.add("a.mp3", "A", "Band", freq=300)
+    library.add("b.mp3", "B", "Band", freq=310)
+    titles()
+    assert stored_tags() == ["a.mp3", "b.mp3"]
+
+    library.path("a.mp3").unlink()
+    mp3_service.invalidate_library_cache()
+    assert titles() == ["B"]
+    assert stored_tags() == ["b.mp3"]
+
+
+def test_clear_cache_reads_every_song_again(client, library, reads):
+    library.add("song.mp3", "Song", "Band")
+    titles()
+    reads.clear()
+
+    assert client.post("/cache/clear").status_code == 200
+    assert titles() == ["Song"]
+    assert reads == ["song.mp3"]
+
+
+def test_stored_tags_from_an_older_version_are_read_again(library, reads):
+    library.add("song.mp3", "Song", "Band")
+    titles()
+    reads.clear()
+    with connect() as conn:
+        conn.execute("UPDATE track_tags SET info = json_remove(info, '$.duration')")
+
+    restart()
+    [track] = mp3_service.list_mp3_infos()
+    assert track.duration is not None
+    assert reads == ["song.mp3"]
+
+
+def test_only_real_mp3_files_are_listed(library):
+    library.add("song.mp3", "Song", "Band")
+    library.path("LOUD.MP3").write_bytes(library.path("song.mp3").read_bytes())
+    library.path(".song.mp3.part").write_bytes(b"partial")
+    library.path("notes.txt").write_text("notes")
+    library.path("folder.mp3").mkdir()
+
+    assert mp3_service.library_names() == {"song.mp3", "LOUD.MP3"}
+    assert [path.name for path in mp3_service.list_mp3_filepaths()] == ["LOUD.MP3", "song.mp3"]
+
+
+@pytest.mark.parametrize(
+    "word, field, rank",
+    [("dreams", "dreams", 0), ("dre", "dreams", 1), ("chain", "the chain", 2), ("hai", "the chain", 3), ("zzz", "the chain", None), ("x", "", None)],
+)
+def test_search_ranks(word, field, rank):
+    assert search_service._match_rank(word, field) == rank

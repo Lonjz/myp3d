@@ -1,4 +1,5 @@
 import hashlib
+import os
 import threading
 import time
 from contextlib import contextmanager
@@ -13,11 +14,21 @@ from models.library import AlbumInfo, LibraryNames, MP3Info
 from services import date_service
 from services.config import OUTPUT_DIR
 from services.cover_service import set_cover_images
+from services.db import connect as _connect
 
 
 CACHE_TTL_SECONDS = 120.0
 NO_ALBUM_LABEL = "(No Album)"
 IN_USE = "The song is in use. Stop playing it and try again"
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS track_tags (
+    filename TEXT PRIMARY KEY,
+    size INTEGER NOT NULL,
+    mtime_ns INTEGER NOT NULL,
+    info TEXT NOT NULL
+)
+"""
 
 
 @dataclass
@@ -61,6 +72,11 @@ _library_cache = _LibraryCache()
 _file_infos: dict[str, tuple[int, int, MP3Info]] = {}
 
 
+def init() -> None:
+    with _connect() as conn:
+        conn.execute(SCHEMA)
+
+
 def invalidate_library_cache() -> None:
     with _cache_lock:
         _library_cache.mp3_infos = None
@@ -68,6 +84,13 @@ def invalidate_library_cache() -> None:
         _library_cache.built_at = 0.0
         _library_cache.dirty = True
         _library_cache.generation += 1
+
+
+def clear_tag_cache() -> None:
+    with _rebuild_lock, _connect() as conn:
+        _file_infos.clear()
+        conn.execute("DELETE FROM track_tags")
+    invalidate_library_cache()
 
 
 def _should_rebuild_cache(now: float) -> bool:
@@ -92,15 +115,17 @@ def sweep_partial_files() -> None:
         path.unlink(missing_ok=True)
 
 
+def _mp3_entries() -> Iterator[os.DirEntry]:
+    with os.scandir(OUTPUT_DIR) as entries:
+        yield from (entry for entry in entries if os.path.splitext(entry.name)[1].lower() == ".mp3" and entry.is_file())
+
+
 def library_names() -> set[str]:
-    return {path.name for path in list_mp3_filepaths()}
+    return {entry.name for entry in _mp3_entries()}
 
 
 def list_mp3_filepaths() -> list[Path]:
-    return sorted(
-        [path for path in OUTPUT_DIR.iterdir() if path.is_file() and path.suffix.lower() == ".mp3"],
-        key=lambda path: path.name.lower(),
-    )
+    return sorted((Path(entry.path) for entry in _mp3_entries()), key=lambda path: path.name.lower())
 
 
 def _cached_mp3_infos() -> Optional[list[MP3Info]]:
@@ -110,24 +135,44 @@ def _cached_mp3_infos() -> Optional[list[MP3Info]]:
     return None
 
 
+def _restore_tags() -> None:
+    with _connect() as conn:
+        rows = conn.execute("SELECT filename, size, mtime_ns, info FROM track_tags").fetchall()
+    for row in rows:
+        info = MP3Info.model_validate_json(row["info"])
+        if info.model_fields_set == MP3Info.model_fields.keys():
+            _file_infos[row["filename"]] = (row["size"], row["mtime_ns"], info)
+
+
+def _store_tags(changed: dict[str, tuple[int, int, MP3Info]], removed: set[str]) -> None:
+    if not changed and not removed:
+        return
+    with _connect() as conn:
+        conn.executemany(
+            "INSERT OR REPLACE INTO track_tags (filename, size, mtime_ns, info) VALUES (?, ?, ?, ?)",
+            [(filename, size, mtime_ns, info.model_dump_json()) for filename, (size, mtime_ns, info) in changed.items()],
+        )
+        conn.executemany("DELETE FROM track_tags WHERE filename = ?", [(filename,) for filename in removed])
+
+
 def _read_library() -> list[MP3Info]:
+    if not _file_infos:
+        _restore_tags()
     seen: dict[str, tuple[int, int, MP3Info]] = {}
-    infos: list[MP3Info] = []
+    changed: dict[str, tuple[int, int, MP3Info]] = {}
     for path in list_mp3_filepaths():
         try:
             stats = path.stat()
-            cached = _file_infos.get(path.name)
-            if cached is not None and cached[:2] == (stats.st_size, stats.st_mtime_ns):
-                info = cached[2]
-            else:
-                info = get_mp3_info(path)
+            entry = _file_infos.get(path.name)
+            if entry is None or entry[:2] != (stats.st_size, stats.st_mtime_ns):
+                entry = changed[path.name] = (stats.st_size, stats.st_mtime_ns, get_mp3_info(path))
         except OSError:
             continue
-        seen[path.name] = (stats.st_size, stats.st_mtime_ns, info)
-        infos.append(info.model_copy())
+        seen[path.name] = entry
+    _store_tags(changed, _file_infos.keys() - seen.keys())
     _file_infos.clear()
     _file_infos.update(seen)
-    return infos
+    return [info.model_copy() for _, _, info in seen.values()]
 
 
 def list_mp3_infos() -> list[MP3Info]:

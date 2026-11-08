@@ -98,6 +98,7 @@ def _reset_state() -> None:
         directory.mkdir(parents=True)
     for path in SESSION_DIR.glob("myp3d.db*"):
         path.unlink()
+    mp3_service.init()
     queue_service.init()
     playlist_service.init()
     favorite_service.init()
@@ -118,7 +119,6 @@ def _reset_state() -> None:
     sync_service._fingerprints.clear()
     music_service._sync = None
     music_playlist_service._sync = None
-    spotify_service._track_entity.cache_clear()
     spotify_service._track_details.cache_clear()
 
 

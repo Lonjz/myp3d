@@ -103,11 +103,6 @@ def _embed_entity(kind: str, spotify_id: str) -> dict:
     return entity
 
 
-@lru_cache(maxsize=2048)
-def _track_entity(spotify_id: str) -> dict:
-    return _embed_entity("track", spotify_id)
-
-
 def _largest_image(entity: dict) -> Optional[str]:
     images = (entity.get("visualIdentity") or {}).get("image") or (entity.get("coverArt") or {}).get("sources") or []
     best = max(images, key=lambda image: image.get("maxWidth") or image.get("width") or 0, default=None)
@@ -130,6 +125,11 @@ def _has_phrase(text: str, phrase: str) -> bool:
 
 def base_title(name: str) -> str:
     return FEAT_PATTERN.sub("", name).strip() or name.strip()
+
+
+@lru_cache(maxsize=32768)
+def _song_key(title: str, artist: Optional[str]) -> tuple[str, str]:
+    return _normalize(base_title(title)), _normalize(artist)
 
 
 def format_title(name: str, artists: list[str]) -> str:
@@ -205,7 +205,7 @@ def _album_from_page(spotify_id: str) -> Optional[str]:
 
 @lru_cache(maxsize=1024)
 def _track_details(spotify_id: str, album_hint: Optional[str]) -> SpotifyTrack:
-    entity = _track_entity(spotify_id)
+    entity = _embed_entity("track", spotify_id)
     return SpotifyTrack(
         id=spotify_id,
         url=f"https://open.spotify.com/track/{spotify_id}",
@@ -251,7 +251,7 @@ def song_suggestions(query: str) -> list[TagSuggestion]:
             continue
         if any(_has_phrase(title, phrase) and not _has_phrase(wanted, phrase) for phrase in CLEAN_PHRASES):
             continue
-        key = (_normalize(base_title(song["title"])), _normalize(song["artists"][0]))
+        key = _song_key(song["title"], song["artists"][0])
         suggestions.setdefault(key, TagSuggestion(title=format_title(song["title"], song["artists"]), artist=song["artists"][0], album=song["album"]))
     return list(suggestions.values())[:SUGGESTION_LIMIT]
 
@@ -362,11 +362,11 @@ def _candidates(track: SpotifyTrack) -> list[SpotifyCandidate]:
 
 
 def _in_library(title: str, artist: Optional[str], filename: Optional[str]) -> bool:
-    key = (_normalize(base_title(title)), _normalize(artist))
+    key = _song_key(title, artist)
     for info in list_mp3_infos():
         if filename and info.filename.lower() == f"{filename}.mp3":
             return True
-        if info.title and (_normalize(base_title(info.title)), _normalize(info.artist)) == key:
+        if info.title and _song_key(info.title, info.artist) == key:
             return True
     return False
 

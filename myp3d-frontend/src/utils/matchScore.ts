@@ -5,12 +5,10 @@ function splitWords(value: string): string[] {
 }
 
 function matchRank(word: string, field: string): number | null {
-  if (!field) return null;
+  if (!field.includes(word)) return null;
   if (field === word) return 0;
   if (field.startsWith(word)) return 1;
-  if (splitWords(field).some((part) => part.startsWith(word))) return 2;
-  if (field.includes(word)) return 3;
-  return null;
+  return splitWords(field).some((part) => part.startsWith(word)) ? 2 : 3;
 }
 
 export function matchScore(query: string, fields: string[], maxRank = 3): number | null {

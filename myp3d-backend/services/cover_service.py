@@ -97,10 +97,10 @@ def get_image_variant(cache_key: str, image_data: bytes, size: CoverSize) -> tup
 
 def get_album_cover(filepaths: list[Path]) -> Optional[tuple[bytes, str]]:
     for filepath in filepaths:
-        audio = eyed3.load(str(filepath))
-        if not audio or not audio.tag or not audio.tag.images:
+        tag = eyed3.id3.Tag()
+        if not tag.parse(str(filepath)) or not tag.images:
             continue
-        image = audio.tag.images[0]
+        image = tag.images[0]
         return image.image_data, image.mime_type or "image/jpeg"
     return None
 

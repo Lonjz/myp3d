@@ -144,12 +144,12 @@ def test_applying_records(library):
     from services import favorite_service, playlist_service, queue_service
 
     record = playlist(PLAYLIST, "From Peer", ["a.mp3"], NOW)
-    database_sync.apply_pull(database_sync.RecordPull("playlist", record, False), SyncDatabase(), lambda *_: b"")
+    database_sync.apply_pull(database_sync.RecordPull("playlist", record, False), {}, lambda *_: b"")
     assert playlist_service.stored_filenames(PLAYLIST) == ["a.mp3"]
 
     favorite = SyncFavoriteRecord(filename="a.mp3", created_at=NOW.isoformat(), updated_at=NOW.isoformat())
-    database_sync.apply_pull(database_sync.RecordPull("favorite", favorite, False), SyncDatabase(), lambda *_: b"")
+    database_sync.apply_pull(database_sync.RecordPull("favorite", favorite, False), {}, lambda *_: b"")
     assert favorite_service.list_filenames() == {"a.mp3"}
 
-    assert database_sync.apply_pull(database_sync.RecordPull("download", download(DOWNLOAD, NOW), False), SyncDatabase(), lambda *_: b"")
+    assert database_sync.apply_pull(database_sync.RecordPull("download", download(DOWNLOAD, NOW), False), {}, lambda *_: b"")
     assert [item.url for item in queue_service.list_items()] == ["https://youtu.be/x"]

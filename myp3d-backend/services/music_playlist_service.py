@@ -467,13 +467,13 @@ def _import_cover(playlist_id: str, persistent_id: str) -> Optional[str]:
 
 
 def _snapshot(playlist_id: str, plan: Plan) -> Snapshot:
-    state = next((item for item in playlist_service.list_states() if item.id == playlist_id), None)
+    state = playlist_service.get_state(playlist_id)
     return Snapshot(
         name=plan.name,
         description=plan.description,
-        local=playlist_service.stored_filenames(playlist_id),
+        local=state.filenames,
         apple=plan.apple,
-        cover=state.cover_hash if state is not None else None,
+        cover=state.cover_hash,
         ordered=True,
     )
 
@@ -500,8 +500,8 @@ def _apply(plan: Plan, file_of_pid: dict[str, str]) -> tuple[str, Optional[str]]
         _drop_link(plan.playlist_id)
         return "deleted", None
 
-    current = next(state for state in playlist_service.list_states() if state.id == plan.playlist_id)
     if plan.write_local:
+        current = playlist_service.get_state(plan.playlist_id)
         favorite_playlist.update_playlist(
             plan.playlist_id,
             plan.name if plan.name != current.name else None,

@@ -34,7 +34,7 @@ def _record_key(record: Record) -> str:
     return record.uid
 
 
-def _keyed(database: SyncDatabase) -> dict[RecordKey, Record]:
+def keyed(database: SyncDatabase) -> dict[RecordKey, Record]:
     keyed: dict[RecordKey, Record] = {("playlist", record.id): record for record in database.playlists}
     keyed.update({("download", record.uid): record for record in database.downloads})
     keyed.update({("favorite", record.filename): record for record in database.favorites})
@@ -76,9 +76,9 @@ def plan_pulls(
     prefer_remote: bool,
     busy: set[str] = frozenset(),
 ) -> list[RecordPull]:
-    current = _keyed(local)
+    current = keyed(local)
     pulls: list[RecordPull] = []
-    for (kind, key), record in _keyed(remote).items():
+    for (kind, key), record in keyed(remote).items():
         mine = current.get((kind, key))
         if mine is None:
             pulls.append(RecordPull(kind, record, False))
@@ -128,10 +128,10 @@ def diff_record(kind: RecordKind, record: Record, replaces: bool = False) -> Syn
 
 
 def shared_records(local: SyncDatabase, remote: SyncDatabase, moving: set[RecordKey]) -> list[SyncDiffRecord]:
-    theirs = _keyed(remote)
+    theirs = keyed(remote)
     return [
         diff_record(kind, record)
-        for (kind, key), record in _keyed(local).items()
+        for (kind, key), record in keyed(local).items()
         if (kind, key) in theirs and (kind, key) not in moving and record.deleted_at is None
     ]
 
@@ -142,7 +142,7 @@ def local_cover(kind: RecordKind, key: str) -> Optional[bytes]:
 
 def apply_pull(
     pull: RecordPull,
-    local: SyncDatabase,
+    current: dict[RecordKey, Record],
     fetch_cover: Callable[[RecordKind, str], bytes],
 ) -> bool:
     if isinstance(pull.record, SyncFavoriteRecord):
@@ -151,7 +151,7 @@ def apply_pull(
     wanted = pull.record.cover_hash
     cover: Optional[bytes] = None
     if wanted is not None:
-        mine = _keyed(local).get((pull.kind, pull.key))
+        mine = current.get((pull.kind, pull.key))
         cover = local_cover(pull.kind, pull.key) if mine is not None and mine.cover_hash == wanted else None
         if cover is None:
             cover = fetch_cover(pull.kind, pull.key)

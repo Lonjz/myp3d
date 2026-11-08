@@ -34,6 +34,7 @@ CREATE INDEX IF NOT EXISTS playlist_tracks_filename ON playlist_tracks(filename)
 """
 
 PLAYLIST_COLUMNS = "id, name, description, cover IS NOT NULL AS has_cover, is_favorites, updated_at"
+STATE_COLUMNS = "id, name, description, cover, is_favorites, created_at, updated_at, deleted_at"
 
 
 
@@ -126,6 +127,20 @@ def cover_digest(cover: bytes) -> str:
     return hashlib.sha1(cover).hexdigest()
 
 
+def _to_state(row: sqlite3.Row, filenames: list[str]) -> PlaylistState:
+    return PlaylistState(
+        id=row["id"],
+        name=row["name"],
+        description=row["description"],
+        filenames=filenames,
+        cover_hash=cover_digest(row["cover"]) if row["cover"] is not None else None,
+        is_favorites=bool(row["is_favorites"]),
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+        deleted_at=row["deleted_at"],
+    )
+
+
 def init() -> None:
     with _connect() as conn:
         conn.executescript(SCHEMA)
@@ -159,26 +174,19 @@ def listed_filenames() -> set[str]:
 
 def list_states() -> list[PlaylistState]:
     with _connect() as conn:
-        rows = conn.execute(
-            "SELECT id, name, description, cover, is_favorites, created_at, updated_at, deleted_at FROM playlists ORDER BY id"
-        ).fetchall()
+        rows = conn.execute(f"SELECT {STATE_COLUMNS} FROM playlists ORDER BY id").fetchall()
         tracks: dict[str, list[str]] = {}
         for track in conn.execute("SELECT playlist_id, filename FROM playlist_tracks ORDER BY playlist_id, position"):
             tracks.setdefault(track["playlist_id"], []).append(track["filename"])
-    return [
-        PlaylistState(
-            id=row["id"],
-            name=row["name"],
-            description=row["description"],
-            filenames=tracks.get(row["id"], []),
-            cover_hash=cover_digest(row["cover"]) if row["cover"] is not None else None,
-            is_favorites=bool(row["is_favorites"]),
-            created_at=row["created_at"],
-            updated_at=row["updated_at"],
-            deleted_at=row["deleted_at"],
-        )
-        for row in rows
-    ]
+    return [_to_state(row, tracks.get(row["id"], [])) for row in rows]
+
+
+def get_state(playlist_id: str) -> PlaylistState:
+    with _connect() as conn:
+        row = conn.execute(f"SELECT {STATE_COLUMNS} FROM playlists WHERE id = ?", (playlist_id,)).fetchone()
+        if row is None:
+            raise AppError(404, "Playlist not found")
+        return _to_state(row, _filenames(conn, playlist_id))
 
 
 def favorites_id() -> Optional[str]:

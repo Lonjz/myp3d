@@ -1,4 +1,20 @@
+import pytest
+
 from services import favorite_playlist, favorite_service, playlist_service
+from services.errors import AppError
+
+
+def test_reading_one_playlist_state(client, seeded_library, make_playlist, cover_jpeg):
+    playlist_id = make_playlist("Mix", ["the chain.mp3", "reckoner.mp3"])
+    make_playlist("Other", ["dreams.mp3"])
+    client.post(f"/playlists/{playlist_id}/cover", files={"cover": ("c.jpg", cover_jpeg, "image/jpeg")})
+
+    state = playlist_service.get_state(playlist_id)
+    assert state.filenames == ["the chain.mp3", "reckoner.mp3"]
+    assert state.cover_hash is not None
+    assert state in playlist_service.list_states()
+    with pytest.raises(AppError):
+        playlist_service.get_state("0123456789abcdef0123456789abcdef")
 
 
 def test_create_and_read(client, seeded_library):

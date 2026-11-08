@@ -14,17 +14,13 @@ def _split_words(value: str) -> list[str]:
 
 
 def _match_rank(word: str, field: str) -> Optional[int]:
-    if not field:
+    if word not in field:
         return None
     if field == word:
         return 0
     if field.startswith(word):
         return 1
-    if any(part.startswith(word) for part in _split_words(field)):
-        return 2
-    if word in field:
-        return 3
-    return None
+    return 2 if any(part.startswith(word) for part in _split_words(field)) else 3
 
 
 def _score(words: list[str], fields: list[str]) -> Optional[int]:

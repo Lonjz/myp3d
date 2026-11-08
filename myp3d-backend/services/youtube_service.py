@@ -178,11 +178,11 @@ def _download_as_mp3(
 
     info = extract_info(ydl_opts, url, download=True)
 
-    with YoutubeDL(ydl_opts) as ydl:
-        filename = ydl.prepare_filename(info)
-        mp3_file = os.path.splitext(filename)[0] + ".mp3"
-        if custom_name:
-            mp3_file = str(OUTPUT_DIR / f"{custom_name}.mp3")
+    if custom_name:
+        mp3_file = str(OUTPUT_DIR / f"{custom_name}.mp3")
+    else:
+        with YoutubeDL(ydl_opts) as ydl:
+            mp3_file = os.path.splitext(ydl.prepare_filename(info))[0] + ".mp3"
 
     if metadata and any(metadata.values()):
         with edit_tags(Path(mp3_file)) as tag:

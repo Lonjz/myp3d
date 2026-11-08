@@ -72,7 +72,7 @@ def _seed() -> None:
     print(f"Seeding {len(tracks)} songs into {LIBRARY_DIR} ...")
     seed.seed_library(LIBRARY_DIR, tracks, AUDIO_CACHE, mono=True)
 
-    for init in (queue_service.init, playlist_service.init, favorite_service.init, date_service.init):
+    for init in (mp3_service.init, queue_service.init, playlist_service.init, favorite_service.init, date_service.init):
         init()
     rng = random.Random(11)
     now = datetime.now(timezone.utc)

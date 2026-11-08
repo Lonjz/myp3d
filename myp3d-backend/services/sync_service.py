@@ -884,12 +884,12 @@ def _apply_pull(session: _Session, pull: _Pull) -> bool:
 
 
 def _apply_records(session: _Session, pulls: list[RecordPull]) -> bool:
-    local_database = database_sync.local_database()
+    current = database_sync.keyed(database_sync.local_database())
     for pull in pulls:
         if not _still_syncing(session):
             return False
         try:
-            outcome = "done" if database_sync.apply_pull(pull, local_database, lambda kind, key: _fetch_record_cover(session, kind, key)) else "skipped"
+            outcome = "done" if database_sync.apply_pull(pull, current, lambda kind, key: _fetch_record_cover(session, kind, key)) else "skipped"
         except Exception:
             outcome = "failed"
         if not database_sync.is_visible(pull):
