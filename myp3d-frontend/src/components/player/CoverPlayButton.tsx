@@ -1,5 +1,6 @@
 import { Music, Pause, Play } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { cx } from '../../utils/formatters';
 import { NowPlayingIndicator } from './NowPlayingIndicator';
 
 interface CoverPlayButtonProps {
@@ -15,7 +16,7 @@ interface CoverPlayButtonProps {
 
 export function CoverPlayButton({ src, label, isCurrent, isPlaying, onPlay, onToggle, className, icon: Icon = Music }: CoverPlayButtonProps) {
   const playingNow = isCurrent && isPlaying;
-  const classes = ['cover-play', isCurrent ? 'is-current' : '', className].filter(Boolean).join(' ');
+  const classes = cx('cover-play', isCurrent && 'is-current', className);
   const actionLabel = playingNow ? 'Pause' : label;
 
   return (

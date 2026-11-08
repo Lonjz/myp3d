@@ -2,7 +2,8 @@ import { ArrowDown, ArrowUp, Check, CircleMinus, Link, ListMusic, RefreshCw, Tra
 import type { LucideIcon } from 'lucide-react';
 import type { MusicPlaylistAction, MusicPlaylistDiff, MusicPlaylistEntry } from '../../api/musicApi';
 import { playlistApi } from '../../api/playlistApi';
-import { Cover, DiffColumn, TrackText } from '../diff/DiffColumns';
+import { countOf, cx } from '../../utils/formatters';
+import { ChangeBadge, Cover, DiffColumn, TrackText } from '../diff/DiffColumns';
 import { AppleMusicIcon } from '../ui/BrandIcons';
 
 const ACTION_BADGES: Record<Exclude<MusicPlaylistAction, 'in_sync'>, { icon: LucideIcon; label: string; danger?: boolean }> = {
@@ -15,7 +16,7 @@ const ACTION_BADGES: Record<Exclude<MusicPlaylistAction, 'in_sync'>, { icon: Luc
   delete_music: { icon: Trash2, label: 'Delete in Apple Music', danger: true },
 };
 
-const leftOutLabel = (count: number) => `${count} song${count === 1 ? '' : 's'} only on one side`;
+const leftOutLabel = (count: number) => `${countOf(count, 'song')} only on one side`;
 
 function PlaylistRow({ entry }: { entry: MusicPlaylistEntry }) {
   const badge = entry.action === 'in_sync' ? null : ACTION_BADGES[entry.action];
@@ -35,15 +36,7 @@ function PlaylistRow({ entry }: { entry: MusicPlaylistEntry }) {
             {entry.left_out}
           </span>
         )}
-        {badge && (
-          <span
-            className={`music-change ${badge.danger ? 'music-change--danger' : ''}`.trim()}
-            title={badge.label}
-            aria-label={badge.label}
-          >
-            <badge.icon aria-hidden="true" />
-          </span>
-        )}
+        {badge && <ChangeBadge {...badge} />}
       </span>
     </li>
   );
@@ -51,7 +44,7 @@ function PlaylistRow({ entry }: { entry: MusicPlaylistEntry }) {
 
 export function PlaylistColumns({ diff, scanning }: { diff: MusicPlaylistDiff; scanning: boolean }) {
   return (
-    <div className={`music-columns ${scanning ? 'is-scanning' : ''}`.trim()} aria-busy={scanning}>
+    <div className={cx('music-columns', scanning && 'is-scanning')} aria-busy={scanning}>
       <DiffColumn icon={AppleMusicIcon} label="Only in Apple Music" count={diff.only_in_music.length}>
         {diff.only_in_music.map((entry) => (
           <PlaylistRow key={entry.key} entry={entry} />

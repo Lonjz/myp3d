@@ -4,6 +4,7 @@ import { Clock, HeartPulse, RotateCcw, SlidersHorizontal, Star, X } from 'lucide
 import type { LucideIcon } from 'lucide-react';
 import type { MP3DurationRange, MP3Issue } from '../../api/mp3Api';
 import { useLingering } from '../../hooks/usePresence';
+import { cx } from '../../utils/formatters';
 import { IconButton } from '../ui/IconButton';
 import type { IconOption } from '../ui/InlineSelect';
 import { Popover } from '../ui/Popover';
@@ -136,9 +137,7 @@ function FilterGroup<T extends string>({ icon: Icon, label, options, value, onCh
           <button
             key={option.value}
             type="button"
-            className={['segmented__option', showText ? 'segmented__option--text' : '', option.value === value ? 'is-active' : '']
-              .filter(Boolean)
-              .join(' ')}
+            className={cx('segmented__option', showText && 'segmented__option--text', option.value === value && 'is-active')}
             aria-pressed={option.value === value}
             aria-label={option.label}
             title={`${label}: ${option.label}`}
@@ -169,7 +168,7 @@ function FilterChip<T extends string>({ label, value, options, onRemove, showTex
   return (
     <button
       type="button"
-      className={['filter-chip motion-pop', className].filter(Boolean).join(' ')}
+      className={cx('filter-chip motion-pop', className)}
       data-state={closing ? 'closed' : 'open'}
       aria-label={`Remove ${label}: ${option.label}`}
       title={`${label}: ${option.label}`}

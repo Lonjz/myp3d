@@ -13,6 +13,7 @@ import { DataTable } from '../components/table/DataTable';
 import type { DataTableColumn } from '../components/table/DataTable';
 import { HeaderIcon } from '../components/table/HeaderIcon';
 import { SortableHeaderButton } from '../components/table/SortableHeaderButton';
+import { EllipsisCell } from '../components/table/TrackTitleCell';
 import { CoverPlayButton } from '../components/player/CoverPlayButton';
 import { usePlayer } from '../components/player/playerContext';
 import { LoadFailed } from '../components/ui/EmptyState';
@@ -101,7 +102,7 @@ export function AlbumsPage() {
       header: renderSortHeader('album_name', 'Album', DiscAlbum),
       render: (album) => (
         <>
-          <span className="table-cell-ellipsis" title={album.album_name || '(No Album)'}>{album.album_name || '(No Album)'}</span>
+          <EllipsisCell text={album.album_name || '(No Album)'} />
           {album.artists.length > 0 && (
             <span className="table-cell-subtitle" title={formatArtists(album)}>{formatArtists(album)}</span>
           )}
@@ -112,21 +113,21 @@ export function AlbumsPage() {
       key: 'artists',
       header: <HeaderIcon label="Artists" icon={MicVocal} />,
       hideBelow: 'sm',
-      render: (album) => <span className="table-cell-ellipsis" title={formatArtists(album)}>{formatArtists(album)}</span>,
+      render: (album) => <EllipsisCell text={formatArtists(album)} />,
     },
     {
       key: 'tracks',
       header: renderSortHeader('track_count', 'Tracks', Music),
       width: '90px',
       hideBelow: 'sm',
-      render: (album) => <span className="table-cell-ellipsis" title={String(album.track_count)}>{album.track_count}</span>,
+      render: (album) => <EllipsisCell text={String(album.track_count)} />,
     },
     {
       key: 'size',
       header: renderSortHeader('total_size', 'Size', HardDrive),
       width: '110px',
       hideBelow: 'md',
-      render: (album) => <span className="table-cell-ellipsis" title={formatBytes(album.total_size)}>{formatBytes(album.total_size)}</span>,
+      render: (album) => <EllipsisCell text={formatBytes(album.total_size)} />,
     },
     {
       key: 'date_added',

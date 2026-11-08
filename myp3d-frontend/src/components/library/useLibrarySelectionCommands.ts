@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { Download, ListChecks, ListPlus, Pencil, Play, Trash2, X } from 'lucide-react';
+import { countOf } from '../../utils/formatters';
 import { useSpotlightCommands } from '../spotlight/useSpotlightCommands';
 import type { SpotlightCommand } from '../spotlight/spotlightTypes';
 
@@ -30,7 +31,7 @@ export function useLibrarySelectionCommands(count: number, actions: LibrarySelec
     };
     if (count === 0) return [selectAll];
 
-    const target = `${count} selected track${count === 1 ? '' : 's'}`;
+    const target = countOf(count, 'selected track');
     return [
       selectAll,
       { id: 'play-selected', title: `Play ${target}`, icon: Play, keywords: ['bulk', 'queue'], run: () => actionsRef.current.play() },

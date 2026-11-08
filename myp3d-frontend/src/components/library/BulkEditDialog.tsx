@@ -1,11 +1,13 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { DiscAlbum, ImagePlus, MicVocal, Music, Save, X } from 'lucide-react';
 import { mp3Api } from '../../api/mp3Api';
 import type { BulkResult, BulkTagUpdate, MP3Info } from '../../api/mp3Api';
 import { emitAppEvent } from '../../utils/appEvents';
 import { CoverCropModal } from '../cover/CoverCropModal';
+import { CoverEditButton } from '../cover/CoverEditButton';
 import { useCoverImageCrop } from '../cover/useCoverImageCrop';
 import { useToast } from '../messages/toastContext';
+import { Chip } from '../ui/Chip';
 import { IconField } from '../ui/IconField';
 import { errorMessage, trackCount } from '../../utils/formatters';
 import { IconButton } from '../ui/IconButton';
@@ -33,7 +35,6 @@ export function BulkEditDialog({ tracks: selectedTracks, closing, onClose, onSav
   const [artist, setArtist] = useState(initial.artist);
   const [album, setAlbum] = useState(initial.album);
   const [saving, setSaving] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     cropModalProps,
@@ -85,34 +86,18 @@ export function BulkEditDialog({ tracks: selectedTracks, closing, onClose, onSav
         onClose={onClose}
         label={`Edit ${trackCount(tracks.length)}`}
       >
-          <input
-            type="file"
-            accept="image/*"
-            ref={fileInputRef}
-            onChange={handleCoverChange}
-            className="hidden-file-input"
-          />
-
           <div className="bulk-edit-dialog__body">
-            <button
-              type="button"
-              className="cover-preview bulk-edit-dialog__cover"
-              onClick={() => fileInputRef.current?.click()}
+            <CoverEditButton
+              label="Change cover"
+              className="bulk-edit-dialog__cover"
+              src={preview}
+              placeholder={<ImagePlus className="bulk-edit-dialog__cover-icon" aria-hidden="true" />}
+              onFileChange={handleCoverChange}
               disabled={saving}
-              aria-label="Change cover"
-              title="Change cover"
-            >
-              {preview ? <img src={preview} alt="" /> : <ImagePlus className="bulk-edit-dialog__cover-icon" aria-hidden="true" />}
-              <span className="cover-preview__overlay" aria-hidden="true">
-                <ImagePlus />
-              </span>
-            </button>
+            />
 
             <div className="bulk-edit-dialog__fields">
-              <span className="album-chip bulk-edit-dialog__count" title="Tracks">
-                <Music aria-hidden="true" />
-                {tracks.length}
-              </span>
+              <Chip icon={Music} className="bulk-edit-dialog__count" title="Tracks">{tracks.length}</Chip>
               <IconField
                 icon={MicVocal}
                 label="Artist"

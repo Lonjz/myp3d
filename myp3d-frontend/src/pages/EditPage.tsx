@@ -1,9 +1,10 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DiscAlbum, FileAudio, ImagePlus, MicVocal, Music, Pause, Play, Save } from 'lucide-react';
+import { DiscAlbum, FileAudio, MicVocal, Music, Pause, Play, Save } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { MP3Info } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
+import { CoverEditButton } from '../components/cover/CoverEditButton';
 import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
 import { useToast } from '../components/messages/toastContext';
 import { InfiniteSidebarList } from '../components/sidebar/InfiniteSidebarList';
@@ -38,7 +39,6 @@ export function EditPage({ filename, onBack }: EditPageProps) {
   const [album, setAlbum] = useState('');
   const [newFilename, setNewFilename] = useState('');
   const backTimerRef = useRef<number | undefined>(undefined);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [, refreshCoverPreview] = useReducer((count: number) => count + 1, 0);
 
   const {
@@ -146,29 +146,12 @@ export function EditPage({ filename, onBack }: EditPageProps) {
         <section className="details-main">
 
           <div className="edit-container glass">
-            <input
-              type="file"
-              accept="image/*"
-              ref={fileInputRef}
-              onChange={handleCoverChange}
-              className="hidden-file-input"
+            <CoverEditButton
+              label="Change cover"
+              src={effectiveCoverPreview}
+              placeholder={<div className="no-cover-large"><Music aria-hidden="true" /></div>}
+              onFileChange={handleCoverChange}
             />
-            <button
-              type="button"
-              className="cover-preview"
-              onClick={() => fileInputRef.current?.click()}
-              aria-label="Change cover"
-              title="Change cover"
-            >
-              {effectiveCoverPreview ? (
-                <img src={effectiveCoverPreview} alt="" />
-              ) : (
-                <div className="no-cover-large"><Music aria-hidden="true" /></div>
-              )}
-              <span className="cover-preview__overlay" aria-hidden="true">
-                <ImagePlus />
-              </span>
-            </button>
 
             <div className="metadata-section">
               <IconField

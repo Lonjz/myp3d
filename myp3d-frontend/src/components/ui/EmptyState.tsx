@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { CircleAlert, RefreshCw } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { cx } from '../../utils/formatters';
 import { IconButton } from './IconButton';
 import { Spinner } from './Spinner';
 
@@ -33,10 +34,8 @@ export function EmptyState({
   className,
   children,
 }: EmptyStateProps) {
-  const classes = ['empty-state', compact ? 'empty-state--compact' : 'glass', className].filter(Boolean).join(' ');
-
   return (
-    <div className={classes} role={label ? 'status' : undefined} aria-label={label} title={label}>
+    <div className={cx('empty-state', compact ? 'empty-state--compact' : 'glass', className)} role={label ? 'status' : undefined} aria-label={label} title={label}>
       {loading ? (
         <Spinner />
       ) : (

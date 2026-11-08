@@ -4,6 +4,7 @@ import { ArrowLeft, Search } from 'lucide-react';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useEndReached, useInfiniteList } from '../../hooks/useInfiniteList';
 import { subscribeAppEvent } from '../../utils/appEvents';
+import { cx } from '../../utils/formatters';
 import { LoadFailed } from '../ui/EmptyState';
 import { IconButton } from '../ui/IconButton';
 import { IconField } from '../ui/IconField';
@@ -76,7 +77,7 @@ export function InfiniteSidebarList<T>({
             <button
               key={itemKey}
               type="button"
-              className={`details-song-item ${isActive ? 'is-active' : ''}`}
+              className={cx('details-song-item', isActive && 'is-active')}
               style={{ '--row': index } as CSSProperties}
               onClick={() => onSelect(item)}
               disabled={isActive}

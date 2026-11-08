@@ -1,4 +1,5 @@
 import { lazy, Suspense, useState } from 'react';
+import type { ReactNode } from 'react';
 import { AudioLines, ChevronLeft, Menu, Search, Settings } from 'lucide-react';
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ToastProvider } from './components/messages/ToastProvider';
@@ -12,7 +13,7 @@ import { TrackActionsProvider } from './components/library/TrackActionsProvider'
 import { PlayerBar } from './components/player/PlayerBar';
 import { PlayerProvider } from './components/player/PlayerProvider';
 import type { KeepAlivePage } from './components/shell/KeepAliveRoutes';
-import { NAV_ITEMS } from './components/shell/navItems';
+import { isNavItemActive, NAV_ITEMS } from './components/shell/navItems';
 import { SpotlightProvider } from './components/spotlight/SpotlightProvider';
 import { useSpotlight } from './components/spotlight/spotlightContext';
 import { SPOTLIGHT_SHORTCUT_LABEL } from './components/spotlight/spotlightTypes';
@@ -23,6 +24,7 @@ import { ErrorBoundary } from './components/shell/ErrorBoundary';
 import { AppearanceProvider } from './components/settings/AppearanceProvider';
 import { SettingsDialog } from './components/settings/SettingsDialog';
 import { emitAppEvent } from './utils/appEvents';
+import { cx } from './utils/formatters';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then((module) => ({ default: module.DashboardPage })));
@@ -40,77 +42,32 @@ const SpotifyPage = lazy(() => import('./pages/SpotifyPage').then((module) => ({
 const ExportPage = lazy(() => import('./pages/ExportPage').then((module) => ({ default: module.ExportPage })));
 const HealthPage = lazy(() => import('./pages/HealthPage').then((module) => ({ default: module.HealthPage })));
 
-function safeDecode(value: string): string {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
+interface DetailRouteProps {
+  param: string;
+  back: string;
+  render: (value: string, onBack: () => void) => ReactNode;
 }
 
-function EditRoute() {
-  const { songName } = useParams();
+function DetailRoute({ param, back, render }: DetailRouteProps) {
+  const value = useParams()[param];
   const navigate = useNavigate();
-
-  if (!songName) {
-    return <Navigate to="/library" replace />;
-  }
-
-  return (
-    <EditPage
-      filename={safeDecode(songName)}
-      onBack={() => navigate('/library')}
-    />
-  );
-}
-
-function AlbumEditRoute() {
-  const { albumKey: encodedAlbumKey } = useParams();
-  const navigate = useNavigate();
-
-  if (!encodedAlbumKey) {
-    return <Navigate to="/albums" replace />;
-  }
-
-  return (
-    <AlbumEditPage
-      albumKey={safeDecode(encodedAlbumKey)}
-      onBack={() => navigate('/albums')}
-    />
-  );
-}
-
-function PlaylistEditRoute() {
-  const { playlistId } = useParams();
-  const navigate = useNavigate();
-
-  if (!playlistId) {
-    return <Navigate to="/playlists" replace />;
-  }
-
-  return (
-    <PlaylistEditPage
-      playlistId={safeDecode(playlistId)}
-      onBack={() => navigate('/playlists')}
-    />
-  );
+  if (!value) return <Navigate to={back} replace />;
+  return render(value, () => navigate(back));
 }
 
 const KEEP_ALIVE_PAGES: KeepAlivePage[] = [
   { path: '/dashboard', element: <DashboardPage /> },
   { path: '/query', element: <QueryPage /> },
-  { path: '/spotify', element: <SpotifyPage /> },
-  { path: '/downloads', element: <DownloadsPage /> },
-  { path: '/library', element: <LibraryPage /> },
-  { path: '/albums', element: <AlbumsPage /> },
-  { path: '/playlists', element: <PlaylistsPage /> },
-  { path: '/health', element: <HealthPage /> },
+  { path: '/spotify', element: <SpotifyPage />, fill: true },
+  { path: '/downloads', element: <DownloadsPage />, fill: true },
+  { path: '/library', element: <LibraryPage />, fill: true },
+  { path: '/albums', element: <AlbumsPage />, fill: true },
+  { path: '/playlists', element: <PlaylistsPage />, fill: true },
+  { path: '/health', element: <HealthPage />, fill: true },
   { path: '/export', element: <ExportPage /> },
   { path: '/sync', element: <SyncPage /> },
-  { path: '/music', element: <MusicPage /> },
+  { path: '/music', element: <MusicPage />, fill: true },
 ];
-
-const FILL_PATHS = new Set(['/library', '/albums', '/playlists', '/music', '/downloads', '/spotify', '/health']);
 
 function SidebarSearchButton() {
   const { open } = useSpotlight();
@@ -158,7 +115,8 @@ function App() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const sidebarOverlay = usePresence(isMobileSidebarOpen);
   const [sidebarPathname, setSidebarPathname] = useState(location.pathname);
-  const isFillPage = FILL_PATHS.has(location.pathname.replace(/(.)\/+$/, '$1'));
+  const pagePath = location.pathname.replace(/(.)\/+$/, '$1');
+  const isFillPage = KEEP_ALIVE_PAGES.some((page) => page.fill && page.path === pagePath);
 
   if (sidebarPathname !== location.pathname) {
     setSidebarPathname(location.pathname);
@@ -178,9 +136,7 @@ function App() {
                 <SettingsDialog />
                 <div className="app-shell">
                   <aside
-                    className={`sidebar glass ${isSidebarExpanded ? 'expanded' : 'collapsed'} ${
-                      isSidebarToggled ? 'is-toggled' : ''
-                    } ${isMobileSidebarOpen ? 'mobile-open' : ''}`}
+                    className={cx('sidebar glass', isSidebarExpanded ? 'expanded' : 'collapsed', isSidebarToggled && 'is-toggled', isMobileSidebarOpen && 'mobile-open')}
                   >
                     <div className="sidebar-header">
                       <span className="sidebar-brand">
@@ -206,7 +162,7 @@ function App() {
                         <NavLink
                           key={item.to}
                           to={item.to}
-                          className={() => (item.isActive(location.pathname) ? 'sidebar-link is-active' : 'sidebar-link')}
+                          className={() => cx('sidebar-link', isNavItemActive(item, location.pathname) && 'is-active')}
                           title={item.label}
                         >
                           <item.icon aria-hidden="true" />
@@ -256,9 +212,18 @@ function App() {
                             <Routes>
                               <Route path="/" element={<Navigate to="/dashboard" replace />} />
                               <Route path="/download" element={<Navigate to="/query" replace />} />
-                              <Route path="/details/:songName" element={<EditRoute />} />
-                              <Route path="/albums/:albumKey" element={<AlbumEditRoute />} />
-                              <Route path="/playlists/:playlistId" element={<PlaylistEditRoute />} />
+                              <Route
+                                path="/details/:songName"
+                                element={<DetailRoute param="songName" back="/library" render={(filename, onBack) => <EditPage filename={filename} onBack={onBack} />} />}
+                              />
+                              <Route
+                                path="/albums/:albumKey"
+                                element={<DetailRoute param="albumKey" back="/albums" render={(albumKey, onBack) => <AlbumEditPage albumKey={albumKey} onBack={onBack} />} />}
+                              />
+                              <Route
+                                path="/playlists/:playlistId"
+                                element={<DetailRoute param="playlistId" back="/playlists" render={(playlistId, onBack) => <PlaylistEditPage playlistId={playlistId} onBack={onBack} />} />}
+                              />
                               <Route path="*" element={<NotFoundPage />} />
                             </Routes>
                           </KeepAliveRoutes>

@@ -2,6 +2,8 @@ import type { KeyboardEvent, MouseEvent } from 'react';
 
 const INTERACTIVE_SELECTOR = 'button, a, input, label, select, textarea, [data-no-row-open]';
 
+export const stopClick = (event: { stopPropagation: () => void }) => event.stopPropagation();
+
 export function rowOpenProps<E extends HTMLElement>(open: () => void) {
   return {
     tabIndex: 0,

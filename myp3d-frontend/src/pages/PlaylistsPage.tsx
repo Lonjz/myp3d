@@ -10,6 +10,7 @@ import { usePlaylists } from '../components/playlists/usePlaylists';
 import { DataTable } from '../components/table/DataTable';
 import type { DataTableColumn } from '../components/table/DataTable';
 import { HeaderIcon } from '../components/table/HeaderIcon';
+import { EllipsisCell } from '../components/table/TrackTitleCell';
 import { LoadFailed } from '../components/ui/EmptyState';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
@@ -71,7 +72,7 @@ export function PlaylistsPage() {
       header: <HeaderIcon label="Playlist" icon={ListMusic} />,
       render: (playlist) => (
         <span className="playlist-name">
-          <span className="table-cell-ellipsis" title={playlist.name}>{playlist.name}</span>
+          <EllipsisCell text={playlist.name} />
           {playlist.is_favorites && (
             <span className="favorite-badge" title="Favourites" aria-label="Favourites" role="img">
               <Star aria-hidden="true" />

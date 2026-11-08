@@ -1,7 +1,7 @@
 import type { ChangeEvent, CSSProperties } from 'react';
 import { ArrowLeftToLine, ArrowRightToLine, Clock, Crosshair, FoldHorizontal, Pause, Play, Repeat, Scissors, WandSparkles } from 'lucide-react';
 import { IconButton } from '../ui/IconButton';
-import { formatDuration } from '../../utils/formatters';
+import { cx, formatDuration } from '../../utils/formatters';
 
 interface TrimRangeSectionProps {
   duration: number | null;
@@ -141,9 +141,7 @@ export function TrimRangeSection({
       </div>
 
       <div
-        className={`trim-range-track ${isDisabled ? 'is-disabled' : ''} ${
-          mode === 'playhead' ? 'is-playhead' : ''
-        }`}
+        className={cx('trim-range-track', isDisabled && 'is-disabled', mode === 'playhead' && 'is-playhead')}
         style={trackStyle}
       >
         {mode === 'range' ? (

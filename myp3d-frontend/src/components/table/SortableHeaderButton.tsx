@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { cx } from '../../utils/formatters';
 
 interface SortableHeaderButtonProps {
   label: string;
@@ -21,7 +22,7 @@ export function SortableHeaderButton({
   return (
     <button
       type="button"
-      className={`library-sort-button ${isActive ? 'is-active' : ''}`}
+      className={cx('library-sort-button', isActive && 'is-active')}
       title={label}
       onClick={onClick}
     >

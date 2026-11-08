@@ -3,9 +3,7 @@ import { musicApi } from '../../api/musicApi';
 import type { MusicAlbumIssue } from '../../api/musicApi';
 import { useSelection } from '../../hooks/useSelection';
 import { useToast } from '../messages/toastContext';
-import { errorMessage } from '../../utils/formatters';
-
-const albumCount = (count: number) => `${count} album${count === 1 ? '' : 's'}`;
+import { countOf, errorMessage } from '../../utils/formatters';
 
 export function useAlbumHealth(active: boolean) {
   const { showSuccess, showError } = useToast();
@@ -39,9 +37,9 @@ export function useAlbumHealth(active: boolean) {
     try {
       const result = await musicApi.fixAlbums(keys);
       selection.drop(result.updated);
-      if (result.failed.length === 0) showSuccess(`Cleared the album artist on ${albumCount(result.updated.length)}`);
+      if (result.failed.length === 0) showSuccess(`Cleared the album artist on ${countOf(result.updated.length, 'album')}`);
       else if (keys.length === 1) showError(`Couldn't clear the album artist: ${result.failed[0].detail}`);
-      else showError(`${result.failed.length} of ${albumCount(keys.length)} couldn't be cleared`);
+      else showError(`${result.failed.length} of ${countOf(keys.length, 'album')} couldn't be cleared`);
     } catch (err) {
       showError(errorMessage(err, 'Failed to clear the album artists'));
     } finally {

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { InputHTMLAttributes } from 'react';
 import { Check, Minus } from 'lucide-react';
+import { cx } from '../../utils/formatters';
 
 interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> {
   label: string;
@@ -18,7 +19,7 @@ export function Checkbox({ label, indeterminate = false, className, ...props }: 
   }, [indeterminate]);
 
   return (
-    <span className={['checkbox', className].filter(Boolean).join(' ')}>
+    <span className={cx('checkbox', className)}>
       <input ref={inputRef} type="checkbox" aria-label={label} title={label} {...props} />
       <Mark className="checkbox__mark" aria-hidden="true" strokeWidth={3} />
     </span>

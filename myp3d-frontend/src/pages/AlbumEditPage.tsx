@@ -1,9 +1,10 @@
-import { useEffect, useReducer, useRef, useState } from 'react';
+import { useEffect, useReducer, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DiscAlbum, FileAudio, HardDrive, ImagePlus, MicVocal, Music, Play, Save, Shuffle } from 'lucide-react';
+import { DiscAlbum, FileAudio, HardDrive, MicVocal, Music, Play, Save, Shuffle } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { AlbumDetail, AlbumInfo } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
+import { CoverEditButton } from '../components/cover/CoverEditButton';
 import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
 import { useToast } from '../components/messages/toastContext';
 import { InfiniteSidebarList } from '../components/sidebar/InfiniteSidebarList';
@@ -12,7 +13,8 @@ import { usePlayer } from '../components/player/playerContext';
 import { TrackIndexButton } from '../components/player/TrackIndexButton';
 import { DataTable } from '../components/table/DataTable';
 import { HeaderIcon } from '../components/table/HeaderIcon';
-import { TrackTitleCell } from '../components/table/TrackTitleCell';
+import { EllipsisCell, TrackTitleCell } from '../components/table/TrackTitleCell';
+import { Chip } from '../components/ui/Chip';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { Spinner } from '../components/ui/Spinner';
@@ -21,7 +23,7 @@ import { useDetail } from '../hooks/useDetail';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { emitAppEvent, subscribeAppEvent } from '../utils/appEvents';
 import { fetchAlbumDetail } from '../utils/detailCache';
-import { errorMessage, formatBytes, trackCount } from '../utils/formatters';
+import { cx, errorMessage, formatBytes, trackCount } from '../utils/formatters';
 import { DiscardChangesDialog } from '../components/ui/DiscardChangesDialog';
 import { useSaveShortcut } from '../hooks/useSaveShortcut';
 
@@ -43,8 +45,6 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
   const [albumName, setAlbumName] = useState('');
   const [artist, setArtist] = useState('');
   const [, refreshCoverPreview] = useReducer((count: number) => count + 1, 0);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     cropModalProps,
@@ -149,30 +149,13 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
         <section className="details-main">
 
           <div className="edit-container glass">
-            <input
-              type="file"
-              accept="image/*"
-              ref={fileInputRef}
-              onChange={handleCoverChange}
-              className="hidden-file-input"
-            />
-            <button
-              type="button"
-              className="cover-preview"
-              onClick={() => fileInputRef.current?.click()}
+            <CoverEditButton
+              label="Change album cover"
+              src={effectiveCoverPreview}
+              placeholder={<div className="no-cover-large"><DiscAlbum aria-hidden="true" /></div>}
+              onFileChange={handleCoverChange}
               disabled={saving || !current}
-              aria-label="Change album cover"
-              title="Change album cover"
-            >
-              {effectiveCoverPreview ? (
-                <img src={effectiveCoverPreview} alt="" />
-              ) : (
-                <div className="no-cover-large"><DiscAlbum aria-hidden="true" /></div>
-              )}
-              <span className="cover-preview__overlay" aria-hidden="true">
-                <ImagePlus />
-              </span>
-            </button>
+            />
 
             <div className="metadata-section">
               <IconField
@@ -191,19 +174,12 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
               />
 
               <div className="album-chips">
-                <span className="album-chip" title="Tracks">
-                  <Music aria-hidden="true" />
-                  {albumDetail.album.track_count}
-                </span>
-                <span className="album-chip" title="Size">
-                  <HardDrive aria-hidden="true" />
-                  {formatBytes(albumDetail.album.total_size)}
-                </span>
+                <Chip icon={Music} title="Tracks">{albumDetail.album.track_count}</Chip>
+                <Chip icon={HardDrive} title="Size">{formatBytes(albumDetail.album.total_size)}</Chip>
                 {albumDetail.album.artists.length > 1 && (
-                  <span className="album-chip album-chip--wide" title={albumDetail.album.artists.join(', ')}>
-                    <MicVocal aria-hidden="true" />
+                  <Chip icon={MicVocal} className="album-chip--wide" title={albumDetail.album.artists.join(', ')}>
                     <span className="album-chip__text">{albumDetail.album.artists.join(', ')}</span>
-                  </span>
+                  </Chip>
                 )}
               </div>
 
@@ -237,9 +213,7 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
             items={albumDetail.tracks}
             getRowKey={(track) => track.filename}
             getRowClassName={(track) =>
-              [player.isCurrent(track.filename) ? 'is-current' : '', menuFilename === track.filename ? 'is-menu-open' : '']
-                .filter(Boolean)
-                .join(' ') || undefined
+              cx(player.isCurrent(track.filename) && 'is-current', menuFilename === track.filename && 'is-menu-open') || undefined
             }
             onRowMenu={(track, event) =>
               openMenu(event, track, {
@@ -285,7 +259,7 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
                 key: 'artist',
                 header: <HeaderIcon label="Artist" icon={MicVocal} />,
                 hideBelow: 'sm',
-                render: (track) => <span className="table-cell-ellipsis" title={track.artist || '-'}>{track.artist || '-'}</span>,
+                render: (track) => <EllipsisCell text={track.artist || '-'} />,
               },
               {
                 key: 'filename',

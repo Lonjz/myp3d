@@ -18,10 +18,10 @@ import type { QueueItem } from '../api/queueApi';
 import { QueueItemDialog } from '../components/downloads/QueueItemDialog';
 import { useDownloadQueue } from '../components/downloads/downloadQueueContext';
 import { EmptyState, LoadFailed } from '../components/ui/EmptyState';
-import { IconButton } from '../components/ui/IconButton';
+import { CountButton, IconButton } from '../components/ui/IconButton';
 import { Spinner } from '../components/ui/Spinner';
 import { usePresence } from '../hooks/usePresence';
-import { formatDuration, formatTrackSubtitle, trackCount } from '../utils/formatters';
+import { cx, formatDuration, formatTrackSubtitle, trackCount } from '../utils/formatters';
 import { rowOpenProps } from '../utils/rowOpen';
 import { getVideoIdFromUrl, getYouTubeThumbnailUrl } from '../utils/youtube';
 
@@ -106,7 +106,7 @@ function QueueRow({ item, index, busy, onStart, onEdit, onRemove, onCancel }: Qu
       style={{ '--row': index } as CSSProperties}
       {...(editable && !busy ? rowOpenProps<HTMLLIElement>(onEdit) : undefined)}
     >
-      <span className={`music-cover ${item.has_cover ? '' : 'downloads-row__thumb'}`.trim()} aria-hidden="true">
+      <span className={cx('music-cover', !item.has_cover && 'downloads-row__thumb')} aria-hidden="true">
         {cover ? <img src={cover} alt="" loading="lazy" /> : <Music />}
       </span>
       <div className="music-row__text">
@@ -165,29 +165,25 @@ export function DownloadsPage() {
           disabled={busy || doneCount === 0}
         />
         {active ? (
-          <button
-            type="button"
-            className="btn-primary downloads-run"
+          <CountButton
+            icon={Square}
+            count={queuedCount}
+            className="downloads-run"
             onClick={() => void stop()}
             disabled={busy || queuedCount === 0}
             title="Stop after the current download"
-            aria-label={`Stop after the current download, ${queuedCount} waiting`}
-          >
-            <Square aria-hidden="true" />
-            {queuedCount}
-          </button>
+            label={`Stop after the current download, ${queuedCount} waiting`}
+          />
         ) : (
-          <button
-            type="button"
-            className="btn-primary downloads-run"
+          <CountButton
+            icon={Play}
+            count={pendingCount}
+            className="downloads-run"
             onClick={() => void start()}
             disabled={busy || pendingCount === 0}
             title="Start downloads"
-            aria-label={`Start ${trackCount(pendingCount)}`}
-          >
-            <Play aria-hidden="true" />
-            {pendingCount}
-          </button>
+            label={`Start ${trackCount(pendingCount)}`}
+          />
         )}
       </div>
 

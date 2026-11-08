@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { RefObject } from 'react';
 import { ExternalLink, Link, MonitorPlay } from 'lucide-react';
 import type { SpotifyCandidate } from '../../api/spotifyApi';
-import { formatDuration } from '../../utils/formatters';
+import { cx, formatDuration } from '../../utils/formatters';
 import { isYouTubeUrl } from '../../utils/youtube';
 import { IconField } from '../ui/IconField';
 import { Popover } from '../ui/Popover';
@@ -59,7 +59,7 @@ function MatchPickerBody({ candidates, choice, onChoose, onChooseUrl, onClose }:
               <li key={candidate.video_id} className="match-picker__row">
                 <button
                   type="button"
-                  className={`match-picker__option ${active ? 'is-active' : ''}`.trim()}
+                  className={cx('match-picker__option', active && 'is-active')}
                   aria-pressed={active}
                   onClick={() => {
                     onChoose(candidate);

@@ -64,6 +64,13 @@ describe('EditPage', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/library'), { timeout: 3000 });
   });
 
+  it('opens a song whose name contains a literal percent escape', async () => {
+    backend.seed({ tracks: [makeTrack({ title: 'Half Price', filename: '50%20off.mp3' })] });
+    renderApp(`/details/${encodeURIComponent('50%20off.mp3')}`);
+
+    expect(await screen.findByDisplayValue('Half Price')).toBeInTheDocument();
+  });
+
   it('shows a missing track', async () => {
     renderApp('/details/missing.mp3');
     expect(await screen.findByRole('status', { name: 'Track not found' })).toBeInTheDocument();

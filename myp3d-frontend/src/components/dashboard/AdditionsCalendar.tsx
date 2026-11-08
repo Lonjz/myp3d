@@ -4,6 +4,7 @@ import { History, Music } from 'lucide-react';
 import type { LibraryStats } from '../../api/mp3Api';
 import { usePersistentState } from '../../hooks/usePersistentState';
 import { useLingering } from '../../hooks/usePresence';
+import { cx } from '../../utils/formatters';
 
 interface AdditionsCalendarProps {
   days: LibraryStats['additions_by_day'];
@@ -185,7 +186,7 @@ export function AdditionsCalendar({ days }: AdditionsCalendarProps) {
           <button
             key={value}
             type="button"
-            className={`calendar__year ${activeRange === value ? 'is-active' : ''}`.trim()}
+            className={cx('calendar__year', activeRange === value && 'is-active')}
             aria-pressed={activeRange === value}
             aria-label={label}
             title={label}

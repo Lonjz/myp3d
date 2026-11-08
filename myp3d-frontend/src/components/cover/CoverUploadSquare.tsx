@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { ImagePlus, X } from 'lucide-react';
+import { cx } from '../../utils/formatters';
 import { IconButton } from '../ui/IconButton';
 
 interface CoverUploadSquareProps {
@@ -40,7 +41,7 @@ export function CoverUploadSquare({
 
       <button
         type="button"
-        className={`cover-upload-square ${previewUrl ? 'has-image' : ''}`}
+        className={cx('cover-upload-square', previewUrl && 'has-image')}
         onClick={() => inputRef.current?.click()}
         disabled={disabled}
         aria-label={previewUrl ? 'Change cover' : 'Add cover'}

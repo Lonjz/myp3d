@@ -46,8 +46,16 @@ export function formatTrackSubtitle(artist: string | null, album: string | null)
   return [artist, album].filter(Boolean).join(' · ');
 }
 
+export function countOf(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? '' : 's'}`;
+}
+
 export function trackCount(count: number): string {
-  return `${count} track${count === 1 ? '' : 's'}`;
+  return countOf(count, 'track');
+}
+
+export function cx(...names: Array<string | false | null | undefined>): string {
+  return names.filter(Boolean).join(' ');
 }
 
 export function errorMessage(err: unknown, fallback: string): string {

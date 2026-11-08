@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { LucideIcon, LucideProps } from 'lucide-react';
 import { siApplemusic, siSpotify } from 'simple-icons';
 import type { SimpleIcon } from 'simple-icons';
+import { cx } from '../../utils/formatters';
 
 const GLYPH_TRANSFORM = 'translate(12 12) scale(0.8333) translate(-12 -12)';
 
@@ -27,7 +28,7 @@ function createBrandIcon({ icon, outline, inner }: BrandShape): LucideIcon {
         strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
-        className={['lucide', className].filter(Boolean).join(' ')}
+        className={cx('lucide', className)}
         {...props}
       >
         {outline}

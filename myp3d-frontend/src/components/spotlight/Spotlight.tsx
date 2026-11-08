@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronDown, ChevronLeft, ChevronRight, CornerDownLeft, Search, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { usePresence } from '../../hooks/usePresence';
+import { cx } from '../../utils/formatters';
 import { IconButton } from '../ui/IconButton';
 import { Spinner } from '../ui/Spinner';
 import type { MenuAction } from '../ui/ContextMenu';
@@ -277,9 +278,7 @@ function SpotlightPanel({ closing, initialQuery, sources, onClose }: SpotlightPa
                         <div
                           key={action.id}
                           id={optionId(index)}
-                          className={['spotlight-row', isActive ? 'is-active' : '', action.danger ? 'is-danger' : '']
-                            .filter(Boolean)
-                            .join(' ')}
+                          className={cx('spotlight-row', isActive && 'is-active', action.danger && 'is-danger')}
                           role="option"
                           aria-selected={isActive}
                           onMouseMove={() => {

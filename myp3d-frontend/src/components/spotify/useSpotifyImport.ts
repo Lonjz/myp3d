@@ -6,7 +6,7 @@ import { emitAppEvent } from '../../utils/appEvents';
 import { extractTrackLinks } from '../../utils/spotify';
 import { getVideoIdFromUrl, getYouTubeThumbnailUrl } from '../../utils/youtube';
 import { useToast } from '../messages/toastContext';
-import { errorMessage } from '../../utils/formatters';
+import { countOf, errorMessage } from '../../utils/formatters';
 
 export const GOOD_MATCH = 0.7;
 const MATCH_CONCURRENCY = 4;
@@ -23,10 +23,6 @@ type ReadyRow = SpotifyRow & { match: SpotifyTrackMatch; choice: SpotifyCandidat
 
 export const isReadyRow = (row: SpotifyRow): row is ReadyRow =>
   row.match !== null && row.choice !== null && !row.queued;
-
-const songs = (count: number) => `${count} song${count === 1 ? '' : 's'}`;
-
-const links = (count: number) => `${count} link${count === 1 ? '' : 's'}`;
 
 export function useSpotifyImport() {
   const { showSuccess, showError, clearToast } = useToast();
@@ -92,7 +88,7 @@ export function useSpotifyImport() {
         setRows(refs.map((ref) => ({ ref, match: null, choice: null, error: null, queued: false })));
         setTruncated(result.truncated);
         setSelected(new Set());
-        if (result.skipped > 0) showError(`Couldn't open ${links(result.skipped)}`);
+        if (result.skipped > 0) showError(`Couldn't open ${countOf(result.skipped, 'link')}`);
       } catch (err) {
         if (runRef.current === run) showError(errorMessage(err, 'Failed to read the Spotify links'));
         return;
@@ -187,7 +183,7 @@ export function useSpotifyImport() {
       const ids = new Set(picks.map((row) => row.ref.id));
       setRows((previous) => previous.map((row) => (ids.has(row.ref.id) ? { ...row, queued: true } : row)));
       setSelected((previous) => new Set([...previous].filter((id) => !ids.has(id))));
-      showSuccess(`Queued ${songs(picks.length)}`);
+      showSuccess(`Queued ${countOf(picks.length, 'song')}`);
     } catch (err) {
       showError(errorMessage(err, 'Failed to queue the songs'));
     } finally {

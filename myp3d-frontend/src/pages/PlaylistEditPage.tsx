@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -8,8 +8,6 @@ import {
   Clock,
   DiscAlbum,
   GripVertical,
-  ImagePlus,
-  ListChecks,
   ListMinus,
   ListMusic,
   ListPlus,
@@ -27,6 +25,7 @@ import type { MP3Info } from '../api/mp3Api';
 import { NEW_PLAYLIST_NAME, playlistApi } from '../api/playlistApi';
 import type { PlaylistDetail, PlaylistInfo } from '../api/playlistApi';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
+import { CoverEditButton } from '../components/cover/CoverEditButton';
 import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
 import { useToast } from '../components/messages/toastContext';
 import { useTrackActions } from '../components/library/trackActionsContext';
@@ -34,10 +33,11 @@ import { usePlayer } from '../components/player/playerContext';
 import { AddToPlaylistDialog } from '../components/playlists/AddToPlaylistDialog';
 import { TrackIndexButton } from '../components/player/TrackIndexButton';
 import { InfiniteSidebarList } from '../components/sidebar/InfiniteSidebarList';
-import { DataTable } from '../components/table/DataTable';
+import { DataTable, SelectionToolbar } from '../components/table/DataTable';
 import { HeaderIcon } from '../components/table/HeaderIcon';
-import { TrackTitleCell } from '../components/table/TrackTitleCell';
+import { EllipsisCell, TrackTitleCell } from '../components/table/TrackTitleCell';
 import { Checkbox } from '../components/ui/Checkbox';
+import { Chip } from '../components/ui/Chip';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
@@ -48,7 +48,7 @@ import { usePresence, useToolbarSwap } from '../hooks/usePresence';
 import { isShiftClick, useTrackSelection } from '../hooks/useTrackSelection';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { emitAppEvent } from '../utils/appEvents';
-import { errorMessage, formatDuration, trackCount } from '../utils/formatters';
+import { cx, errorMessage, formatDuration, trackCount } from '../utils/formatters';
 import { DiscardChangesDialog } from '../components/ui/DiscardChangesDialog';
 import { useSaveShortcut } from '../hooks/useSaveShortcut';
 
@@ -101,7 +101,6 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
   const [addToPlaylistOpen, setAddToPlaylistOpen] = useState(false);
   const addToPlaylistPresence = usePresence(addToPlaylistOpen);
   const selection = useTrackSelection();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     cropModalProps,
@@ -262,32 +261,13 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
         <section className="details-main">
 
           <div className="edit-container glass">
-            <input
-              type="file"
-              accept="image/*"
-              ref={fileInputRef}
-              onChange={handleCoverChange}
-              className="hidden-file-input"
-            />
-            <button
-              type="button"
-              className="cover-preview"
-              onClick={() => fileInputRef.current?.click()}
+            <CoverEditButton
+              label="Change playlist cover"
+              src={effectiveCoverPreview}
+              placeholder={<div className="no-cover-large playlist-no-cover"><ListMusic aria-hidden="true" /></div>}
+              onFileChange={handleCoverChange}
               disabled={saving || !current}
-              aria-label="Change playlist cover"
-              title="Change playlist cover"
-            >
-              {effectiveCoverPreview ? (
-                <img src={effectiveCoverPreview} alt="" />
-              ) : (
-                <div className="no-cover-large playlist-no-cover">
-                  <ListMusic aria-hidden="true" />
-                </div>
-              )}
-              <span className="cover-preview__overlay" aria-hidden="true">
-                <ImagePlus />
-              </span>
-            </button>
+            />
 
             <div className="metadata-section">
               <IconField
@@ -315,10 +295,7 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
               </label>
 
               <div className="album-chips">
-                <span className="album-chip" title="Tracks">
-                  <Music aria-hidden="true" />
-                  {tracks.length}
-                </span>
+                <Chip icon={Music} title="Tracks">{tracks.length}</Chip>
               </div>
 
               <div className="metadata-actions">
@@ -358,12 +335,12 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
             items={visibleRows}
             getRowKey={(row) => row.key}
             getRowClassName={({ key, track }) =>
-              [
-                selection.isSelected(track.filename) ? 'is-selected' : '',
-                player.isCurrent(track.filename) ? 'is-current' : '',
-                dragIndex !== null && rows[dragIndex]?.key === key ? 'is-dragging' : '',
-                menuFilename === track.filename ? 'is-menu-open' : '',
-              ].filter(Boolean).join(' ') || undefined
+              cx(
+                selection.isSelected(track.filename) && 'is-selected',
+                player.isCurrent(track.filename) && 'is-current',
+                dragIndex !== null && rows[dragIndex]?.key === key && 'is-dragging',
+                menuFilename === track.filename && 'is-menu-open',
+              ) || undefined
             }
             onRowMenu={saving ? undefined : ({ key, track }, event) =>
               openMenu(event, track, {
@@ -392,18 +369,12 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
             })}
             emptyMessage={filtering ? 'No matches' : 'No tracks'}
             toolbar={showSelection ? (
-              <div key="selection" className="library-toolbar__set" data-state={toolbarState}>
-                <IconButton icon={X} label="Clear selection" onClick={selection.clear} />
-                <span className="library-selection-count" title="Selected">
-                  <ListChecks aria-hidden="true" />
-                  {selection.size}
-                </span>
-                <IconButton icon={Play} label="Play selected" onClick={playSelected} />
+              <SelectionToolbar key="selection" count={selection.size} state={toolbarState} onClear={selection.clear} onPlay={playSelected}>
                 <IconButton icon={ArrowUpToLine} label="Move to top" onClick={() => moveSelected(true)} disabled={!canEdit} />
                 <IconButton icon={ArrowDownToLine} label="Move to bottom" onClick={() => moveSelected(false)} disabled={!canEdit} />
                 <IconButton icon={ListPlus} label="Add to playlist" onClick={() => setAddToPlaylistOpen(true)} />
                 <IconButton icon={ListMinus} label="Remove from playlist" variant="danger" onClick={removeSelected} disabled={!canEdit} />
-              </div>
+              </SelectionToolbar>
             ) : (
               <div key="browse" className="library-toolbar__set" data-state={toolbarState}>
                 <IconField
@@ -487,7 +458,7 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
                 key: 'album',
                 header: <HeaderIcon label="Album" icon={DiscAlbum} />,
                 hideBelow: 'sm',
-                render: ({ track }) => <span className="table-cell-ellipsis" title={track.album || '-'}>{track.album || '-'}</span>,
+                render: ({ track }) => <EllipsisCell text={track.album || '-'} />,
               },
               {
                 key: 'duration',

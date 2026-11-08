@@ -18,7 +18,7 @@ import type { DownloadFormValues } from '../hooks/useDownloadForm';
 import { readStoredValue, useStoredValueWriter } from '../hooks/usePersistentState';
 import { useTrimPreview } from '../hooks/useTrimPreview';
 import type { TrimMode } from '../hooks/useTrimPreview';
-import { errorMessage, formatDuration } from '../utils/formatters';
+import { cx, errorMessage, formatDuration } from '../utils/formatters';
 import { getVideoIdFromUrl } from '../utils/youtube';
 
 const QUERY_DRAFT_KEY = 'query:draft';
@@ -249,7 +249,7 @@ export function QueryPage() {
                 <button
                   key={`${result.video_id}-${result.url}`}
                   type="button"
-                  className={`query-result-item ${isActive ? 'is-active' : ''}`}
+                  className={cx('query-result-item', isActive && 'is-active')}
                   style={{ '--row': index } as CSSProperties}
                   onClick={() => applySelectedResult(result)}
                 >

@@ -1,40 +1,22 @@
 import { DiscAlbum, MicVocal, Music } from 'lucide-react';
 import type { MusicAlbumIssue } from '../../api/musicApi';
 import type { Selection } from '../../hooks/useSelection';
-import { Cover, DiffColumn, TrackText } from '../diff/DiffColumns';
-import { Checkbox } from '../ui/Checkbox';
-
-const stopClick = (event: { stopPropagation: () => void }) => event.stopPropagation();
-const songCount = (count: number) => `${count} song${count === 1 ? '' : 's'} with an album artist`;
+import { countOf } from '../../utils/formatters';
+import { BusyColumn, SelectableRow } from '../diff/DiffColumns';
+import { Chip } from '../ui/Chip';
 
 function AlbumRow({ album, selection }: { album: MusicAlbumIssue; selection: Selection }) {
-  const title = album.album || '-';
-  const selected = selection.selected.has(album.key);
-  const albumArtists = album.album_artists.join(', ');
+  const albumArtists = `Album artist: ${album.album_artists.join(', ')}`;
+  const songs = `${countOf(album.track_count, 'song')} with an album artist`;
   return (
-    <li
-      className={`music-row is-clickable health-row ${selected ? 'is-selected' : ''}`.trim()}
-      onClick={() => selection.toggle(album.key)}
-    >
-      <Checkbox
-        label={`Select ${title}`}
-        checked={selected}
-        onChange={() => selection.toggle(album.key)}
-        onClick={stopClick}
-      />
-      <Cover icon={DiscAlbum} />
-      <TrackText title={title} sub={album.artists.join(', ')} />
-      <span className="album-chip music-album-artist" title={`Album artist: ${albumArtists}`} aria-label={`Album artist: ${albumArtists}`}>
-        <MicVocal aria-hidden="true" />
-        <span className="album-chip__text">{albumArtists}</span>
-      </span>
+    <SelectableRow rowKey={album.key} selection={selection} title={album.album || '-'} sub={album.artists.join(', ')} coverIcon={DiscAlbum}>
+      <Chip icon={MicVocal} className="music-album-artist" title={albumArtists} label={albumArtists}>
+        <span className="album-chip__text">{album.album_artists.join(', ')}</span>
+      </Chip>
       <span className="music-changes">
-        <span className="album-chip" title={songCount(album.track_count)} aria-label={songCount(album.track_count)}>
-          <Music aria-hidden="true" />
-          {album.track_count}
-        </span>
+        <Chip icon={Music} title={songs} label={songs}>{album.track_count}</Chip>
       </span>
-    </li>
+    </SelectableRow>
   );
 }
 
@@ -48,12 +30,10 @@ export function AlbumColumns({
   busy: boolean;
 }) {
   return (
-    <div className={`health-columns ${busy ? 'is-busy' : ''}`.trim()} aria-busy={busy}>
-      <DiffColumn icon={DiscAlbum} label="Album artists" count={albums.length}>
-        {albums.map((album) => (
-          <AlbumRow key={album.key} album={album} selection={selection} />
-        ))}
-      </DiffColumn>
-    </div>
+    <BusyColumn busy={busy} icon={DiscAlbum} label="Album artists" count={albums.length}>
+      {albums.map((album) => (
+        <AlbumRow key={album.key} album={album} selection={selection} />
+      ))}
+    </BusyColumn>
   );
 }

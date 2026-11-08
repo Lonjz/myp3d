@@ -5,6 +5,7 @@ import { useLocation } from 'react-router-dom';
 export interface KeepAlivePage {
   path: string;
   element: ReactNode;
+  fill?: boolean;
 }
 
 interface KeepAliveRoutesProps {

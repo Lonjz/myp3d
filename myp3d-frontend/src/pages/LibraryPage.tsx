@@ -7,7 +7,6 @@ import {
   Download,
   FileAudio,
   HardDrive,
-  ListChecks,
   ListPlus,
   MicVocal,
   Music,
@@ -31,12 +30,12 @@ import { usePresence, useToolbarSwap } from '../hooks/usePresence';
 import { useSequentialDownload } from '../hooks/useSequentialDownload';
 import { useSortState } from '../hooks/useSortState';
 import { isShiftClick, useTrackSelection } from '../hooks/useTrackSelection';
-import { errorMessage, formatBytes, formatDate, formatDateTime, formatDuration, formatTrackSubtitle } from '../utils/formatters';
+import { cx, errorMessage, formatBytes, formatDate, formatDateTime, formatDuration, formatTrackSubtitle } from '../utils/formatters';
 import { subscribeAppEvent } from '../utils/appEvents';
-import { DataTable } from '../components/table/DataTable';
+import { DataTable, SelectionToolbar } from '../components/table/DataTable';
 import type { DataTableColumn } from '../components/table/DataTable';
 import { SortableHeaderButton } from '../components/table/SortableHeaderButton';
-import { TrackTitleCell } from '../components/table/TrackTitleCell';
+import { EllipsisCell, TrackTitleCell } from '../components/table/TrackTitleCell';
 import { BulkEditDialog } from '../components/library/BulkEditDialog';
 import { LibraryFilters } from '../components/library/LibraryFilters';
 import { DURATION_OPTIONS, ISSUE_OPTIONS, SCOPE_OPTIONS } from '../components/library/libraryFilterOptions';
@@ -283,13 +282,13 @@ export function LibraryPage() {
       key: 'artist',
       header: renderSortHeader('artist'),
       hideBelow: 'sm',
-      render: (mp3) => <span className="table-cell-ellipsis" title={mp3.artist || '-'}>{mp3.artist || '-'}</span>,
+      render: (mp3) => <EllipsisCell text={mp3.artist || '-'} />,
     },
     {
       key: 'album',
       header: renderSortHeader('album'),
       hideBelow: 'sm',
-      render: (mp3) => <span className="table-cell-ellipsis" title={mp3.album || '-'}>{mp3.album || '-'}</span>,
+      render: (mp3) => <EllipsisCell text={mp3.album || '-'} />,
     },
     {
       key: 'filename',
@@ -302,17 +301,14 @@ export function LibraryPage() {
       header: renderSortHeader('size'),
       width: '96px',
       hideBelow: 'md',
-      render: (mp3) => <span className="table-cell-ellipsis" title={formatBytes(mp3.file_size)}>{formatBytes(mp3.file_size)}</span>,
+      render: (mp3) => <EllipsisCell text={formatBytes(mp3.file_size)} />,
     },
     {
       key: 'duration',
       header: renderSortHeader('duration'),
       width: '96px',
       hideBelow: 'md',
-      render: (mp3) => {
-        const length = formatDuration(mp3.duration == null ? null : Math.round(mp3.duration));
-        return <span className="table-cell-ellipsis" title={length}>{length}</span>;
-      },
+      render: (mp3) => <EllipsisCell text={formatDuration(mp3.duration == null ? null : Math.round(mp3.duration))} />,
     },
     {
       key: 'date_added',
@@ -353,9 +349,7 @@ export function LibraryPage() {
             openMenu(event, mp3, { play: () => void playFrom(mp3.filename), onDeleted: selection.deselect })
           }
           getRowClassName={(mp3) =>
-            [selection.isSelected(mp3.filename) ? 'is-selected' : '', menuFilename === mp3.filename ? 'is-menu-open' : '']
-              .filter(Boolean)
-              .join(' ') || undefined
+            cx(selection.isSelected(mp3.filename) && 'is-selected', menuFilename === mp3.filename && 'is-menu-open') || undefined
           }
           className="library-table--selectable"
           emptyMessage={
@@ -369,18 +363,12 @@ export function LibraryPage() {
           onEndReached={loadMore}
           resetKey={queryParams}
           toolbar={showSelection ? (
-            <div key="selection" className="library-toolbar__set" data-state={toolbarState}>
-              <IconButton icon={X} label="Clear selection" onClick={selection.clear} />
-              <span className="library-selection-count" title="Selected">
-                <ListChecks aria-hidden="true" />
-                {selection.size}
-              </span>
-              <IconButton icon={Play} label="Play selected" onClick={playSelected} />
+            <SelectionToolbar key="selection" count={selection.size} state={toolbarState} onClear={selection.clear} onPlay={playSelected}>
               <IconButton icon={Pencil} label="Edit selected" onClick={editSelected} disabled={deleting} />
               <IconButton icon={ListPlus} label="Add to playlist" onClick={addSelectedToPlaylist} disabled={deleting} />
               {downloadControl}
               <IconButton icon={Trash2} label="Delete selected" variant="danger" onClick={deleteSelected} disabled={deleting} />
-            </div>
+            </SelectionToolbar>
           ) : (
             <div key="browse" className="library-toolbar__set" data-state={toolbarState}>
               <IconField

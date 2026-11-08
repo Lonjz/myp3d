@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode, RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { usePresence } from '../../hooks/usePresence';
+import { cx } from '../../utils/formatters';
 
 const POPOVER_GAP = 6;
 const VIEWPORT_GAP = 12;
@@ -81,7 +82,7 @@ export function Popover({
   return createPortal(
     <div
       ref={panelRef}
-      className={['popover glass motion-pop', className].filter(Boolean).join(' ')}
+      className={cx('popover glass motion-pop', className)}
       role={role}
       aria-label={label}
       data-state={closing ? 'closed' : 'open'}

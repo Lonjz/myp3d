@@ -1,7 +1,10 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { CSSProperties, HTMLAttributes, MouseEvent, ReactNode } from 'react';
+import { ListChecks, Play, X } from 'lucide-react';
 import { useEndReached } from '../../hooks/useInfiniteList';
+import { cx } from '../../utils/formatters';
 import { rowOpenProps } from '../../utils/rowOpen';
+import { IconButton } from '../ui/IconButton';
 import { Spinner } from '../ui/Spinner';
 
 export interface DataTableColumn<T> {
@@ -30,6 +33,28 @@ interface DataTableProps<T> {
   hasMore?: boolean;
   onEndReached?: () => void;
   resetKey?: unknown;
+}
+
+interface SelectionToolbarProps {
+  count: number;
+  state: string;
+  onClear: () => void;
+  onPlay: () => void;
+  children: ReactNode;
+}
+
+export function SelectionToolbar({ count, state, onClear, onPlay, children }: SelectionToolbarProps) {
+  return (
+    <div className="library-toolbar__set" data-state={state}>
+      <IconButton icon={X} label="Clear selection" onClick={onClear} />
+      <span className="library-selection-count" title="Selected">
+        <ListChecks aria-hidden="true" />
+        {count}
+      </span>
+      <IconButton icon={Play} label="Play selected" onClick={onPlay} />
+      {children}
+    </div>
+  );
 }
 
 export function DataTable<T>({
@@ -76,7 +101,7 @@ export function DataTable<T>({
     }
   }, [resetKey]);
 
-  const tableClassName = `library-table ${className ?? ''}`.trim();
+  const tableClassName = cx('library-table', className);
   const colgroup = (
     <colgroup>
       {columns.map((column) => (
@@ -126,7 +151,7 @@ export function DataTable<T>({
                     {...getRowProps?.(item, index)}
                     {...(onRowOpen ? rowOpenProps<HTMLTableRowElement>(() => onRowOpen(item)) : undefined)}
                     onContextMenu={onRowMenu ? (event) => onRowMenu(item, event) : undefined}
-                    className={[getRowClassName?.(item), onRowOpen ? 'is-clickable' : ''].filter(Boolean).join(' ') || undefined}
+                    className={cx(getRowClassName?.(item), onRowOpen && 'is-clickable') || undefined}
                     style={{ '--row': index } as CSSProperties}
                   >
                     {columns.map((column) => (

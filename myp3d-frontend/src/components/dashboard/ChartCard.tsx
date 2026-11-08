@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
+import { cx } from '../../utils/formatters';
 
 interface ChartCardProps {
   title: string;
@@ -12,7 +13,7 @@ interface ChartCardProps {
 
 export function ChartCard({ title, icon: Icon, heading, actions, className, children }: ChartCardProps) {
   return (
-    <section className={`chart-card glass ${className ?? ''}`.trim()}>
+    <section className={cx('chart-card glass', className)}>
       <header className="chart-card__header">
         {heading ? (
           <>

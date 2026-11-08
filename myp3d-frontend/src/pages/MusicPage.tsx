@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import {
   AudioWaveform,
   Check,
@@ -23,19 +24,19 @@ import type { LucideIcon } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { BulkResult, MP3Info } from '../api/mp3Api';
 import type { MusicChange, MusicPair, MusicTrack } from '../api/musicApi';
-import { Cover, DiffColumn, TrackText } from '../components/diff/DiffColumns';
+import { BulkFixTools, ChangeBadge, Cover, DiffColumn, TrackText } from '../components/diff/DiffColumns';
 import { AlbumColumns } from '../components/music/AlbumColumns';
 import { MusicJobPanel } from '../components/music/MusicJobPanel';
 import { PlaylistColumns } from '../components/music/PlaylistColumns';
 import { useAlbumHealth } from '../components/music/useAlbumHealth';
 import { useMusicSync } from '../components/music/useMusicSync';
 import { usePlaylistMusicSync } from '../components/music/usePlaylistMusicSync';
-import { Checkbox } from '../components/ui/Checkbox';
+import { Chip } from '../components/ui/Chip';
 import { EmptyState, LoadFailed } from '../components/ui/EmptyState';
-import { IconButton } from '../components/ui/IconButton';
+import { CountButton, IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { AppleMusicIcon } from '../components/ui/BrandIcons';
-import { formatTrackSubtitle } from '../utils/formatters';
+import { countOf, cx, formatTrackSubtitle } from '../utils/formatters';
 import { SegmentedControl } from '../components/ui/SegmentedControl';
 
 type MusicStep = 'songs' | 'playlists' | 'albums';
@@ -68,42 +69,38 @@ const changeTitle = (change: MusicChange, { track, music }: MusicPair) => {
   return 'Cover art';
 };
 
-function LocalRow({ track }: { track: MP3Info }) {
-  const title = track.title || track.filename;
+function TrackRow({ track, children }: { track: MP3Info; children: ReactNode }) {
   return (
     <li className="music-row">
       <Cover src={track.has_cover ? mp3Api.getCoverUrl(track.filename, 'thumb') : undefined} />
-      <TrackText title={title} sub={formatTrackSubtitle(track.artist, track.album)} />
-      <span className="music-changes">
-        <span className="music-change" title="Add to Apple Music" aria-label="Add to Apple Music">
-          <Plus aria-hidden="true" />
-        </span>
-      </span>
+      <TrackText title={track.title || track.filename} sub={formatTrackSubtitle(track.artist, track.album)} />
+      {children}
     </li>
+  );
+}
+
+function LocalRow({ track }: { track: MP3Info }) {
+  return (
+    <TrackRow track={track}>
+      <span className="music-changes">
+        <ChangeBadge icon={Plus} label="Add to Apple Music" />
+      </span>
+    </TrackRow>
   );
 }
 
 function PairRow({ pair }: { pair: MusicPair }) {
   const { track, changes } = pair;
-  const title = track.title || track.filename;
   return (
-    <li className="music-row">
-      <Cover src={track.has_cover ? mp3Api.getCoverUrl(track.filename, 'thumb') : undefined} />
-      <TrackText title={title} sub={formatTrackSubtitle(track.artist, track.album)} />
+    <TrackRow track={track}>
       {changes.length > 0 && (
         <span className="music-changes">
-          {changes.map((change) => {
-            const Icon = CHANGE_ICONS[change];
-            const label = changeTitle(change, pair);
-            return (
-              <span key={change} className="music-change" title={label} aria-label={label}>
-                <Icon aria-hidden="true" />
-              </span>
-            );
-          })}
+          {changes.map((change) => (
+            <ChangeBadge key={change} icon={CHANGE_ICONS[change]} label={changeTitle(change, pair)} />
+          ))}
         </span>
       )}
-    </li>
+    </TrackRow>
   );
 }
 
@@ -121,18 +118,8 @@ const failureList = (failures: BulkResult['failed']) => failures.map((item) => `
 function FailureChips({ failed, withoutArt }: { failed: BulkResult['failed']; withoutArt: BulkResult['failed'] }) {
   return (
     <>
-      {failed.length > 0 && (
-        <span className="album-chip" title={failureList(failed)}>
-          <CircleAlert aria-hidden="true" />
-          {failed.length}
-        </span>
-      )}
-      {withoutArt.length > 0 && (
-        <span className="album-chip" title={`No cover art set:\n${failureList(withoutArt)}`}>
-          <ImageOff aria-hidden="true" />
-          {withoutArt.length}
-        </span>
-      )}
+      {failed.length > 0 && <Chip icon={CircleAlert} title={failureList(failed)}>{failed.length}</Chip>}
+      {withoutArt.length > 0 && <Chip icon={ImageOff} title={`No cover art set:\n${failureList(withoutArt)}`}>{withoutArt.length}</Chip>}
     </>
   );
 }
@@ -216,20 +203,9 @@ export function MusicPage() {
             busy={playlists.busy}
             onDismiss={() => void playlists.dismiss()}
           >
-            <span className="album-chip" title="Added">
-              <Plus aria-hidden="true" />
-              {job.created}
-            </span>
-            <span className="album-chip" title="Updated">
-              <PencilLine aria-hidden="true" />
-              {job.updated}
-            </span>
-            {job.deleted > 0 && (
-              <span className="album-chip" title="Deleted">
-                <Trash2 aria-hidden="true" />
-                {job.deleted}
-              </span>
-            )}
+            <Chip icon={Plus} title="Added">{job.created}</Chip>
+            <Chip icon={PencilLine} title="Updated">{job.updated}</Chip>
+            {job.deleted > 0 && <Chip icon={Trash2} title="Deleted">{job.deleted}</Chip>}
             <FailureChips failed={job.failed} withoutArt={job.without_art} />
           </MusicJobPanel>
         );
@@ -252,14 +228,8 @@ export function MusicPage() {
           busy={songs.busy}
           onDismiss={() => void songs.dismiss()}
         >
-          <span className="album-chip" title="Added">
-            <Plus aria-hidden="true" />
-            {job.added}
-          </span>
-          <span className="album-chip" title="Updated">
-            <PencilLine aria-hidden="true" />
-            {job.updated}
-          </span>
+          <Chip icon={Plus} title="Added">{job.added}</Chip>
+          <Chip icon={PencilLine} title="Updated">{job.updated}</Chip>
           <FailureChips failed={job.failed} withoutArt={job.without_art} />
         </MusicJobPanel>
       );
@@ -267,7 +237,7 @@ export function MusicPage() {
     if (!songs.diff) return <MusicEmpty scanning={songs.scanning} />;
     const { diff } = songs;
     return (
-      <div className={`music-columns ${songs.scanning ? 'is-scanning' : ''}`.trim()} aria-busy={songs.scanning}>
+      <div className={cx('music-columns', songs.scanning && 'is-scanning')} aria-busy={songs.scanning}>
         <DiffColumn icon={AppleMusicIcon} label="Only in Apple Music" count={diff.only_in_music.length}>
           {diff.only_in_music.map((track) => (
             <MusicRow key={track.persistent_id} track={track} />
@@ -296,7 +266,7 @@ export function MusicPage() {
       <IconField
         icon={Folder}
         label="Apple Music folder"
-        className={`music-folder ${folderMissing ? 'is-invalid' : ''}`.trim()}
+        className={cx('music-folder', folderMissing && 'is-invalid')}
         value={folder}
         onChange={(e) => setFolder(e.target.value)}
         onKeyDown={(e) => {
@@ -321,52 +291,29 @@ export function MusicPage() {
           disabled={songs.scanning || folderMissing || jobOpen || anySyncing}
         />
       )}
-      <button
-        type="button"
-        className="btn-primary music-add"
+      <CountButton
+        icon={RefreshCw}
+        count={pendingCount}
+        className="music-add"
         onClick={startSync}
         disabled={active.busy || active.scanning || jobOpen || anySyncing || songsBlocking || pendingCount === 0}
         title={songsBlocking ? 'Sync songs first' : 'Sync with Apple Music'}
-        aria-label={songsBlocking ? 'Sync songs first' : `Sync ${pendingCount} with Apple Music`}
-      >
-        <RefreshCw aria-hidden="true" />
-        {pendingCount}
-      </button>
+        label={songsBlocking ? 'Sync songs first' : `Sync ${pendingCount} with Apple Music`}
+      />
     </>
   );
 
-  const albumLocked = albums.albums === null || albums.scanning || albums.busy || anySyncing;
-  const albumChosen = albums.selection.chosen.length;
   const albumTools = (
-    <>
-      <span className="health-select-all">
-        <Checkbox
-          label={albums.selection.allChosen ? 'Deselect all' : 'Select all'}
-          checked={albums.selection.allChosen}
-          indeterminate={albumChosen > 0 && !albums.selection.allChosen}
-          onChange={albums.selection.toggleAll}
-          disabled={albums.selection.keys.length === 0 || albumLocked}
-        />
-      </span>
-      <IconButton
-        icon={ScanSearch}
-        label="Scan again"
-        className="sync-toolbar__push"
-        onClick={() => void albums.scan()}
-        disabled={albums.scanning || albums.busy}
-      />
-      <button
-        type="button"
-        className="btn-primary health-fix"
-        onClick={() => void albums.fix()}
-        disabled={albumChosen === 0 || albumLocked}
-        aria-label={`Clear the album artist on ${albumChosen} album${albumChosen === 1 ? '' : 's'}`}
-        title={anySyncing ? 'Wait for the sync to finish' : 'Clear album artist'}
-      >
-        <Eraser aria-hidden="true" />
-        {albumChosen}
-      </button>
-    </>
+    <BulkFixTools
+      selection={albums.selection}
+      locked={albums.albums === null || albums.scanning || albums.busy || anySyncing}
+      scanDisabled={albums.scanning || albums.busy}
+      onScan={() => void albums.scan()}
+      fixIcon={Eraser}
+      fixLabel={`Clear the album artist on ${countOf(albums.selection.chosen.length, 'album')}`}
+      fixTitle={anySyncing ? 'Wait for the sync to finish' : 'Clear album artist'}
+      onFix={() => void albums.fix()}
+    />
   );
 
   return (

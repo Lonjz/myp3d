@@ -1,16 +1,15 @@
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ArrowRight, CaseLower, CircleAlert, FileAudio, MicVocal, ScanSearch, Scissors, VolumeX } from 'lucide-react';
+import { ArrowRight, CaseLower, CircleAlert, FileAudio, MicVocal, Scissors, VolumeX } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { healthApi } from '../api/healthApi';
 import type { ArtistTrack, NamingTrack, SilenceScan, SilentTrack } from '../api/healthApi';
 import { mp3Api } from '../api/mp3Api';
 import type { BulkResult, MP3Info } from '../api/mp3Api';
-import { Cover, DiffColumn, TrackText } from '../components/diff/DiffColumns';
+import { BulkFixTools, BusyColumn, SelectableRow } from '../components/diff/DiffColumns';
 import { useToast } from '../components/messages/toastContext';
-import { Checkbox } from '../components/ui/Checkbox';
+import { Chip } from '../components/ui/Chip';
 import { EmptyState, LoadFailed } from '../components/ui/EmptyState';
-import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { usePersistentState } from '../hooks/usePersistentState';
 import { usePoll } from '../hooks/usePoll';
@@ -18,7 +17,8 @@ import { useSelection } from '../hooks/useSelection';
 import type { Selection } from '../hooks/useSelection';
 import { emitAppEvent, subscribeAppEvent } from '../utils/appEvents';
 import { normalizeFilenameInput, stripMp3Extension } from '../utils/filenames';
-import { errorMessage, formatTrackSubtitle, trackCount } from '../utils/formatters';
+import { cx, errorMessage, formatTrackSubtitle, trackCount } from '../utils/formatters';
+import { stopClick } from '../utils/rowOpen';
 import { SegmentedControl } from '../components/ui/SegmentedControl';
 
 type CheckName = 'silence' | 'naming' | 'artists';
@@ -29,8 +29,6 @@ const CHECKS: { value: CheckName; label: string; icon: LucideIcon }[] = [
   { value: 'naming', label: 'File names', icon: FileAudio },
   { value: 'artists', label: 'Multiple artists', icon: MicVocal },
 ];
-
-const stopClick = (event: { stopPropagation: () => void }) => event.stopPropagation();
 
 function useFix(verb: string, past: string, failure: string) {
   const { showSuccess, showError } = useToast();
@@ -90,7 +88,7 @@ function CheckToolbar({
   selection,
   locked,
   onScan,
-  fixIcon: FixIcon,
+  fixIcon,
   fixLabel,
   fixTitle,
   onFix,
@@ -104,31 +102,18 @@ function CheckToolbar({
   fixTitle: string;
   onFix: () => void;
 }) {
-  const count = selection.chosen.length;
   return (
     <div className="sync-toolbar glass">
       {picker}
-      <span className="health-select-all">
-        <Checkbox
-          label={selection.allChosen ? 'Deselect all' : 'Select all'}
-          checked={selection.allChosen}
-          indeterminate={count > 0 && !selection.allChosen}
-          onChange={selection.toggleAll}
-          disabled={selection.keys.length === 0 || locked}
-        />
-      </span>
-      <IconButton icon={ScanSearch} label="Scan again" className="sync-toolbar__push" onClick={onScan} disabled={locked} />
-      <button
-        type="button"
-        className="btn-primary health-fix"
-        onClick={onFix}
-        disabled={count === 0 || locked}
-        aria-label={`${fixLabel} ${trackCount(count)}`}
-        title={fixTitle}
-      >
-        <FixIcon aria-hidden="true" />
-        {count}
-      </button>
+      <BulkFixTools
+        selection={selection}
+        locked={locked}
+        onScan={onScan}
+        fixIcon={fixIcon}
+        fixLabel={`${fixLabel} ${trackCount(selection.chosen.length)}`}
+        fixTitle={fixTitle}
+        onFix={onFix}
+      />
     </div>
   );
 }
@@ -146,32 +131,16 @@ function CheckRow({
   sub: string;
   children: ReactNode;
 }) {
-  const selected = selection.selected.has(track.filename);
   return (
-    <li
-      className={`music-row is-clickable health-row ${selected ? 'is-selected' : ''}`.trim()}
-      onClick={() => selection.toggle(track.filename)}
+    <SelectableRow
+      rowKey={track.filename}
+      selection={selection}
+      title={title}
+      sub={sub}
+      coverSrc={track.has_cover ? mp3Api.getCoverUrl(track.filename, 'thumb') : undefined}
     >
-      <Checkbox
-        label={`Select ${title}`}
-        checked={selected}
-        onChange={() => selection.toggle(track.filename)}
-        onClick={stopClick}
-      />
-      <Cover src={track.has_cover ? mp3Api.getCoverUrl(track.filename, 'thumb') : undefined} />
-      <TrackText title={title} sub={sub} />
       {children}
-    </li>
-  );
-}
-
-function CheckBody({ busy, icon, label, count, children }: { busy: boolean; icon: LucideIcon; label: string; count: number; children: ReactNode }) {
-  return (
-    <div className={`health-columns ${busy ? 'is-busy' : ''}`.trim()} aria-busy={busy}>
-      <DiffColumn icon={icon} label={label} count={count}>
-        {children}
-      </DiffColumn>
-    </div>
+    </SelectableRow>
   );
 }
 
@@ -241,7 +210,7 @@ function SilenceCheck({ picker }: { picker: ReactNode }) {
     if (!scan) return <EmptyState icon={VolumeX} />;
     if (scan.status === 'failed') return <EmptyState icon={CircleAlert} text={scan.error ?? "Couldn't scan the library"} />;
     return (
-      <CheckBody busy={fix.busy} icon={VolumeX} label="Silent endings" count={visible.length}>
+      <BusyColumn busy={fix.busy} icon={VolumeX} label="Silent endings" count={visible.length}>
         {visible.map((track) => {
           const silence = `${track.silence.toFixed(1)}s`;
           return (
@@ -252,14 +221,11 @@ function SilenceCheck({ picker }: { picker: ReactNode }) {
               title={track.title || track.filename}
               sub={formatTrackSubtitle(track.artist, track.album)}
             >
-              <span className="album-chip health-silence" title={`Silent ending: ${silence}`} aria-label={`Silent ending: ${silence}`}>
-                <VolumeX aria-hidden="true" />
-                {silence}
-              </span>
+              <Chip icon={VolumeX} className="health-silence" title={`Silent ending: ${silence}`} label={`Silent ending: ${silence}`}>{silence}</Chip>
             </CheckRow>
           );
         })}
-      </CheckBody>
+      </BusyColumn>
     );
   };
 
@@ -312,7 +278,7 @@ function NamingCheck({ picker }: { picker: ReactNode }) {
       ) : tracks === null ? (
         <EmptyState loading label="Checking file names" />
       ) : (
-        <CheckBody busy={fix.busy} icon={FileAudio} label="File names" count={list.length}>
+        <BusyColumn busy={fix.busy} icon={FileAudio} label="File names" count={list.length}>
           {list.map((track) => {
             const name = nameFor(track);
             return (
@@ -348,7 +314,7 @@ function NamingCheck({ picker }: { picker: ReactNode }) {
               </CheckRow>
             );
           })}
-        </CheckBody>
+        </BusyColumn>
       )}
     </>
   );
@@ -386,7 +352,7 @@ function ArtistCheck({ picker }: { picker: ReactNode }) {
       ) : tracks === null ? (
         <EmptyState loading label="Checking artists" />
       ) : (
-        <CheckBody busy={fix.busy} icon={MicVocal} label="Multiple artists" count={list.length}>
+        <BusyColumn busy={fix.busy} icon={MicVocal} label="Multiple artists" count={list.length}>
           {list.map((track) => {
             const index = primaryIndex(track);
             return (
@@ -402,7 +368,7 @@ function ArtistCheck({ picker }: { picker: ReactNode }) {
                     <button
                       key={artist}
                       type="button"
-                      className={`album-chip health-artist ${artistIndex === index ? 'is-active' : ''}`.trim()}
+                      className={cx('album-chip health-artist', artistIndex === index && 'is-active')}
                       aria-pressed={artistIndex === index}
                       title={`Make ${artist} the main artist`}
                       onClick={() => setPrimaries((current) => ({ ...current, [track.filename]: artist }))}
@@ -414,7 +380,7 @@ function ArtistCheck({ picker }: { picker: ReactNode }) {
               </CheckRow>
             );
           })}
-        </CheckBody>
+        </BusyColumn>
       )}
     </>
   );

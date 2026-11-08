@@ -27,17 +27,18 @@ import type { LucideIcon } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import { syncApi } from '../api/syncApi';
 import type { SyncDiff, SyncDiffRecord, SyncDiffTrack, SyncSession } from '../api/syncApi';
-import { Cover, DiffColumn, TrackText } from '../components/diff/DiffColumns';
+import { ChangeBadge, Cover, DiffColumn, TrackText } from '../components/diff/DiffColumns';
 import { useSyncSession } from '../components/sync/useSyncSession';
+import { Chip } from '../components/ui/Chip';
 import { EmptyState, LoadFailed } from '../components/ui/EmptyState';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
-import { IconButton } from '../components/ui/IconButton';
+import { CountButton, IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { ProgressRow } from '../components/ui/ProgressRow';
 import { Spinner } from '../components/ui/Spinner';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { usePersistentState } from '../hooks/usePersistentState';
-import { formatTrackSubtitle, trackCount } from '../utils/formatters';
+import { cx, formatTrackSubtitle, trackCount } from '../utils/formatters';
 
 const DEFAULT_PORT = '47817';
 const MIN_PORT = 1024;
@@ -80,21 +81,9 @@ function DiffRow({
       <TrackText title={title} sub={formatTrackSubtitle(track.artist, track.album)} />
       {(showUpdates || showAudio || showDated) && (
         <span className="music-changes">
-          {showUpdates && (
-            <span className="music-change" title={updatesLabel} aria-label={updatesLabel}>
-              <Pencil aria-hidden="true" />
-            </span>
-          )}
-          {showAudio && (
-            <span className="music-change" title={audioLabel} aria-label={audioLabel}>
-              <AudioWaveform aria-hidden="true" />
-            </span>
-          )}
-          {showDated && (
-            <span className="music-change" title={datedLabel} aria-label={datedLabel}>
-              <CalendarClock aria-hidden="true" />
-            </span>
-          )}
+          {showUpdates && <ChangeBadge icon={Pencil} label={showUpdates} />}
+          {showAudio && <ChangeBadge icon={AudioWaveform} label={showAudio} />}
+          {showDated && <ChangeBadge icon={CalendarClock} label={showDated} />}
         </span>
       )}
     </li>
@@ -122,13 +111,7 @@ function RecordRow({
       <TrackText title={record.name} sub="" />
       {badge && (
         <span className="music-changes">
-          <span
-            className={`music-change ${badge.danger ? 'music-change--danger' : ''}`.trim()}
-            title={badge.label}
-            aria-label={badge.label}
-          >
-            <badge.icon aria-hidden="true" />
-          </span>
+          <ChangeBadge {...badge} />
         </span>
       )}
     </li>
@@ -151,7 +134,7 @@ function PairedColumns({ diff, loading, failed, peerName, onRetry }: PairedColum
   }
 
   return (
-    <div className={`music-columns ${loading ? 'is-scanning' : ''}`.trim()} aria-busy={loading}>
+    <div className={cx('music-columns', loading && 'is-scanning')} aria-busy={loading}>
       <DiffColumn
         icon={ArrowDown}
         label={`From ${peerName}`}
@@ -254,20 +237,9 @@ function SessionPanel({
       <h2 className="sync-panel__title">{outcome.title}</h2>
       {(status === 'done' || local.done > 0 || remote.done > 0) && (
         <div className="album-chips sync-panel__chips">
-          <span className="album-chip" title="Received">
-            <ArrowDown aria-hidden="true" />
-            {local.done}
-          </span>
-          <span className="album-chip" title="Sent">
-            <ArrowUp aria-hidden="true" />
-            {remote.done}
-          </span>
-          {failed > 0 && (
-            <span className="album-chip" title="Failed">
-              <CircleAlert aria-hidden="true" />
-              {failed}
-            </span>
-          )}
+          <Chip icon={ArrowDown} title="Received">{local.done}</Chip>
+          <Chip icon={ArrowUp} title="Sent">{remote.done}</Chip>
+          {failed > 0 && <Chip icon={CircleAlert} title="Failed">{failed}</Chip>}
         </div>
       )}
       <IconButton icon={Check} label="Done" variant="primary" onClick={onDismiss} disabled={busy} />
@@ -309,19 +281,17 @@ export function SyncPage() {
     : 0;
 
   return (
-    <div className={`page sync-page ${paired ? 'page--fill sync-page--paired' : ''}`.trim()}>
-      <div className={`sync-toolbar glass ${paired ? 'is-paired' : ''}`.trim()}>
-        <span className="album-chip sync-device" title="This device">
-          <MonitorSmartphone aria-hidden="true" />
+    <div className={cx('page sync-page', paired && 'page--fill sync-page--paired')}>
+      <div className={cx('sync-toolbar glass', paired && 'is-paired')}>
+        <Chip icon={MonitorSmartphone} className="sync-device" title="This device">
           <span className="album-chip__text">{status?.device.name ?? '…'}</span>
-        </span>
+        </Chip>
         {paired ? (
           <>
             <LinkIcon className="sync-link" aria-label="Paired" />
-            <span className="album-chip sync-device" title="Paired device">
-              <MonitorSmartphone aria-hidden="true" />
+            <Chip icon={MonitorSmartphone} className="sync-device" title="Paired device">
               <span className="album-chip__text">{paired.peer.name}</span>
-            </span>
+            </Chip>
             <IconButton
               icon={ScanSearch}
               label="Compare again"
@@ -330,17 +300,15 @@ export function SyncPage() {
               disabled={busy || diffLoading}
             />
             <IconButton icon={X} label={`Unpair from ${paired.peer.name}`} onClick={() => void unpair()} disabled={busy} />
-            <button
-              type="button"
-              className="btn-primary sync-start"
+            <CountButton
+              icon={ArrowLeftRight}
+              count={pending}
+              className="sync-start"
               onClick={() => void start()}
               disabled={busy || diffLoading || pending === 0}
               title={`Sync with ${paired.peer.name}`}
-              aria-label={`Sync ${trackCount(pending)} with ${paired.peer.name}`}
-            >
-              <ArrowLeftRight aria-hidden="true" />
-              {pending}
-            </button>
+              label={`Sync ${trackCount(pending)} with ${paired.peer.name}`}
+            />
           </>
         ) : (
           <>
@@ -351,14 +319,14 @@ export function SyncPage() {
               inputMode="numeric"
               min={MIN_PORT}
               max={MAX_PORT}
-              className={`sync-port ${portInvalid || startError ? 'is-invalid' : ''}`.trim()}
+              className={cx('sync-port', (portInvalid || startError) && 'is-invalid')}
               value={portInput}
               onChange={(e) => setPortInput(e.target.value)}
               aria-invalid={portInvalid || Boolean(startError)}
               disabled={showSession}
             />
             <span
-              className={`sync-live ${listening ? 'is-on' : ''}`.trim()}
+              className={cx('sync-live', listening && 'is-on')}
               title={startError ?? (listening ? `Listening on port ${port}` : 'Not listening')}
             >
               <MonitorUp aria-hidden="true" />

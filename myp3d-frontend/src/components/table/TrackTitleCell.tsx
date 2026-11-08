@@ -6,11 +6,15 @@ interface TrackTitleCellProps {
   favorite: boolean;
 }
 
+export function EllipsisCell({ text }: { text: string }) {
+  return <span className="table-cell-ellipsis" title={text}>{text}</span>;
+}
+
 export function TrackTitleCell({ title, subtitle, favorite }: TrackTitleCellProps) {
   return (
     <span className="track-title-cell">
       <span className="track-title-cell__text">
-        <span className="table-cell-ellipsis" title={title}>{title}</span>
+        <EllipsisCell text={title} />
         {subtitle && <span className="table-cell-subtitle" title={subtitle}>{subtitle}</span>}
       </span>
       {favorite && (

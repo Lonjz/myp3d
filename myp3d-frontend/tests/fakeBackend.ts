@@ -183,8 +183,7 @@ function route(method: 'get' | 'post' | 'put' | 'patch' | 'delete', path: string
       const [{ status, detail }] = failures.splice(failure, 1);
       return error(status, detail);
     }
-    const decoded = Object.fromEntries(Object.entries(params).map(([key, value]) => [key, decodeURIComponent(String(value))]));
-    const result = await resolve({ params: decoded, url, body, request });
+    const result = await resolve({ params: params as Params, url, body, request });
     return result instanceof Response ? result : HttpResponse.json(result);
   });
 }

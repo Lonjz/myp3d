@@ -21,11 +21,11 @@ import { EmptyState } from '../components/ui/EmptyState';
 import type { SpotifyRow } from '../components/spotify/useSpotifyImport';
 import { SpotifyIcon } from '../components/ui/BrandIcons';
 import { Checkbox } from '../components/ui/Checkbox';
-import { IconButton } from '../components/ui/IconButton';
+import { CountButton, IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { ProgressRow } from '../components/ui/ProgressRow';
 import { Spinner } from '../components/ui/Spinner';
-import { formatDuration, formatTrackSubtitle, trackCount } from '../utils/formatters';
+import { cx, formatDuration, formatTrackSubtitle, trackCount } from '../utils/formatters';
 
 const TRUNCATED_HINT =
   'Spotify only shows the first 100 songs of a playlist. Export it at exportify.net and drop the CSV here to get the rest.';
@@ -82,7 +82,7 @@ function MatchCell({ row, onChoose, onChooseUrl }: MatchCellProps) {
       <button
         ref={anchorRef}
         type="button"
-        className={`spotify-match ${open ? 'is-open' : ''}`.trim()}
+        className={cx('spotify-match', open && 'is-open')}
         onClick={() => setOpen((value) => !value)}
         disabled={row.queued}
         aria-expanded={open}
@@ -200,7 +200,7 @@ export function SpotifyPage() {
 
   return (
     <div
-      className={`page page--fill sync-page spotify-page ${dropping ? 'is-dropping' : ''}`.trim()}
+      className={cx('page page--fill sync-page spotify-page', dropping && 'is-dropping')}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -249,17 +249,16 @@ export function SpotifyPage() {
           disabled={queuedCount === 0}
         />
         <IconButton icon={ListX} label="Clear all" onClick={clearAll} disabled={rows.length === 0 && !resolving} />
-        <button
-          type="button"
-          className="btn-primary spotify-queue"
+        <CountButton
+          icon={ListPlus}
+          count={selectedCount}
+          busy={queueing}
+          className="spotify-queue"
           onClick={() => void queueSelected()}
           disabled={queueing || selectedCount === 0}
           title="Add to queue"
-          aria-label={`Add ${trackCount(selectedCount)} to the queue`}
-        >
-          {queueing ? <Spinner inline /> : <ListPlus aria-hidden="true" />}
-          {selectedCount}
-        </button>
+          label={`Add ${trackCount(selectedCount)} to the queue`}
+        />
       </form>
 
       {rows.length === 0 ? (
@@ -301,7 +300,7 @@ export function SpotifyPage() {
               return (
                 <li
                   key={row.ref.id}
-                  className={`spotify-row ${row.queued ? 'is-queued' : ''}`.trim()}
+                  className={cx('spotify-row', row.queued && 'is-queued')}
                   style={{ '--row': index } as CSSProperties}
                 >
                   <Checkbox
