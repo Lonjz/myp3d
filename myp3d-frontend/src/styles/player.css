@@ -106,7 +106,7 @@
 }
 
 .player-bar__toggle.icon-btn--primary {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 6px 18px color-mix(in srgb, var(--color-rose) 30%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, calc(0.45 * var(--bevel))), 0 6px 18px color-mix(in srgb, var(--color-accent) calc(30% * var(--bevel)), transparent);
 }
 
 .player-bar__side {
@@ -155,7 +155,7 @@
   margin: 0;
   border-radius: var(--radius-full);
   background:
-    linear-gradient(90deg, var(--color-rose), var(--color-lavender)) 0 0 / var(--progress) 100% no-repeat,
+    linear-gradient(90deg, var(--color-accent), var(--color-accent-alt)) 0 0 / var(--progress) 100% no-repeat,
     rgba(255, 255, 255, 0.16);
   cursor: pointer;
   -webkit-appearance: none;
@@ -333,7 +333,7 @@
   inset: 0;
   justify-content: center;
   align-items: center;
-  background: rgba(16, 11, 33, 0.55);
+  background: var(--color-cover-scrim);
 }
 
 .queue-row__text {
@@ -384,7 +384,7 @@
   width: 3px;
   height: 40%;
   border-radius: 1px;
-  background: var(--color-rose);
+  background: var(--color-accent);
 }
 
 .now-playing span:nth-child(2) {
@@ -505,7 +505,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(16, 11, 33, 0.55);
+  background: var(--color-cover-scrim);
   color: var(--color-text);
   opacity: 0;
   transition: opacity var(--duration-fast) var(--ease-standard);
@@ -562,7 +562,7 @@
 }
 
 .track-index.is-current {
-  color: var(--color-rose);
+  color: var(--color-accent);
 }
 
 .track-index__icon {
@@ -594,7 +594,7 @@ tr:hover .track-index__icon,
 }
 
 .album-tracks-table tr.is-current td {
-  background: color-mix(in srgb, var(--color-lavender) 10%, transparent);
+  background: color-mix(in srgb, var(--color-accent-alt) 10%, transparent);
 }
 
 .metadata-actions {

@@ -29,8 +29,8 @@
   width: 4.5rem;
   height: 4.5rem;
   border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--color-lavender) 16%, transparent);
-  color: var(--color-lavender);
+  background: color-mix(in srgb, var(--color-accent-alt) 16%, transparent);
+  color: var(--color-accent-alt);
 }
 
 .export-tile__icon svg {

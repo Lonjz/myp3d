@@ -14,16 +14,18 @@
   --color-text: #fbf8ff;
   --color-text-secondary: #d8d0ee;
   --color-text-muted: #a99fc8;
-  --color-on-light: #221a3b;
+  --color-on-accent: #221a3b;
 
   --color-accent: #ff9ec4;
-  --color-accent-hover: #ffb8d4;
+  --color-accent-hover: color-mix(in srgb, var(--color-accent) 72%, white);
   --color-accent-alt: #b9a2ff;
+  --gradient-primary: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-alt) 100%);
 
-  --color-lavender: #b9a2ff;
-  --color-rose: #ff9ec4;
-  --color-peach: #ffc4a3;
-  --color-sky: #9ec5ff;
+  --backdrop-base: linear-gradient(160deg, #1a1431 0%, #221a3e 48%, #2a1d40 100%);
+  --backdrop-1: #b9a2ff;
+  --backdrop-2: #ff9ec4;
+  --backdrop-3: #ffc4a3;
+  --backdrop-4: #9ec5ff;
 
   --color-success: #8ee3b8;
   --color-danger: #ff8b9a;
@@ -34,6 +36,9 @@
 
   --color-scrim: rgba(12, 8, 26, 0.55);
   --color-scrim-nav: rgba(12, 8, 26, 0.45);
+  --color-scrim-soft: rgba(12, 8, 26, 0.28);
+  --color-tooltip: rgba(30, 23, 56, 0.92);
+  --color-cover-scrim: rgba(16, 11, 33, 0.55);
 
   --chart-series: #8a80f0;
   --chart-series-active: color-mix(in srgb, var(--chart-series) 75%, white);
@@ -62,10 +67,11 @@
   --glass-shadow: 0 12px 40px rgba(8, 4, 24, 0.32);
   --glass-blur: blur(28px) saturate(170%);
   --glass-blur-heavy: blur(40px) saturate(180%);
+  --bevel: 1;
 
   --selected-bg:
     linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.06) 55%, rgba(255, 255, 255, 0.1) 100%),
-    color-mix(in srgb, var(--color-lavender) 18%, transparent);
+    color-mix(in srgb, var(--color-accent-alt) 18%, transparent);
   --selected-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.34),
     inset 0 0 0 1px rgba(255, 255, 255, 0.1),

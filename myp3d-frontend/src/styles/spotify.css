@@ -39,8 +39,8 @@
 
 .spotify-page.is-dropping .spotify-list,
 .spotify-page.is-dropping .empty-state {
-  outline-color: color-mix(in srgb, var(--color-lavender) 70%, transparent);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-lavender) 18%, transparent);
+  outline-color: color-mix(in srgb, var(--color-accent-alt) 70%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-accent-alt) 18%, transparent);
 }
 
 .spotify-list.glass {
@@ -71,7 +71,7 @@
   justify-self: center;
   width: 20px;
   height: 20px;
-  color: var(--color-lavender);
+  color: var(--color-accent-alt);
 }
 
 .spotify-list__icon--match {
@@ -230,8 +230,8 @@
   height: 2.5rem;
   overflow: hidden;
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--color-lavender) 16%, transparent);
-  color: var(--color-lavender);
+  background: color-mix(in srgb, var(--color-accent-alt) 16%, transparent);
+  color: var(--color-accent-alt);
 }
 
 .match-thumb img {

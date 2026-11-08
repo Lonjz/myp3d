@@ -41,8 +41,8 @@
   width: 1.75rem;
   height: 1.75rem;
   border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--color-lavender) 18%, transparent);
-  color: var(--color-lavender);
+  background: color-mix(in srgb, var(--color-accent-alt) 18%, transparent);
+  color: var(--color-accent-alt);
 }
 
 .downloads-trim svg {
@@ -123,8 +123,8 @@
   width: 8px;
   height: 8px;
   border-radius: var(--radius-full);
-  background: linear-gradient(135deg, var(--color-rose), var(--color-lavender));
-  box-shadow: 0 0 8px color-mix(in srgb, var(--color-rose) 70%, transparent);
+  background: var(--gradient-primary);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--color-accent) calc(70% * var(--bevel)), transparent);
   animation: downloads-pulse 1.6s ease-in-out infinite;
 }
 

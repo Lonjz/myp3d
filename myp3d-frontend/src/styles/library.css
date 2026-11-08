@@ -237,7 +237,7 @@
 }
 
 .library-table tbody tr.is-selected {
-  background: color-mix(in srgb, var(--color-lavender) 16%, transparent);
+  background: color-mix(in srgb, var(--color-accent-alt) 16%, transparent);
 }
 
 .library-table tbody tr.is-menu-open,
@@ -247,7 +247,7 @@
 }
 
 .library-table tbody tr.is-selected:hover {
-  background: color-mix(in srgb, var(--color-lavender) 22%, transparent);
+  background: color-mix(in srgb, var(--color-accent-alt) 22%, transparent);
 }
 
 .library-toolbar > *,
@@ -285,7 +285,7 @@
 .library-selection-count svg {
   width: 18px;
   height: 18px;
-  color: var(--color-lavender);
+  color: var(--color-accent-alt);
 }
 
 .library-progress-pill {

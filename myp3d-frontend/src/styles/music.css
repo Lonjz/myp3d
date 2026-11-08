@@ -71,7 +71,7 @@
 .music-column__icon {
   width: 20px;
   height: 20px;
-  color: var(--color-lavender);
+  color: var(--color-accent-alt);
 }
 
 .music-column__count {
@@ -141,8 +141,8 @@
   height: 2.5rem;
   overflow: hidden;
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--color-lavender) 16%, transparent);
-  color: var(--color-lavender);
+  background: color-mix(in srgb, var(--color-accent-alt) 16%, transparent);
+  color: var(--color-accent-alt);
 }
 
 .music-cover img {
@@ -199,8 +199,8 @@
   width: 1.75rem;
   height: 1.75rem;
   border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--color-rose) 18%, transparent);
-  color: var(--color-rose);
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  color: var(--color-accent);
 }
 
 .music-change svg {

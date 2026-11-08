@@ -11,7 +11,7 @@
 .spotlight-scrim {
   position: absolute;
   inset: 0;
-  background: rgba(12, 8, 26, 0.28);
+  background: var(--color-scrim-soft);
 }
 
 .spotlight.glass {
@@ -200,8 +200,8 @@
   padding: 0;
   border: 0;
   border-radius: var(--radius-full);
-  background: linear-gradient(135deg, var(--color-rose) 0%, var(--color-lavender) 100%);
-  color: var(--color-on-light);
+  background: var(--gradient-primary);
+  color: var(--color-on-accent);
   cursor: pointer;
   opacity: 0;
   transform: scale(0.85);

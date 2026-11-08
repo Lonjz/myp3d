@@ -33,7 +33,7 @@
   width: 4.5rem;
   height: 4.5rem;
   border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--color-lavender) 14%, transparent);
+  background: color-mix(in srgb, var(--color-accent-alt) 14%, transparent);
   color: var(--color-text-muted);
 }
 
@@ -53,7 +53,7 @@
 }
 
 .empty-state__icon.is-on {
-  color: var(--color-lavender);
+  color: var(--color-accent-alt);
 }
 
 .empty-state__icon.is-on::before,
@@ -61,7 +61,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  border: 1px solid color-mix(in srgb, var(--color-lavender) 60%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent-alt) 60%, transparent);
   border-radius: inherit;
   animation: pulse-ring 2.4s var(--ease-out) infinite;
 }
