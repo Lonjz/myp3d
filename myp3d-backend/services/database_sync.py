@@ -85,9 +85,11 @@ def plan_pulls(
             continue
         if mine == record or (kind == "download" and key in busy):
             continue
+        if mine.deleted_at is not None and record.deleted_at is not None:
+            continue
         theirs, ours = _stamp(record), _stamp(mine)
         if theirs > ours or (theirs == ours and prefer_remote):
-            pulls.append(RecordPull(kind, record, True))
+            pulls.append(RecordPull(kind, record, mine.deleted_at is None))
     return pulls
 
 

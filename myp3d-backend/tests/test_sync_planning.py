@@ -112,6 +112,18 @@ def test_deletions_carry_over_as_tombstones():
     assert not database_sync.is_visible(database_sync.plan_pulls(SyncDatabase(), remote, False)[0])
 
 
+def test_records_deleted_on_both_sides_need_nothing():
+    local = SyncDatabase(playlists=[playlist(PLAYLIST, "Mix", [], NOW, deleted=True)])
+    remote = SyncDatabase(playlists=[playlist(PLAYLIST, "Mix", [], NOW + timedelta(minutes=1), deleted=True)])
+    assert database_sync.plan_pulls(local, remote, False) == []
+
+
+def test_restoring_a_deleted_record_is_an_addition():
+    local = SyncDatabase(playlists=[playlist(PLAYLIST, "Mix", [], NOW, deleted=True)])
+    remote = SyncDatabase(playlists=[playlist(PLAYLIST, "Mix", [], NOW + timedelta(minutes=1))])
+    assert keys(database_sync.plan_pulls(local, remote, False)) == [("playlist", PLAYLIST, False)]
+
+
 def test_running_downloads_are_left_alone():
     local = SyncDatabase(downloads=[download(DOWNLOAD, NOW)])
     remote = SyncDatabase(downloads=[download(DOWNLOAD, NOW + timedelta(minutes=1))])
