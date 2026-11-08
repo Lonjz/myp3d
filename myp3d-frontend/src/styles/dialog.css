@@ -3,9 +3,14 @@
   inset: 0;
   z-index: 1150;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: var(--space-4);
+  padding: clamp(var(--space-4), 12vh, 7rem) var(--space-4) var(--space-4);
+}
+
+.confirm-layer > .motion-pop {
+  transform-origin: 50% 0;
+  --pop-y: -10px;
 }
 
 .confirm-scrim {

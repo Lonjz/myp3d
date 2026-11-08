@@ -8,8 +8,6 @@
 
 .player-dock__inner {
   position: relative;
-  max-width: calc(1440px - 2 * var(--space-7));
-  margin: 0 auto;
   pointer-events: auto;
 }
 

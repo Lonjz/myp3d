@@ -1,6 +1,4 @@
 .page {
-  max-width: 1440px;
-  margin: 0 auto;
   padding: var(--space-6) var(--space-7);
 }
 

@@ -92,6 +92,7 @@
   --space-7: 2rem;
   --space-8: 3rem;
 
+  --toolbar-height: calc(2.75rem + 2 * var(--space-2));
   --table-cell-padding-y: var(--space-3);
   --table-cover-size: 44px;
 
