@@ -157,6 +157,10 @@ The first run generates about 160 MB of audio in `myp3d-backend/tests/.sandbox/`
 - Interactive API docs are at http://localhost:8000/docs.
 - Only download things you have the right to.
 
+## Honorable mention
+
+[Claude Code](https://claude.com/claude-code) ヽ(•‿•)ノ for never once asking why one person's MP3 folder needs a Health page.
+
 ## License
 
 [MIT](LICENSE)
