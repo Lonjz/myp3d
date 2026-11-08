@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import type { ChangeEvent, KeyboardEvent } from 'react';
+import type { KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AlignLeft,
@@ -44,8 +44,8 @@ import { IconField } from '../components/ui/IconField';
 import { Spinner } from '../components/ui/Spinner';
 import { EmptyState, LoadFailed } from '../components/ui/EmptyState';
 import { useDetail } from '../hooks/useDetail';
-import { usePresence } from '../hooks/usePresence';
-import { useTrackSelection } from '../hooks/useTrackSelection';
+import { usePresence, useToolbarSwap } from '../hooks/usePresence';
+import { isShiftClick, useTrackSelection } from '../hooks/useTrackSelection';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { emitAppEvent } from '../utils/appEvents';
 import { errorMessage, formatDuration, trackCount } from '../utils/formatters';
@@ -57,7 +57,14 @@ interface PlaylistEditPageProps {
   onBack: () => void;
 }
 
-const PLAYLIST_SIDEBAR_PAGE_SIZE = 25;
+const getPlaylistKey = (playlist: PlaylistInfo) => playlist.id;
+
+const fetchPlaylistPage = async ({ search, page, limit }: { search: string; page: number; limit: number }) => {
+  const query = search.toLowerCase();
+  const all = await playlistApi.list();
+  const matches = query ? all.filter((playlist) => playlist.name.toLowerCase().includes(query)) : all;
+  return { items: matches.slice((page - 1) * limit, page * limit), meta: { total: matches.length } };
+};
 
 const moveItem = <T,>(items: T[], from: number, to: number): T[] => {
   const next = [...items];
@@ -72,9 +79,6 @@ interface TrackRow {
 }
 
 const toRows = (tracks: MP3Info[]): TrackRow[] => tracks.map((track, index) => ({ key: `${index}:${track.filename}`, track }));
-
-const isShiftClick = (event: ChangeEvent<HTMLInputElement>) =>
-  event.nativeEvent instanceof MouseEvent && event.nativeEvent.shiftKey;
 
 const matchesQuery = (track: MP3Info, query: string) =>
   [track.title, track.artist, track.album, track.filename].some((value) => value?.toLowerCase().includes(query));
@@ -222,10 +226,7 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
     selection.clear();
   };
 
-  const browsePresence = usePresence(!hasSelection);
-  const selectionPresence = usePresence(hasSelection);
-  const showSelection = hasSelection ? !browsePresence.mounted : selectionPresence.mounted;
-  const toolbarState = (showSelection ? selectionPresence.closing : browsePresence.closing) ? 'closed' : 'open';
+  const { showSelection, toolbarState } = useToolbarSwap(hasSelection);
 
   const handleGripKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     const offset = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0;
@@ -250,24 +251,12 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
           backLabel="Back to playlists"
           onBack={onBack}
           activeKey={playlistId}
-          getItemKey={(playlist) => playlist.id}
+          getItemKey={getPlaylistKey}
           getItemTitle={(playlist) => playlist.name}
           getItemSubtitle={(playlist) => trackCount(playlist.track_count)}
           onSelect={(playlist) => navigate(`/playlists/${encodeURIComponent(playlist.id)}`)}
-          fetchPage={async ({ page, limit, search }) => {
-            const query = search.trim().toLowerCase();
-            const all = await playlistApi.list();
-            const matches = query ? all.filter((playlist) => playlist.name.toLowerCase().includes(query)) : all;
-            return {
-              items: matches.slice((page - 1) * limit, page * limit),
-              total: matches.length,
-              totalPages: Math.max(1, Math.ceil(matches.length / limit)),
-            };
-          }}
-          emptyMessage="No matches"
+          fetchPage={fetchPlaylistPage}
           pinnedItem={detail}
-          pageSize={PLAYLIST_SIDEBAR_PAGE_SIZE}
-          searchDebounceMs={300}
         />
 
         <section className="details-main">

@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { backend } from '../fakeBackend';
 import { makePlaylist, makeTrack } from '../factories';
@@ -24,6 +24,19 @@ async function openPlaylist() {
 }
 
 describe('PlaylistEditPage', () => {
+  it('shows the new name in the sidebar after saving', async () => {
+    const { user } = await openPlaylist();
+    const sidebar = within(document.querySelector('.details-sidebar') as HTMLElement);
+    await sidebar.findByText('1 / 1');
+
+    await user.clear(screen.getByRole('textbox', { name: 'Playlist name' }));
+    await user.type(screen.getByRole('textbox', { name: 'Playlist name' }), 'Road Trip');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await sidebar.findByText('Road Trip')).toBeInTheDocument();
+    expect(sidebar.queryByText('Mix')).not.toBeInTheDocument();
+  });
+
   it('removes the selected tracks', async () => {
     const { user } = await openPlaylist();
     await user.click(screen.getByRole('checkbox', { name: 'Select Reckoner' }));

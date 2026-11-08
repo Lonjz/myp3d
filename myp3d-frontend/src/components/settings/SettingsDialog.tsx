@@ -3,6 +3,7 @@ import { RotateCcw, X } from 'lucide-react';
 import { usePersistentState } from '../../hooks/usePersistentState';
 import { usePresence } from '../../hooks/usePresence';
 import { subscribeAppEvent } from '../../utils/appEvents';
+import { isEditableTarget } from '../../utils/keyboard';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { IconButton } from '../ui/IconButton';
 import { Modal } from '../ui/Modal';
@@ -20,11 +21,6 @@ const TAB_OPTIONS: readonly SegmentOption<SettingsTab>[] = [
   { value: 'data', label: 'Data', text: 'Data' },
   { value: 'shortcuts', label: 'Shortcuts', text: 'Shortcuts' },
 ];
-
-function isTyping(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
-}
 
 interface SettingsPanelProps {
   tab: SettingsTab;
@@ -87,7 +83,7 @@ export function SettingsDialog() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== '?' || event.ctrlKey || event.metaKey || event.altKey || isTyping(event.target)) return;
+      if (event.key !== '?' || event.ctrlKey || event.metaKey || event.altKey || isEditableTarget(event.target)) return;
       event.preventDefault();
       if (open) {
         setOpen(false);

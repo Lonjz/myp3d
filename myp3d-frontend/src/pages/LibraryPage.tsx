@@ -1,6 +1,5 @@
-import { useEffect, useEffectEvent, useMemo, useState } from 'react';
-import type { ChangeEvent } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   CalendarPlus,
   Clock,
@@ -24,13 +23,14 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { MP3DurationRange, MP3FilterBy, MP3Info, MP3Issue, MP3SortBy } from '../api/mp3Api';
+import { useConsumeSearchParams } from '../hooks/useConsumeSearchParams';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useInfiniteList } from '../hooks/useInfiniteList';
 import { usePersistentState } from '../hooks/usePersistentState';
-import { usePresence } from '../hooks/usePresence';
+import { usePresence, useToolbarSwap } from '../hooks/usePresence';
 import { useSequentialDownload } from '../hooks/useSequentialDownload';
 import { useSortState } from '../hooks/useSortState';
-import { useTrackSelection } from '../hooks/useTrackSelection';
+import { isShiftClick, useTrackSelection } from '../hooks/useTrackSelection';
 import { errorMessage, formatBytes, formatDate, formatDateTime, formatDuration, formatTrackSubtitle } from '../utils/formatters';
 import { subscribeAppEvent } from '../utils/appEvents';
 import { DataTable } from '../components/table/DataTable';
@@ -70,8 +70,6 @@ function pickOption<T extends string>(value: string | null, options: readonly T[
 }
 
 const getTrackKey = (mp3: MP3Info) => mp3.filename;
-const isShiftClick = (event: ChangeEvent<HTMLInputElement>) =>
-  event.nativeEvent instanceof MouseEvent && event.nativeEvent.shiftKey;
 
 export function LibraryPage() {
   const navigate = useNavigate();
@@ -102,21 +100,15 @@ export function LibraryPage() {
     [debouncedSearchQuery, filterBy, sortBy, sortDirection, durationRange, favoritesOnly, issue],
   );
 
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  const applySearchParams = useEffectEvent((params: URLSearchParams) => {
-    if (!LINK_PARAMS.some((key) => params.has(key))) return;
+  useConsumeSearchParams((params) => {
+    if (!LINK_PARAMS.some((key) => params.has(key))) return false;
     setSearchQuery(params.get('q') ?? '');
     setFilterBy(pickOption(params.get('filter'), SCOPE_OPTIONS.map((option) => option.value), 'all'));
     setDurationRange(pickOption<MP3DurationRange>(params.get('duration'), DURATION_OPTIONS.map((option) => option.value), 'any'));
     setFavoritesOnly(params.get('favorites') === '1');
     setIssue(pickOption<MP3Issue>(params.get('issue'), ISSUE_OPTIONS.map((option) => option.value), 'any'));
-    setSearchParams({}, { replace: true });
+    return true;
   });
-
-  useEffect(() => {
-    applySearchParams(searchParams);
-  }, [searchParams]);
 
   const {
     items: mp3s,
@@ -198,10 +190,7 @@ export function LibraryPage() {
   };
 
   const hasSelection = selection.size > 0;
-  const browsePresence = usePresence(!hasSelection);
-  const selectionPresence = usePresence(hasSelection);
-  const showSelection = hasSelection ? !browsePresence.mounted : selectionPresence.mounted;
-  const toolbarState = (showSelection ? selectionPresence.closing : browsePresence.closing) ? 'closed' : 'open';
+  const { showSelection, toolbarState } = useToolbarSwap(hasSelection);
   const playSelected = () => {
     if (hasSelection) player.playTracks(selection.tracks, 0);
   };

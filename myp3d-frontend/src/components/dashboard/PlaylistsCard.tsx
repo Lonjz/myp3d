@@ -5,27 +5,15 @@ import { playlistApi } from '../../api/playlistApi';
 import { CoverPlayButton } from '../player/CoverPlayButton';
 import { usePlayer } from '../player/playerContext';
 import { usePlaylists } from '../playlists/usePlaylists';
-import { useToast } from '../messages/toastContext';
 import { EmptyState } from '../ui/EmptyState';
 import { ChartCard } from './ChartCard';
-import { errorMessage } from '../../utils/formatters';
 
 const PLAYLIST_LIMIT = 5;
 
 export function PlaylistsCard() {
   const player = usePlayer();
-  const { showError } = useToast();
   const { playlists } = usePlaylists();
   const recent = [...playlists].sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, PLAYLIST_LIMIT);
-
-  const playPlaylist = async (id: string) => {
-    try {
-      const detail = await playlistApi.get(id);
-      if (detail.tracks.length > 0) player.playTracks(detail.tracks, 0);
-    } catch (err) {
-      showError(errorMessage(err, 'Failed to load playlist'));
-    }
-  };
 
   return (
     <ChartCard title="Playlists" icon={ListMusic}>
@@ -42,7 +30,7 @@ export function PlaylistsCard() {
                   icon={ListMusic}
                   isCurrent={false}
                   isPlaying={player.state.isPlaying}
-                  onPlay={() => void playPlaylist(playlist.id)}
+                  onPlay={() => void player.playPlaylist(playlist.id)}
                   onToggle={player.togglePlay}
                 />
               </div>

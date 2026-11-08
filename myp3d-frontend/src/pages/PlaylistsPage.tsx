@@ -47,15 +47,6 @@ export function PlaylistsPage() {
     }
   };
 
-  const playPlaylist = async (id: string) => {
-    try {
-      const detail = await playlistApi.get(id);
-      if (detail.tracks.length > 0) player.playTracks(detail.tracks, 0);
-    } catch (err) {
-      showError(errorMessage(err, 'Failed to load playlist'));
-    }
-  };
-
   const columns: DataTableColumn<PlaylistInfo>[] = [
     {
       key: 'cover',
@@ -69,7 +60,7 @@ export function PlaylistsPage() {
             icon={ListMusic}
             isCurrent={false}
             isPlaying={player.state.isPlaying}
-            onPlay={() => void playPlaylist(playlist.id)}
+            onPlay={() => void player.playPlaylist(playlist.id)}
             onToggle={player.togglePlay}
           />
         </div>

@@ -1,4 +1,3 @@
-import { startDownload } from '../utils/download';
 import { API_BASE } from './mp3Api';
 
 export const exportApi = {
@@ -8,9 +7,5 @@ export const exportApi = {
 
   albumArtUrl(): string {
     return `${API_BASE}/export/covers.zip`;
-  },
-
-  start(url: string): void {
-    startDownload(url);
   },
 };

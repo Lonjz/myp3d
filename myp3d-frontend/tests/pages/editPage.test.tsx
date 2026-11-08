@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { backend } from '../fakeBackend';
 import { albumKeyOf, makeTrack } from '../factories';
@@ -20,6 +20,34 @@ describe('EditPage', () => {
     await waitFor(() => expect(backend.store.tracks[0].artist).toBe('Daft Punk'));
     const [put] = backend.requestsTo('PUT', '/mp3s/the chain.mp3/metadata');
     expect(put.body).toMatchObject({ title: 'The Chain', artist: 'Daft Punk' });
+  });
+
+  it('clears a tag when its field is emptied', async () => {
+    backend.seed({ tracks: [makeTrack({ title: 'The Chain', filename: 'the chain.mp3' })] });
+    const { user } = renderApp('/details/the chain.mp3');
+
+    await screen.findByDisplayValue('Rumours');
+    await user.clear(field('Album'));
+    await user.click(saveButton());
+
+    await waitFor(() => expect(backend.requestsTo('PUT', '/mp3s/the chain.mp3/metadata')).toHaveLength(1));
+    const [put] = backend.requestsTo('PUT', '/mp3s/the chain.mp3/metadata');
+    expect(put.body).toMatchObject({ title: 'The Chain', album: '' });
+  });
+
+  it('shows the new title in the sidebar after saving', async () => {
+    backend.seed({ tracks: [makeTrack({ title: 'Old Name', filename: 'song.mp3' })] });
+    const { user } = renderApp('/details/song.mp3');
+
+    await screen.findByDisplayValue('Old Name');
+    const sidebar = within(document.querySelector('.details-sidebar') as HTMLElement);
+    await sidebar.findByText('1 / 1');
+    await user.clear(field('Title'));
+    await user.type(field('Title'), 'New Name');
+    await user.click(saveButton());
+
+    expect(await sidebar.findByText('New Name')).toBeInTheDocument();
+    expect(sidebar.queryByText('Old Name')).not.toBeInTheDocument();
   });
 
   it('renames the file and goes back to the library', async () => {

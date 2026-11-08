@@ -150,11 +150,11 @@ def update_metadata(filename: str, metadata: MetadataUpdate):
     try:
         with edit_tags(filepath) as tag:
             if metadata.title is not None:
-                tag.title = metadata.title
+                tag.title = metadata.title.strip() or None
             if metadata.artist is not None:
-                tag.artist = metadata.artist
+                tag.artist = metadata.artist.strip() or None
             if metadata.album is not None:
-                tag.album = metadata.album
+                tag.album = metadata.album.strip() or None
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

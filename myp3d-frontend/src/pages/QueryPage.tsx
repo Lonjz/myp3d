@@ -1,7 +1,6 @@
-import { useState, useEffect, useEffectEvent, useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { ArrowRight, Download, ListPlus, MonitorPlay, Search } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
 import { mp3Api } from '../api/mp3Api';
 import type { DownloadRequest, YouTubeSearchResult } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
@@ -13,6 +12,7 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { Spinner } from '../components/ui/Spinner';
+import { useConsumeSearchParams } from '../hooks/useConsumeSearchParams';
 import { useDownloadForm } from '../hooks/useDownloadForm';
 import type { DownloadFormValues } from '../hooks/useDownloadForm';
 import { readStoredValue, useStoredValueWriter } from '../hooks/usePersistentState';
@@ -178,12 +178,10 @@ export function QueryPage() {
     }
   };
 
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  const applySearchParams = useEffectEvent((params: URLSearchParams) => {
+  useConsumeSearchParams((params) => {
     const incomingUrl = params.get('url');
     const incomingQuery = params.get('q');
-    if (!incomingUrl && !incomingQuery) return;
+    if (!incomingUrl && !incomingQuery) return false;
 
     if (incomingUrl) {
       applyUrl(incomingUrl);
@@ -192,12 +190,8 @@ export function QueryPage() {
       setSearchQuery(incomingQuery);
       void runSearch(incomingQuery);
     }
-    setSearchParams({}, { replace: true });
+    return true;
   });
-
-  useEffect(() => {
-    applySearchParams(searchParams);
-  }, [searchParams]);
 
   const prepareSubmit = (): Partial<DownloadRequest> | null => {
     if (!url.trim()) {
@@ -296,7 +290,6 @@ export function QueryPage() {
 
           <form onSubmit={handleSubmit} className="download-form glass">
             <DownloadConfigSection
-              idPrefix="query"
               url={url}
               onUrlChange={applyUrl}
               customFilename={customFilename}

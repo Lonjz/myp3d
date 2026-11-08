@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { CSSProperties, HTMLAttributes, MouseEvent, ReactNode } from 'react';
+import { useEndReached } from '../../hooks/useInfiniteList';
 import { rowOpenProps } from '../../utils/rowOpen';
 import { Spinner } from '../ui/Spinner';
 
@@ -61,24 +62,7 @@ export function DataTable<T>({
     }
   }, []);
 
-  useEffect(() => {
-    const scroller = scrollRef.current;
-    const sentinel = sentinelRef.current;
-    if (!scroller || !sentinel || !onEndReached || !hasMore || loadingMore) {
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          onEndReached();
-        }
-      },
-      { root: scroller, rootMargin: '0px 0px 600px 0px' },
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [hasMore, loadingMore, onEndReached]);
+  useEndReached(scrollRef, sentinelRef, onEndReached, hasMore && !loadingMore);
 
   useEffect(() => {
     if (resetKeyRef.current === resetKey) {

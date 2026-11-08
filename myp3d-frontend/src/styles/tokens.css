@@ -3,7 +3,6 @@
 
   --color-bg: #17122b;
   --color-surface: #2a2147;
-  --color-surface-sunken: #1f1838;
   --color-surface-hover: rgba(255, 255, 255, 0.1);
   --color-surface-selected: rgba(255, 255, 255, 0.18);
 
@@ -17,7 +16,6 @@
   --color-on-accent: #221a3b;
 
   --color-accent: #ff9ec4;
-  --color-accent-hover: color-mix(in srgb, var(--color-accent) 72%, white);
   --color-accent-alt: #b9a2ff;
   --gradient-primary: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-alt) 100%);
 
@@ -31,7 +29,6 @@
 
   --color-success: #8ee3b8;
   --color-danger: #ff8b9a;
-  --color-danger-hover: #ffa3af;
   --color-danger-text: #ffc0c8;
   --color-warning: #ffd48f;
   --color-info: #a9c6ff;
@@ -50,7 +47,6 @@
   --glass-tint: rgba(255, 255, 255, 0.06);
   --glass-tint-strong: rgba(24, 18, 46, 0.42);
   --glass-tint-hover: rgba(255, 255, 255, 0.12);
-  --glass-tint-dark: rgba(16, 11, 33, 0.78);
   --glass-tint-overlay: rgba(22, 16, 42, 0.6);
   --glass-sheen: linear-gradient(
     135deg,
@@ -81,7 +77,6 @@
 
   --shadow-sm: 0 2px 8px rgba(8, 4, 24, 0.25);
   --shadow-md: 0 12px 34px rgba(8, 4, 24, 0.3);
-  --shadow-lg: 0 20px 50px rgba(8, 4, 24, 0.45);
 
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -110,10 +105,8 @@
   --text-lg: 1.125rem;
   --text-xl: 1.5rem;
   --text-2xl: 2rem;
-  --text-display: 2.75rem;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
-  --font-weight-bold: 700;
 
   --duration-sidebar: 300ms;
   --duration-fast: 150ms;

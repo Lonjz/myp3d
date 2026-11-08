@@ -3,79 +3,8 @@ import { mp3Api } from '../api/mp3Api';
 import { useToast } from '../components/messages/toastContext';
 import { emitAppEvent, subscribeAppEvent } from '../utils/appEvents';
 import { errorMessage } from '../utils/formatters';
-
-interface YouTubePlayer {
-  destroy?: () => void;
-  getCurrentTime?: () => number;
-  getDuration?: () => number;
-  seekTo?: (seconds: number, allowSeekAhead: boolean) => void;
-  playVideo?: () => void;
-  pauseVideo?: () => void;
-}
-
-interface YouTubePlayerOptions {
-  videoId: string;
-  height: string;
-  width: string;
-  playerVars: Record<string, string | number>;
-  events: {
-    onReady: () => void;
-    onStateChange: (event: { data: number }) => void;
-    onError: () => void;
-  };
-}
-
-interface YouTubeApi {
-  Player: new (element: HTMLElement, options: YouTubePlayerOptions) => YouTubePlayer;
-}
-
-type YouTubeWindow = Window & {
-  YT?: YouTubeApi;
-  onYouTubeIframeAPIReady?: () => void;
-};
-
-const loadYouTubeApi = (() => {
-  let promise: Promise<YouTubeApi> | null = null;
-
-  return () => {
-    const youtubeWindow = window as YouTubeWindow;
-    const existing = youtubeWindow.YT;
-    if (existing && existing.Player) {
-      return Promise.resolve(existing);
-    }
-
-    if (promise) {
-      return promise;
-    }
-
-    promise = new Promise<YouTubeApi>((resolve, reject) => {
-      const scriptId = 'youtube-iframe-api';
-      const existingScript = document.getElementById(scriptId) as HTMLScriptElement | null;
-
-      if (!existingScript) {
-        const script = document.createElement('script');
-        script.id = scriptId;
-        script.src = 'https://www.youtube.com/iframe_api';
-        script.async = true;
-        script.onerror = () => reject(new Error('Failed to load YouTube preview'));
-        document.body.appendChild(script);
-      }
-
-      const previousReady = youtubeWindow.onYouTubeIframeAPIReady;
-      youtubeWindow.onYouTubeIframeAPIReady = () => {
-        previousReady?.();
-        const ready = youtubeWindow.YT;
-        if (ready && ready.Player) {
-          resolve(ready);
-        } else {
-          reject(new Error('YouTube preview unavailable'));
-        }
-      };
-    });
-
-    return promise;
-  };
-})();
+import { loadYouTubeApi } from '../utils/youtube';
+import type { YouTubePlayer } from '../utils/youtube';
 
 const EDGE_SECONDS = 3;
 
@@ -121,19 +50,10 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
   useEffect(() => {
     startRef.current = start;
     endRef.current = end;
-  }, [start, end]);
-
-  useEffect(() => {
     isPlayingRef.current = isPlaying;
-  }, [isPlaying]);
-
-  useEffect(() => {
     loopRef.current = loop;
-  }, [loop]);
-
-  useEffect(() => {
     videoIdRef.current = videoId;
-  }, [videoId]);
+  }, [start, end, isPlaying, loop, videoId]);
 
   const reset = (nextDuration: number | null) => {
     setDuration(nextDuration);
@@ -147,6 +67,18 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
       window.clearInterval(monitorRef.current);
       monitorRef.current = null;
     }
+  };
+
+  const destroyPlayer = () => {
+    playerRef.current?.destroy?.();
+    playerRef.current = null;
+  };
+
+  const stopAt = (seconds: number) => {
+    playerRef.current?.pauseVideo?.();
+    setIsPlaying(false);
+    setPlayhead(seconds);
+    stopMonitor();
   };
 
   const startMonitor = () => {
@@ -165,10 +97,7 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
       }
       if (edgeRef.current === 'tail' && current >= currentEnd) {
         edgeRef.current = null;
-        playerRef.current.pauseVideo?.();
-        setIsPlaying(false);
-        setPlayhead(currentEnd);
-        stopMonitor();
+        stopAt(currentEnd);
         return;
       }
       if (currentEnd > currentStart && current >= currentEnd) {
@@ -179,13 +108,18 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
           }
           setPlayhead(currentStart);
         } else {
-          playerRef.current.pauseVideo?.();
-          setIsPlaying(false);
-          setPlayhead(currentEnd);
-          stopMonitor();
+          stopAt(currentEnd);
         }
       }
     }, 200);
+  };
+
+  const playFrom = (seconds: number) => {
+    playerRef.current?.seekTo?.(seconds, true);
+    setPlayhead(seconds);
+    playerRef.current?.playVideo?.();
+    setIsPlaying(true);
+    startMonitor();
   };
 
   const pause = () => {
@@ -232,10 +166,7 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
 
   useEffect(() => {
     if (!videoId || !containerRef.current) {
-      if (playerRef.current) {
-        playerRef.current.destroy?.();
-        playerRef.current = null;
-      }
+      destroyPlayer();
       stopMonitor();
       return undefined;
     }
@@ -246,10 +177,7 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
       .then((YT) => {
         if (cancelled || !containerRef.current) return;
 
-        if (playerRef.current) {
-          playerRef.current.destroy?.();
-        }
-
+        destroyPlayer();
         containerRef.current.innerHTML = '';
         const playerTarget = document.createElement('div');
         playerTarget.className = 'query-player-iframe';
@@ -289,16 +217,11 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
     return () => {
       cancelled = true;
       stopMonitor();
-      if (playerRef.current) {
-        playerRef.current.destroy?.();
-        playerRef.current = null;
-      }
+      destroyPlayer();
       setIsReady(false);
       setIsPlaying(false);
     };
   }, [videoId]);
-
-  useEffect(() => () => stopMonitor(), []);
 
   useEffect(() => subscribeAppEvent('player-play', () => playerRef.current?.pauseVideo?.()), []);
 
@@ -310,12 +233,7 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
     }
     edgeRef.current = null;
     const startTarget = mode === 'playhead' ? playhead : start;
-    const safeStart = Math.min(Math.max(startTarget, start), Math.max(start, end - 0.05));
-    playerRef.current.seekTo?.(safeStart || 0, true);
-    setPlayhead(safeStart);
-    playerRef.current.playVideo?.();
-    setIsPlaying(true);
-    startMonitor();
+    playFrom(Math.min(Math.max(startTarget, start), Math.max(start, end - 0.05)));
   };
 
   const changePlayhead = (value: number) => {
@@ -334,11 +252,7 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
   const playEdges = () => {
     if (!playerRef.current || !canPlay) return;
     edgeRef.current = end - start > EDGE_SECONDS * 2 ? 'head' : 'tail';
-    playerRef.current.seekTo?.(start, true);
-    setPlayhead(start);
-    playerRef.current.playVideo?.();
-    setIsPlaying(true);
-    startMonitor();
+    playFrom(start);
   };
 
   const smartTrim = async () => {

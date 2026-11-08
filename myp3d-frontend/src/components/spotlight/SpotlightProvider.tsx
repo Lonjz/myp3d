@@ -8,14 +8,9 @@ import { useAppCommandsSource } from './sources/useAppCommandsSource';
 import { spotifySource } from './sources/spotifySource';
 import { youtubeSource } from './sources/youtubeSource';
 import type { SpotlightSource } from './spotlightTypes';
+import { isEditableTarget } from '../../utils/keyboard';
 
 const BUILT_IN_SOURCES: SpotlightSource[] = [youtubeSource, spotifySource, pagesSource];
-
-function isEditableTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target.isContentEditable) return true;
-  return ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
-}
 
 export function SpotlightProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);

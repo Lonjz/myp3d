@@ -18,6 +18,13 @@ export function usePresence(open: boolean, exitMs = EXIT_DURATION_MS) {
   return { mounted, closing: mounted && !open };
 }
 
+export function useToolbarSwap(hasSelection: boolean) {
+  const browse = usePresence(!hasSelection);
+  const selecting = usePresence(hasSelection);
+  const showSelection = hasSelection ? !browse.mounted : selecting.mounted;
+  return { showSelection, toolbarState: (showSelection ? selecting.closing : browse.closing) ? 'closed' : 'open' };
+}
+
 export function useLingering<T>(value: T | null, exitMs = EXIT_DURATION_MS) {
   const [shown, setShown] = useState(value);
   const { mounted, closing } = usePresence(value !== null, exitMs);

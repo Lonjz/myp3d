@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { playlistApi } from '../../api/playlistApi';
 import type { PlaylistInfo } from '../../api/playlistApi';
-import { subscribeAppEvent } from '../../utils/appEvents';
+import { subscribeAppEvents } from '../../utils/appEvents';
 
 export function usePlaylists() {
   const [playlists, setPlaylists] = useState<PlaylistInfo[]>([]);
@@ -21,12 +21,7 @@ export function usePlaylists() {
 
   useEffect(() => {
     void refresh();
-    const unsubscribePlaylists = subscribeAppEvent('playlists-changed', () => void refresh());
-    const unsubscribeLibrary = subscribeAppEvent('library-changed', () => void refresh());
-    return () => {
-      unsubscribePlaylists();
-      unsubscribeLibrary();
-    };
+    return subscribeAppEvents(['playlists-changed', 'library-changed'], () => void refresh());
   }, [refresh]);
 
   return { playlists, loading, failed, refresh };

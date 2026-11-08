@@ -20,7 +20,7 @@ import { EmptyState, LoadFailed } from '../components/ui/EmptyState';
 import { useDetail } from '../hooks/useDetail';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { emitAppEvent, subscribeAppEvent } from '../utils/appEvents';
-import { getCachedAlbumDetail, setCachedAlbumDetail } from '../utils/detailCache';
+import { fetchAlbumDetail } from '../utils/detailCache';
 import { errorMessage, formatBytes, trackCount } from '../utils/formatters';
 import { DiscardChangesDialog } from '../components/ui/DiscardChangesDialog';
 import { useSaveShortcut } from '../hooks/useSaveShortcut';
@@ -33,15 +33,7 @@ interface AlbumEditPageProps {
 const NO_ALBUM_LABEL = '(No Album)';
 
 const getSharedArtist = (detail: AlbumDetail) => (detail.album.artists.length === 1 ? detail.album.artists[0] : '');
-const ALBUM_SIDEBAR_PAGE_SIZE = 25;
-
-async function fetchAlbum(albumKey: string, force: boolean): Promise<AlbumDetail> {
-  const cached = force ? null : getCachedAlbumDetail(albumKey);
-  if (cached) return cached;
-  const detail = await mp3Api.getAlbum(albumKey);
-  setCachedAlbumDetail(albumKey, detail);
-  return detail;
-}
+const getAlbumKey = (album: AlbumInfo) => album.album_key;
 
 export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
   const navigate = useNavigate();
@@ -73,7 +65,7 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
     setArtist(getSharedArtist(detail));
   };
 
-  const { detail: albumDetail, current, missing, failed, reload } = useDetail(albumKey, fetchAlbum, applyAlbumDetail, (err) =>
+  const { detail: albumDetail, current, missing, failed, reload } = useDetail(albumKey, fetchAlbumDetail, applyAlbumDetail, (err) =>
     showError(errorMessage(err, 'Failed to load album')),
   );
 
@@ -146,29 +138,12 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
           backLabel="Back to albums"
           onBack={onBack}
           activeKey={albumKey}
-          getItemKey={(album) => album.album_key}
+          getItemKey={getAlbumKey}
           getItemTitle={(album) => album.album_name || NO_ALBUM_LABEL}
           getItemSubtitle={getAlbumSubtitle}
           onSelect={(album) => navigate(`/albums/${encodeURIComponent(album.album_key)}`)}
-          fetchPage={async ({ page, limit, search }) => {
-            const response = await mp3Api.listAlbumsPaged({
-              page,
-              limit,
-              search,
-              sortBy: 'album_name',
-              sortDirection: 'asc',
-            });
-
-            return {
-              items: response.items,
-              total: response.meta.total,
-              totalPages: response.meta.total_pages,
-            };
-          }}
-          emptyMessage="No matches"
+          fetchPage={mp3Api.listAlbumsPaged}
           pinnedItem={albumDetail.album}
-          pageSize={ALBUM_SIDEBAR_PAGE_SIZE}
-          searchDebounceMs={300}
         />
 
         <section className="details-main">

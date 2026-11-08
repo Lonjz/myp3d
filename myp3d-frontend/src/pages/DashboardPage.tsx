@@ -14,7 +14,7 @@ import { TrackListCard } from '../components/dashboard/TrackListCard';
 import { useDownloadQueue } from '../components/downloads/downloadQueueContext';
 import { useToast } from '../components/messages/toastContext';
 import { LoadFailed } from '../components/ui/EmptyState';
-import { subscribeAppEvent } from '../utils/appEvents';
+import { subscribeAppEvents } from '../utils/appEvents';
 import { errorMessage, formatBytes, formatHours } from '../utils/formatters';
 
 const STAT_TILE_COUNT = 7;
@@ -58,9 +58,7 @@ export function DashboardPage() {
 
   useEffect(() => () => setRevealing(false), []);
 
-  useEffect(() => subscribeAppEvent('library-changed', () => void loadStats()), [loadStats]);
-  useEffect(() => subscribeAppEvent('favorites-changed', () => void loadStats()), [loadStats]);
-  useEffect(() => subscribeAppEvent('playlists-changed', () => void loadStats()), [loadStats]);
+  useEffect(() => subscribeAppEvents(['library-changed', 'favorites-changed', 'playlists-changed'], () => void loadStats()), [loadStats]);
 
   if (!stats) {
     return (

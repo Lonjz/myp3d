@@ -2,8 +2,10 @@ import { useCallback, useEffect, useEffectEvent, useMemo, useReducer, useRef, us
 import type { ReactNode } from 'react';
 import { apiFetch, isUnreachable, mp3Api, UNREACHABLE_MESSAGE } from '../../api/mp3Api';
 import type { MP3Info } from '../../api/mp3Api';
+import { playlistApi } from '../../api/playlistApi';
 import { readStoredValue, useStoredValueWriter, writeStoredValue } from '../../hooks/usePersistentState';
 import { emitAppEvent, subscribeAppEvent } from '../../utils/appEvents';
+import { isEditableTarget } from '../../utils/keyboard';
 import { useToast } from '../messages/toastContext';
 import { PlayerContext, PlayerTimeContext } from './playerContext';
 import type { PlayerContextValue, PlayerTimeValue, PlayOptions } from './playerContext';
@@ -25,12 +27,10 @@ interface SavedPosition {
 
 const randomSeed = () => Math.floor(Math.random() * 4294967296);
 
-function isTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target.isContentEditable) return true;
-  if (target.closest('button, [role="slider"], [role="option"], [role="dialog"], [role="alertdialog"]')) return true;
-  return ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
-}
+const SPACE_KEY_OWNERS = 'button, [role="slider"], [role="option"], [role="dialog"], [role="alertdialog"]';
+
+const ownsSpaceKey = (target: EventTarget | null) =>
+  isEditableTarget(target) || (target instanceof HTMLElement && target.closest(SPACE_KEY_OWNERS) !== null);
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const { showError } = useToast();
@@ -161,6 +161,17 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     [playTracks, showError],
   );
 
+  const playPlaylist = useCallback(
+    async (id: string) => {
+      try {
+        playTracks((await playlistApi.get(id)).tracks, 0);
+      } catch (err) {
+        showError(errorMessage(err, 'Failed to load playlist'));
+      }
+    },
+    [playTracks, showError],
+  );
+
   const previous = useCallback(() => {
     const audio = audioRef.current;
     if (audio && audio.currentTime > RESTART_THRESHOLD_SECONDS) {
@@ -180,6 +191,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       currentTrack,
       playTracks,
       playAlbum,
+      playPlaylist,
       playNext: (track) => dispatch({ type: 'playNext', track }),
       enqueue: (tracks) => dispatch({ type: 'enqueue', tracks }),
       togglePlay: () => dispatch({ type: 'setPlaying', playing: !state.isPlaying }),
@@ -203,7 +215,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       },
       isCurrent: (filename) => filename === currentFilename,
     }),
-    [state, currentTrack, currentFilename, playTracks, playAlbum, previous, seek],
+    [state, currentTrack, currentFilename, playTracks, playAlbum, playPlaylist, previous, seek],
   );
 
   usePlayerCommands(value);
@@ -226,7 +238,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const onGlobalKeyDown = useEffectEvent((event: KeyboardEvent) => {
     if (event.code !== 'Space' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
-    if (state.queue.length === 0 || isTypingTarget(event.target)) return;
+    if (state.queue.length === 0 || ownsSpaceKey(event.target)) return;
     event.preventDefault();
     dispatch({ type: 'setPlaying', playing: !state.isPlaying });
   });

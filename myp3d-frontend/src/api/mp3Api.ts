@@ -1,36 +1,22 @@
+import { readStoredValue, writeStoredValue } from '../hooks/usePersistentState';
 import { emitAppEvent, subscribeAppEvent } from '../utils/appEvents';
 
 export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-const ASSET_VERSION_KEY = 'myp3d:asset-version';
+const ASSET_VERSION_KEY = 'asset-version';
 
 export type CoverSize = 'thumb' | 'medium' | 'full';
 
-function storeAssetVersion(version: string): string {
-  try {
-    window.localStorage.setItem(ASSET_VERSION_KEY, version);
-  } catch {
-    return version;
-  }
+function newAssetVersion(): string {
+  const version = String(Date.now());
+  writeStoredValue(ASSET_VERSION_KEY, version);
   return version;
 }
 
-function readAssetVersion(): string {
-  try {
-    const stored = window.localStorage.getItem(ASSET_VERSION_KEY);
-    if (stored) return stored;
-  } catch {
-    return String(Date.now());
-  }
-  return storeAssetVersion(String(Date.now()));
-}
+let assetVersion = String(readStoredValue(ASSET_VERSION_KEY, '') || newAssetVersion());
 
-let assetVersion = readAssetVersion();
-
-function bumpAssetVersion(): void {
-  assetVersion = storeAssetVersion(String(Date.now()));
-}
-
-subscribeAppEvent('library-changed', bumpAssetVersion);
+subscribeAppEvent('library-changed', () => {
+  assetVersion = newAssetVersion();
+});
 
 function coverUrl(path: string, size?: CoverSize): string {
   const params = new URLSearchParams();
@@ -255,16 +241,24 @@ export const jsonInit = (method: string, body: unknown): RequestInit => ({
   body: JSON.stringify(body),
 });
 
-function pagedQuery(
-  params: { page: number; limit: number; search?: string; sortBy?: string; sortDirection?: string },
-  defaults: { sortBy: string; sortDirection: string },
-): URLSearchParams {
+export function coverForm(file: File): FormData {
+  const formData = new FormData();
+  formData.append('cover', file);
+  return formData;
+}
+
+const trackPath = (filename: string) => `/mp3s/${encodeURIComponent(filename)}`;
+const albumPath = (albumKey: string) => `/albums/${encodeURIComponent(albumKey)}`;
+
+function trackQuery(params: Omit<MP3ListPagedParams, 'page' | 'limit'>): URLSearchParams {
   return new URLSearchParams({
-    page: String(params.page),
-    limit: String(params.limit),
     search: params.search || '',
-    sort_by: params.sortBy || defaults.sortBy,
-    sort_direction: params.sortDirection || defaults.sortDirection,
+    filter_by: params.filterBy || 'all',
+    sort_by: params.sortBy || 'date_added',
+    sort_direction: params.sortDirection || 'desc',
+    duration: params.durationRange || 'any',
+    favorites: String(Boolean(params.favoritesOnly)),
+    issue: params.issue || 'any',
   });
 }
 
@@ -273,26 +267,15 @@ export const mp3Api = {
     return apiFetch('/download', jsonInit('POST', request), 'Download failed');
   },
 
-  listAllPaged(params: MP3ListPagedParams): Promise<PaginatedMP3Response> {
-    const query = pagedQuery(params, { sortBy: 'date_added', sortDirection: 'desc' });
-    query.set('filter_by', params.filterBy || 'all');
-    query.set('duration', params.durationRange || 'any');
-    query.set('favorites', String(Boolean(params.favoritesOnly)));
-    query.set('issue', params.issue || 'any');
+  listAllPaged({ page, limit, ...filters }: MP3ListPagedParams): Promise<PaginatedMP3Response> {
+    const query = trackQuery(filters);
+    query.set('page', String(page));
+    query.set('limit', String(limit));
     return apiFetch(`/mp3s/paged?${query.toString()}`, undefined, 'Failed to fetch paged MP3 list');
   },
 
   listAll(params: Omit<MP3ListPagedParams, 'page' | 'limit'> = {}): Promise<MP3Info[]> {
-    const query = new URLSearchParams({
-      search: params.search || '',
-      filter_by: params.filterBy || 'all',
-      sort_by: params.sortBy || 'date_added',
-      sort_direction: params.sortDirection || 'desc',
-      duration: params.durationRange || 'any',
-      favorites: String(Boolean(params.favoritesOnly)),
-      issue: params.issue || 'any',
-    });
-    return apiFetch(`/mp3s/all?${query.toString()}`, undefined, 'Failed to fetch MP3 list');
+    return apiFetch(`/mp3s/all?${trackQuery(params).toString()}`, undefined, 'Failed to fetch MP3 list');
   },
 
   async searchYouTube(query: string, limit = 12): Promise<YouTubeSearchResult[]> {
@@ -318,29 +301,23 @@ export const mp3Api = {
   },
 
   getInfo(filename: string): Promise<MP3Info> {
-    return apiFetch(`/mp3s/${encodeURIComponent(filename)}/info`, undefined, 'Failed to fetch MP3 info');
+    return apiFetch(`${trackPath(filename)}/info`, undefined, 'Failed to fetch MP3 info');
   },
 
   updateMetadata(filename: string, metadata: MetadataUpdate): Promise<{ success: boolean; filename: string }> {
-    return apiFetch(`/mp3s/${encodeURIComponent(filename)}/metadata`, jsonInit('PUT', metadata), 'Update failed');
+    return apiFetch(`${trackPath(filename)}/metadata`, jsonInit('PUT', metadata), 'Update failed');
   },
 
   updateCover(filename: string, file: File): Promise<{ success: boolean }> {
-    const formData = new FormData();
-    formData.append('cover', file);
-    return apiFetch(
-      `/mp3s/${encodeURIComponent(filename)}/cover`,
-      { method: 'POST', body: formData },
-      'Cover update failed',
-    );
+    return apiFetch(`${trackPath(filename)}/cover`, { method: 'POST', body: coverForm(file) }, 'Cover update failed');
   },
 
   getCoverUrl(filename: string, size?: CoverSize): string {
-    return coverUrl(`/mp3s/${encodeURIComponent(filename)}/cover`, size);
+    return coverUrl(`${trackPath(filename)}/cover`, size);
   },
 
   getFileUrl(filename: string): string {
-    return `${API_BASE}/mp3s/${encodeURIComponent(filename)}`;
+    return `${API_BASE}${trackPath(filename)}`;
   },
 
   bulkUpdateTags(filenames: string[], tags: BulkTagUpdate): Promise<BulkResult> {
@@ -348,8 +325,7 @@ export const mp3Api = {
   },
 
   bulkUpdateCover(filenames: string[], file: File): Promise<BulkResult> {
-    const formData = new FormData();
-    formData.append('cover', file);
+    const formData = coverForm(file);
     filenames.forEach((filename) => formData.append('filenames', filename));
     return apiFetch('/mp3s/bulk/cover', { method: 'POST', body: formData }, 'Bulk cover update failed');
   },
@@ -359,30 +335,30 @@ export const mp3Api = {
   },
 
   listAlbumsPaged(params: AlbumListPagedParams): Promise<PaginatedAlbumResponse> {
-    const query = pagedQuery(params, { sortBy: 'album_name', sortDirection: 'asc' });
+    const query = new URLSearchParams({
+      page: String(params.page),
+      limit: String(params.limit),
+      search: params.search || '',
+      sort_by: params.sortBy || 'album_name',
+      sort_direction: params.sortDirection || 'asc',
+    });
     return apiFetch(`/albums/paged?${query.toString()}`, undefined, 'Failed to fetch paged album list');
   },
 
   getAlbum(albumKey: string): Promise<AlbumDetail> {
-    return apiFetch(`/albums/${encodeURIComponent(albumKey)}`, undefined, 'Failed to fetch album details');
+    return apiFetch(albumPath(albumKey), undefined, 'Failed to fetch album details');
   },
 
   updateAlbum(albumKey: string, payload: AlbumUpdateRequest): Promise<AlbumUpdateResponse> {
-    return apiFetch(`/albums/${encodeURIComponent(albumKey)}`, jsonInit('PUT', payload), 'Album update failed');
+    return apiFetch(albumPath(albumKey), jsonInit('PUT', payload), 'Album update failed');
   },
 
   updateAlbumCover(albumKey: string, file: File): Promise<{ success: boolean; updated_tracks: number; message: string }> {
-    const formData = new FormData();
-    formData.append('cover', file);
-    return apiFetch(
-      `/albums/${encodeURIComponent(albumKey)}/cover`,
-      { method: 'POST', body: formData },
-      'Album cover update failed',
-    );
+    return apiFetch(`${albumPath(albumKey)}/cover`, { method: 'POST', body: coverForm(file) }, 'Album cover update failed');
   },
 
   getAlbumCoverUrl(albumKey: string, size?: CoverSize): string {
-    return coverUrl(`/albums/${encodeURIComponent(albumKey)}/cover`, size);
+    return coverUrl(`${albumPath(albumKey)}/cover`, size);
   },
 
   getStats(): Promise<LibraryStats> {

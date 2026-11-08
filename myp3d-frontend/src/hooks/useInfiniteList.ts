@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { RefObject } from 'react';
 import { subscribeAppEvent } from '../utils/appEvents';
 
 type InfinitePage<TItem> = {
@@ -36,6 +37,28 @@ function appendUnique<TItem>(base: TItem[], incoming: TItem[], getKey: (item: TI
     }
   }
   return merged;
+}
+
+export function useEndReached(
+  rootRef: RefObject<HTMLElement | null>,
+  sentinelRef: RefObject<HTMLElement | null>,
+  onEnd: (() => void) | undefined,
+  enabled: boolean,
+) {
+  useEffect(() => {
+    const root = rootRef.current;
+    const sentinel = sentinelRef.current;
+    if (!root || !sentinel || !onEnd || !enabled) return undefined;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) onEnd();
+      },
+      { root, rootMargin: '0px 0px 600px 0px' },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [rootRef, sentinelRef, onEnd, enabled]);
 }
 
 export function useInfiniteList<TParams extends Record<string, unknown>, TItem>({

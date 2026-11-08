@@ -1,5 +1,5 @@
-import { createContext, useContext } from 'react';
 import type { QueueItem, QueueItemUpdate } from '../../api/queueApi';
+import { createStrictContext } from '../../utils/strictContext';
 
 export interface DownloadQueueContextValue {
   items: QueueItem[] | null;
@@ -15,14 +15,6 @@ export interface DownloadQueueContextValue {
   update: (id: number, changes: QueueItemUpdate) => Promise<boolean>;
 }
 
-export const DownloadQueueContext = createContext<DownloadQueueContextValue | undefined>(undefined);
+export const [DownloadQueueContext, useDownloadQueue] = createStrictContext<DownloadQueueContextValue>('useDownloadQueue');
 
 export const isQueueItemActive = (item: QueueItem) => item.status === 'queued' || item.status === 'running';
-
-export function useDownloadQueue(): DownloadQueueContextValue {
-  const context = useContext(DownloadQueueContext);
-  if (!context) {
-    throw new Error('useDownloadQueue must be used within a DownloadQueueProvider');
-  }
-  return context;
-}

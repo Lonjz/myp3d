@@ -1,6 +1,6 @@
-import { createContext, useContext } from 'react';
 import type { MouseEvent } from 'react';
 import type { MP3Info } from '../../api/mp3Api';
+import { createStrictContext } from '../../utils/strictContext';
 import type { MenuAction } from '../ui/ContextMenu';
 
 export interface TrackActionOptions {
@@ -19,12 +19,4 @@ export interface TrackActionsContextValue {
   menuFilename: string | null;
 }
 
-export const TrackActionsContext = createContext<TrackActionsContextValue | undefined>(undefined);
-
-export function useTrackActions(): TrackActionsContextValue {
-  const context = useContext(TrackActionsContext);
-  if (!context) {
-    throw new Error('useTrackActions must be used within a TrackActionsProvider');
-  }
-  return context;
-}
+export const [TrackActionsContext, useTrackActions] = createStrictContext<TrackActionsContextValue>('useTrackActions');

@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react';
+import { createStrictContext } from '../../utils/strictContext';
 import type { SpotlightSource } from './spotlightTypes';
 
 export interface SpotlightContextValue {
@@ -9,12 +9,4 @@ export interface SpotlightContextValue {
   registerSource: (source: SpotlightSource) => () => void;
 }
 
-export const SpotlightContext = createContext<SpotlightContextValue | undefined>(undefined);
-
-export function useSpotlight(): SpotlightContextValue {
-  const context = useContext(SpotlightContext);
-  if (!context) {
-    throw new Error('useSpotlight must be used within a SpotlightProvider');
-  }
-  return context;
-}
+export const [SpotlightContext, useSpotlight] = createStrictContext<SpotlightContextValue>('useSpotlight');

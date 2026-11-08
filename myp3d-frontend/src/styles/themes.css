@@ -1,7 +1,6 @@
 :root[data-theme='glass']:not([data-palette='dusk']) {
   --color-bg: var(--palette-ink);
   --color-surface: color-mix(in srgb, var(--palette-ink), white 12%);
-  --color-surface-sunken: color-mix(in srgb, var(--palette-ink), white 5%);
   --color-on-accent: color-mix(in srgb, var(--palette-ink), black 10%);
   --color-scrim: color-mix(in srgb, var(--palette-ink) 55%, transparent);
   --color-scrim-nav: color-mix(in srgb, var(--palette-ink) 45%, transparent);
@@ -9,7 +8,6 @@
   --color-tooltip: color-mix(in srgb, var(--palette-ink) 92%, transparent);
   --color-cover-scrim: color-mix(in srgb, var(--palette-ink) 55%, transparent);
   --glass-tint-strong: color-mix(in srgb, var(--palette-ink) 42%, transparent);
-  --glass-tint-dark: color-mix(in srgb, var(--palette-ink) 78%, transparent);
   --glass-tint-overlay: color-mix(in srgb, var(--palette-ink) 60%, transparent);
 }
 
@@ -64,7 +62,6 @@
 :root[data-theme='amoled'] {
   --color-bg: #000;
   --color-surface: #181818;
-  --color-surface-sunken: #0a0a0a;
   --color-surface-hover: rgba(255, 255, 255, 0.08);
   --color-surface-selected: rgba(255, 255, 255, 0.14);
 
@@ -90,7 +87,6 @@
   --glass-tint: #121212;
   --glass-tint-strong: #121212;
   --glass-tint-hover: rgba(255, 255, 255, 0.1);
-  --glass-tint-dark: #181818;
   --glass-tint-overlay: #181818;
   --glass-sheen: linear-gradient(transparent, transparent);
   --glass-rim: linear-gradient(rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.07));
@@ -105,7 +101,6 @@
 
   --shadow-sm: 0 0 #0000;
   --shadow-md: 0 0 #0000;
-  --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.6);
 }
 
 :root[data-theme='amoled'] .app-backdrop__aurora {

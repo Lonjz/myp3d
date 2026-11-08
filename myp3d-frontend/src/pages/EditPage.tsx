@@ -15,7 +15,7 @@ import { EmptyState, LoadFailed } from '../components/ui/EmptyState';
 import { useDetail } from '../hooks/useDetail';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { emitAppEvent, subscribeAppEvent } from '../utils/appEvents';
-import { getCachedMp3Info, setCachedMp3Info } from '../utils/detailCache';
+import { fetchMp3Info } from '../utils/detailCache';
 import { normalizeFilenameInput, stripMp3Extension } from '../utils/filenames';
 import { errorMessage } from '../utils/formatters';
 import { DiscardChangesDialog } from '../components/ui/DiscardChangesDialog';
@@ -26,16 +26,7 @@ interface EditPageProps {
   onBack: () => void;
 }
 
-const SIDEBAR_SCROLL_KEY = 'edit-sidebar-scroll-top';
-const SIDEBAR_PAGE_SIZE = 25;
-
-async function fetchMp3Info(filename: string, force: boolean): Promise<MP3Info> {
-  const cached = force ? null : getCachedMp3Info(filename);
-  if (cached) return cached;
-  const info = await mp3Api.getInfo(filename);
-  setCachedMp3Info(filename, info);
-  return info;
-}
+const getTrackKey = (song: MP3Info) => song.filename;
 
 export function EditPage({ filename, onBack }: EditPageProps) {
   const navigate = useNavigate();
@@ -96,9 +87,9 @@ export function EditPage({ filename, onBack }: EditPageProps) {
 
     try {
       const result = await mp3Api.updateMetadata(filename, {
-        title: title || undefined,
-        artist: artist || undefined,
-        album: album || undefined,
+        title,
+        artist,
+        album,
         new_filename: newFilename.trim() && newFilename !== stripMp3Extension(filename) ? `${newFilename.trim()}.mp3` : undefined,
       });
 
@@ -111,9 +102,9 @@ export function EditPage({ filename, onBack }: EditPageProps) {
       player.trackUpdated(filename, {
         ...mp3,
         filename: result.filename,
-        title: title || mp3.title,
-        artist: artist || mp3.artist,
-        album: album || mp3.album,
+        title: title || null,
+        artist: artist || null,
+        album: album || null,
       });
       emitAppEvent('library-changed');
       if (result.filename === filename) {
@@ -144,31 +135,12 @@ export function EditPage({ filename, onBack }: EditPageProps) {
           backLabel="Back to library"
           onBack={onBack}
           activeKey={filename}
-          getItemKey={(song) => song.filename}
+          getItemKey={getTrackKey}
           getItemTitle={(song) => song.title || song.filename}
           getItemSubtitle={(song) => song.artist || 'Unknown Artist'}
           onSelect={(song) => navigate(`/details/${encodeURIComponent(song.filename)}`)}
-          fetchPage={async ({ page, limit, search }) => {
-            const response = await mp3Api.listAllPaged({
-              page,
-              limit,
-              search,
-              filterBy: 'all',
-              sortBy: 'date_added',
-              sortDirection: 'desc',
-            });
-
-            return {
-              items: response.items,
-              total: response.meta.total,
-              totalPages: response.meta.total_pages,
-            };
-          }}
-          emptyMessage="No matches"
+          fetchPage={mp3Api.listAllPaged}
           pinnedItem={mp3}
-          pageSize={SIDEBAR_PAGE_SIZE}
-          searchDebounceMs={300}
-          scrollStorageKey={SIDEBAR_SCROLL_KEY}
         />
 
         <section className="details-main">

@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react';
+import { createStrictContext } from '../../utils/strictContext';
 
 export interface ToastContextValue {
   showSuccess: (text: string) => void;
@@ -7,12 +7,4 @@ export interface ToastContextValue {
   clearToast: () => void;
 }
 
-export const ToastContext = createContext<ToastContextValue | undefined>(undefined);
-
-export function useToast() {
-  const context = useContext(ToastContext);
-  if (!context) {
-    throw new Error('useToast must be used within ToastProvider');
-  }
-  return context;
-}
+export const [ToastContext, useToast] = createStrictContext<ToastContextValue>('useToast');

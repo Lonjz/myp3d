@@ -1,4 +1,4 @@
-import { API_BASE, apiFetch, jsonInit } from './mp3Api';
+import { API_BASE, apiFetch, coverForm, jsonInit } from './mp3Api';
 import type { CoverSize, MP3Info } from './mp3Api';
 
 export interface PlaylistInfo {
@@ -47,9 +47,7 @@ export const playlistApi = {
   },
 
   updateCover(id: string, file: File): Promise<PlaylistInfo> {
-    const formData = new FormData();
-    formData.append('cover', file);
-    return apiFetch(`${playlistPath(id)}/cover`, { method: 'POST', body: formData }, 'Failed to save cover');
+    return apiFetch(`${playlistPath(id)}/cover`, { method: 'POST', body: coverForm(file) }, 'Failed to save cover');
   },
 
   remove(id: string): Promise<{ success: boolean }> {

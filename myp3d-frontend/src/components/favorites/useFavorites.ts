@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { favoriteApi } from '../../api/favoriteApi';
-import { emitAppEvent, subscribeAppEvent } from '../../utils/appEvents';
+import { emitAppEvent, subscribeAppEvents } from '../../utils/appEvents';
 import { useToast } from '../messages/toastContext';
 import { errorMessage } from '../../utils/formatters';
 
@@ -31,14 +31,7 @@ export function useFavorites() {
     };
 
     void load();
-    const unsubscribeFavorites = subscribeAppEvent('favorites-changed', () => void load());
-    const unsubscribeLibrary = subscribeAppEvent('library-changed', () => void load());
-    const unsubscribePlaylists = subscribeAppEvent('playlists-changed', () => void load());
-    return () => {
-      unsubscribeFavorites();
-      unsubscribeLibrary();
-      unsubscribePlaylists();
-    };
+    return subscribeAppEvents(['favorites-changed', 'library-changed', 'playlists-changed'], () => void load());
   }, [setFavorites, showError]);
 
   const toggle = useCallback(

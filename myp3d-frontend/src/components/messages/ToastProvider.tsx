@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { UNREACHABLE_MESSAGE } from '../../api/mp3Api';
 import { FeedbackToast, type FeedbackMessage } from './FeedbackToast';
@@ -8,36 +8,21 @@ import type { ToastContextValue } from './toastContext';
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [message, setMessage] = useState<FeedbackMessage | null>(null);
 
-  const showSuccess = useCallback((text: string) => {
-    setMessage({ type: 'success', text });
-  }, []);
-
-  const showError = useCallback((text: string) => {
-    if (text === UNREACHABLE_MESSAGE) return;
-    setMessage({ type: 'error', text });
-  }, []);
-
-  const showInfo = useCallback((text: string) => {
-    setMessage({ type: 'info', text });
-  }, []);
-
-  const clearToast = useCallback(() => {
-    setMessage(null);
-  }, []);
-
   const value = useMemo<ToastContextValue>(
     () => ({
-      showSuccess,
-      showError,
-      showInfo,
-      clearToast,
+      showSuccess: (text) => setMessage({ type: 'success', text }),
+      showError: (text) => {
+        if (text !== UNREACHABLE_MESSAGE) setMessage({ type: 'error', text });
+      },
+      showInfo: (text) => setMessage({ type: 'info', text }),
+      clearToast: () => setMessage(null),
     }),
-    [showSuccess, showError, showInfo, clearToast],
+    [],
   );
 
   return (
     <ToastContext.Provider value={value}>
-      <FeedbackToast message={message} onClose={clearToast} />
+      <FeedbackToast message={message} onClose={value.clearToast} />
       {children}
     </ToastContext.Provider>
   );

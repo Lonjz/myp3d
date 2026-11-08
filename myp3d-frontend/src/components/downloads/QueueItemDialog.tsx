@@ -116,7 +116,6 @@ export function QueueItemDialog({ item, closing, onClose, onSaved }: QueueItemDi
       >
             <form className="modal-form" onSubmit={(event) => void handleSave(event)}>
               <DownloadConfigSection
-                idPrefix="queue"
                 url={url}
                 onUrlChange={handleUrlChange}
                 customFilename={customFilename}

@@ -220,6 +220,5 @@ export function useDownloadForm({ onSubmitted, initialValues }: UseDownloadFormO
     checkOverwrite,
     submitDownload,
     queueDownload,
-    resetFields,
   };
 }

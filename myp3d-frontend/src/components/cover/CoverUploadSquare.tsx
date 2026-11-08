@@ -3,7 +3,6 @@ import { ImagePlus, X } from 'lucide-react';
 import { IconButton } from '../ui/IconButton';
 
 interface CoverUploadSquareProps {
-  inputId: string;
   previewUrl: string | null;
   disabled?: boolean;
   onSelectFile: (file: File) => void;
@@ -11,7 +10,6 @@ interface CoverUploadSquareProps {
 }
 
 export function CoverUploadSquare({
-  inputId,
   previewUrl,
   disabled = false,
   onSelectFile,
@@ -32,7 +30,6 @@ export function CoverUploadSquare({
   return (
     <div className="cover-upload-square-wrap">
       <input
-        id={inputId}
         ref={inputRef}
         type="file"
         accept="image/*"

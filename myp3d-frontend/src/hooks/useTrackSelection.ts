@@ -1,5 +1,9 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
+import type { ChangeEvent } from 'react';
 import type { MP3Info } from '../api/mp3Api';
+
+export const isShiftClick = (event: ChangeEvent<HTMLInputElement>) =>
+  event.nativeEvent instanceof MouseEvent && event.nativeEvent.shiftKey;
 
 export function useTrackSelection() {
   const [selected, setSelected] = useState<Map<string, MP3Info>>(() => new Map());

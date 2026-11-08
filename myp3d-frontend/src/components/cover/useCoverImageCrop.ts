@@ -63,7 +63,6 @@ export function useCoverImageCrop({
   const zoomInputId = useId();
   const [coverImageBase64, setCoverImageBase64] = useState<string | undefined>(initialCover);
   const [coverFile, setCoverFile] = useState<File | null>(null);
-  const [coverPreview, setCoverPreview] = useState<string | null>(initialCover ?? null);
   const [cropSource, setCropSource] = useState<string | null>(null);
   const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -77,7 +76,6 @@ export function useCoverImageCrop({
 
     setCoverImageBase64(croppedImage);
     setCoverFile(new File([blob], outputFilename, { type: 'image/jpeg' }));
-    setCoverPreview(croppedImage);
     setIsCropModalOpen(false);
     setCropSource(null);
     onClearError?.();
@@ -127,15 +125,11 @@ export function useCoverImageCrop({
   const handleRemoveCover = () => {
     setCoverImageBase64(undefined);
     setCoverFile(null);
-    setCoverPreview(null);
     setCropSource(null);
   };
 
   const resetCoverState = () => {
-    setCoverImageBase64(undefined);
-    setCoverFile(null);
-    setCoverPreview(null);
-    setCropSource(null);
+    handleRemoveCover();
     setCrop({ x: 0, y: 0 });
     setZoom(1);
     setCroppedAreaPixels(null);
@@ -173,19 +167,10 @@ export function useCoverImageCrop({
     cropModalProps,
     coverImageBase64,
     coverFile,
-    coverPreview,
-    cropSource,
-    crop,
-    zoom,
+    coverPreview: coverImageBase64 ?? null,
     isCropModalOpen,
-    isApplyingCrop,
-    setCrop,
-    setZoom,
-    handleCropComplete,
     handleCoverFileSelect,
     handleCoverChange,
-    handleApplyCrop,
-    handleCancelCrop,
     handleRemoveCover,
     resetCoverState,
   };

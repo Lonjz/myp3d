@@ -3,6 +3,7 @@ import { DatabaseZap, DiscAlbum, Keyboard, Music, Settings } from 'lucide-react'
 import { exportApi } from '../../../api/exportApi';
 import { useClearCache } from '../../../hooks/useClearCache';
 import { emitAppEvent } from '../../../utils/appEvents';
+import { startDownload } from '../../../utils/download';
 import { createCommandsSource } from './commandsSource';
 import type { InstantSpotlightSource } from '../spotlightTypes';
 
@@ -24,14 +25,14 @@ export function useAppCommandsSource(): InstantSpotlightSource {
           title: 'Export all tracks',
           icon: Music,
           keywords: ['zip', 'backup', 'download', 'archive'],
-          run: () => exportApi.start(exportApi.tracksUrl()),
+          run: () => startDownload(exportApi.tracksUrl()),
         },
         {
           id: 'export-album-art',
           title: 'Export album art',
           icon: DiscAlbum,
           keywords: ['zip', 'covers', 'images', 'artwork', 'archive'],
-          run: () => exportApi.start(exportApi.albumArtUrl()),
+          run: () => startDownload(exportApi.albumArtUrl()),
         },
         {
           id: 'shortcuts',

@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { ChangeEvent, CSSProperties, DragEvent } from 'react';
 import {
   ArrowRight,
@@ -13,7 +13,7 @@ import {
   Music,
   Upload,
 } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import { useConsumeSearchParams } from '../hooks/useConsumeSearchParams';
 import { ExplicitBadge, MatchDot } from '../components/spotify/matchBadges';
 import { MatchPicker } from '../components/spotify/MatchPicker';
 import { isReadyRow, useSpotifyImport } from '../components/spotify/useSpotifyImport';
@@ -140,21 +140,16 @@ export function SpotifyPage() {
     clearAll,
     queueSelected,
   } = useSpotifyImport();
-  const [searchParams, setSearchParams] = useSearchParams();
   const [dropping, setDropping] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const applySearchParams = useEffectEvent((params: URLSearchParams) => {
+  useConsumeSearchParams((params) => {
     const incoming = params.get('url');
-    if (!incoming) return;
+    if (!incoming) return false;
     setText(incoming);
     void resolve(incoming);
-    setSearchParams({}, { replace: true });
+    return true;
   });
-
-  useEffect(() => {
-    applySearchParams(searchParams);
-  }, [searchParams]);
 
   const selectable = rows.filter(isReadyRow);
   const fresh = selectable.filter((row) => !row.match.in_library);

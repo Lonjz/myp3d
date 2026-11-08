@@ -10,6 +10,12 @@ def test_edit_tags(client, seeded_library):
     assert client.get("/mp3s/the chain.mp3/info").json()["album"] == "Live"
 
 
+def test_an_empty_field_clears_the_tag(client, seeded_library):
+    client.put("/mp3s/the chain.mp3/metadata", json={"artist": "", "album": "   "})
+    tags = seeded_library.tags("the chain.mp3")
+    assert (tags["title"], tags["artist"], tags["album"]) == ("The Chain", None, None)
+
+
 def test_rename_moves_playlists_favourites_and_dates(client, seeded_library, make_playlist, star):
     playlist_id = make_playlist("Mix", ["dreams.mp3", "the chain.mp3"])
     star("the chain.mp3")

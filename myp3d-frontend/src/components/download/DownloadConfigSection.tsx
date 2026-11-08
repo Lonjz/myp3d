@@ -25,7 +25,6 @@ function FilenameStatusIcon({ status }: { status: FilenameStatus }) {
 }
 
 interface DownloadConfigSectionProps {
-  idPrefix?: string;
   disabled?: boolean;
   url: string;
   onUrlChange: (value: string) => void;
@@ -45,7 +44,6 @@ interface DownloadConfigSectionProps {
 }
 
 export function DownloadConfigSection({
-  idPrefix = '',
   disabled = false,
   url,
   onUrlChange,
@@ -69,7 +67,6 @@ export function DownloadConfigSection({
     <div className="download-config-grid">
       <div className="download-cover">
         <CoverUploadSquare
-          inputId={`${idPrefix}coverImage`}
           previewUrl={coverPreview}
           disabled={disabled}
           onSelectFile={onCoverSelect}

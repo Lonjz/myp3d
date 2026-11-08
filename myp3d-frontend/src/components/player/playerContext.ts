@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
 import type { MP3Info } from '../../api/mp3Api';
+import { createStrictContext } from '../../utils/strictContext';
 import type { PlayerState } from './playerReducer';
 
 export interface PlayOptions {
@@ -11,6 +12,7 @@ export interface PlayerContextValue {
   currentTrack: MP3Info | null;
   playTracks: (tracks: MP3Info[], startIndex?: number, options?: PlayOptions) => void;
   playAlbum: (albumKey: string, options?: PlayOptions) => Promise<void>;
+  playPlaylist: (id: string) => Promise<void>;
   playNext: (track: MP3Info) => void;
   enqueue: (tracks: MP3Info[]) => void;
   togglePlay: () => void;
@@ -35,16 +37,8 @@ export interface PlayerTimeValue {
   duration: number;
 }
 
-export const PlayerContext = createContext<PlayerContextValue | undefined>(undefined);
+export const [PlayerContext, usePlayer] = createStrictContext<PlayerContextValue>('usePlayer');
 export const PlayerTimeContext = createContext<PlayerTimeValue>({ currentTime: 0, duration: 0 });
-
-export function usePlayer(): PlayerContextValue {
-  const context = useContext(PlayerContext);
-  if (!context) {
-    throw new Error('usePlayer must be used within a PlayerProvider');
-  }
-  return context;
-}
 
 export function usePlayerTime(): PlayerTimeValue {
   return useContext(PlayerTimeContext);

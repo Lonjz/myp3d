@@ -25,6 +25,11 @@ export function subscribeAppEvent<K extends AppEventName>(name: K, listener: Lis
   };
 }
 
+export function subscribeAppEvents(names: AppEventName[], listener: () => void): () => void {
+  const unsubscribers = names.map((name) => subscribeAppEvent(name, listener));
+  return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
+}
+
 export function emitAppEvent<K extends AppEventName>(
   name: K,
   ...args: AppEventMap[K] extends undefined ? [] : [AppEventMap[K]]

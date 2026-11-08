@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { CircleAlert, CircleCheck, Info, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useLingering } from '../../hooks/usePresence';
@@ -11,8 +11,9 @@ export type FeedbackMessage = {
 interface FeedbackToastProps {
   message: FeedbackMessage | null;
   onClose: () => void;
-  autoHideMs?: number;
 }
+
+const AUTO_HIDE_MS = 4200;
 
 const MESSAGE_ICONS: Record<FeedbackMessage['type'], { icon: LucideIcon; label: string }> = {
   success: { icon: CircleCheck, label: 'Success' },
@@ -20,29 +21,14 @@ const MESSAGE_ICONS: Record<FeedbackMessage['type'], { icon: LucideIcon; label: 
   info: { icon: Info, label: 'Info' },
 };
 
-export function FeedbackToast({
-  message,
-  onClose,
-  autoHideMs = 4200,
-}: FeedbackToastProps) {
-  const onCloseRef = useRef(onClose);
+export function FeedbackToast({ message, onClose }: FeedbackToastProps) {
   const { value: shown, closing } = useLingering(message);
 
   useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
-
-  useEffect(() => {
-    if (!message) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      onCloseRef.current();
-    }, autoHideMs);
-
+    if (!message) return undefined;
+    const timeoutId = window.setTimeout(onClose, AUTO_HIDE_MS);
     return () => window.clearTimeout(timeoutId);
-  }, [message, autoHideMs]);
+  }, [message, onClose]);
 
   if (!shown) {
     return null;
