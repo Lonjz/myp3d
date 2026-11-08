@@ -2,13 +2,10 @@
 
 A YouTube-to-MP3 downloader and music library that runs on your own machine. FastAPI backend, React frontend.
 
-![Dashboard](docs/screenshots/dashboard.webp)
-
 <table>
   <tr>
-    <td><a href="docs/screenshots/library.webp"><img src="docs/screenshots/library.webp" alt="Library"></a></td>
-    <td><a href="docs/screenshots/spotlight.webp"><img src="docs/screenshots/spotlight.webp" alt="Search"></a></td>
-    <td><a href="docs/screenshots/album.webp"><img src="docs/screenshots/album.webp" alt="Album"></a></td>
+    <td width="50%"><a href="docs/screenshots/dashboard.webp"><img src="docs/screenshots/dashboard.webp" alt="Dashboard"></a></td>
+    <td width="50%"><a href="docs/screenshots/themes.webp"><img src="docs/screenshots/themes.webp" alt="Themes"></a></td>
   </tr>
 </table>
 
@@ -23,6 +20,40 @@ A YouTube-to-MP3 downloader and music library that runs on your own machine. Fas
 - Sync two libraries over your local network
 - Sync songs, playlists and favourites with Apple Music (macOS)
 - Export every song, or every album cover, as a zip
+- Glass and AMOLED themes, colour palettes, custom accents and your own background picture
+
+## Tour
+
+<table>
+  <tr>
+    <td width="50%"><b>Query</b>: search YouTube, trim, tag, crop a cover, then download or queue<br><a href="docs/screenshots/query.webp"><img src="docs/screenshots/query.webp" alt="Query"></a></td>
+    <td width="50%"><b>Spotify</b>: paste a link, check the YouTube matches, queue what you want<br><a href="docs/screenshots/spotify.webp"><img src="docs/screenshots/spotify.webp" alt="Spotify"></a></td>
+  </tr>
+  <tr>
+    <td width="50%"><b>Downloads</b>: run the queue and watch it go<br><a href="docs/screenshots/downloads.webp"><img src="docs/screenshots/downloads.webp" alt="Downloads"></a></td>
+    <td width="50%"><b>Library</b>: search, sort, filter and edit many songs at once<br><a href="docs/screenshots/library.webp"><img src="docs/screenshots/library.webp" alt="Library"></a></td>
+  </tr>
+  <tr>
+    <td width="50%"><b>Editing</b>: tags, file name and a cropped cover<br><a href="docs/screenshots/edit.webp"><img src="docs/screenshots/edit.webp" alt="Editing"></a></td>
+    <td width="50%"><b>Albums</b>: browse, play and retag a whole album<br><a href="docs/screenshots/album.webp"><img src="docs/screenshots/album.webp" alt="Albums"></a></td>
+  </tr>
+  <tr>
+    <td width="50%"><b>Playlists</b>: drag to reorder, move to top, filter, play<br><a href="docs/screenshots/playlists.webp"><img src="docs/screenshots/playlists.webp" alt="Playlists"></a></td>
+    <td width="50%"><b>Player</b>: seek, shuffle, repeat, volume and an editable queue<br><a href="docs/screenshots/player.webp"><img src="docs/screenshots/player.webp" alt="Player"></a></td>
+  </tr>
+  <tr>
+    <td width="50%"><b>Spotlight</b>: everything from the keyboard<br><a href="docs/screenshots/spotlight.webp"><img src="docs/screenshots/spotlight.webp" alt="Spotlight"></a></td>
+    <td width="50%"><b>Health</b>: trim silent endings, tidy file names, fix multiple artists<br><a href="docs/screenshots/health.webp"><img src="docs/screenshots/health.webp" alt="Health"></a></td>
+  </tr>
+  <tr>
+    <td width="50%"><b>LAN sync</b>: pair two computers, see the differences, sync both ways<br><a href="docs/screenshots/sync.webp"><img src="docs/screenshots/sync.webp" alt="LAN sync"></a></td>
+    <td width="50%"><b>Apple Music</b>: songs, playlists and album artists (macOS)<br><a href="docs/screenshots/apple.webp"><img src="docs/screenshots/apple.webp" alt="Apple Music"></a></td>
+  </tr>
+  <tr>
+    <td width="50%"><b>Settings</b>: row density, backups, settings files and shortcuts<br><a href="docs/screenshots/settings.webp"><img src="docs/screenshots/settings.webp" alt="Settings"></a></td>
+    <td width="50%"><b>Export</b>: every song or every album cover as a zip<br><a href="docs/screenshots/export.webp"><img src="docs/screenshots/export.webp" alt="Export"></a></td>
+  </tr>
+</table>
 
 ## Setup
 
