@@ -154,6 +154,7 @@ function HeaderSearchButton() {
 function App() {
   const location = useLocation();
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
+  const [isSidebarToggled, setIsSidebarToggled] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const sidebarOverlay = usePresence(isMobileSidebarOpen);
   const [sidebarPathname, setSidebarPathname] = useState(location.pathname);
@@ -178,8 +179,8 @@ function App() {
                 <div className="app-shell">
                   <aside
                     className={`sidebar glass ${isSidebarExpanded ? 'expanded' : 'collapsed'} ${
-                      isMobileSidebarOpen ? 'mobile-open' : ''
-                    }`}
+                      isSidebarToggled ? 'is-toggled' : ''
+                    } ${isMobileSidebarOpen ? 'mobile-open' : ''}`}
                   >
                     <div className="sidebar-header">
                       <span className="sidebar-brand">
@@ -191,7 +192,10 @@ function App() {
                         label={isSidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
                         variant="ghost"
                         className="sidebar-collapse-btn"
-                        onClick={() => setIsSidebarExpanded((value) => !value)}
+                        onClick={() => {
+                          setIsSidebarToggled(true);
+                          setIsSidebarExpanded((value) => !value);
+                        }}
                       />
                     </div>
 

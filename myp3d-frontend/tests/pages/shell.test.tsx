@@ -18,6 +18,16 @@ describe('app shell', () => {
     expect(await screen.findByRole('checkbox', { name: 'Select Dreams' })).toBeInTheDocument();
   });
 
+  it('only slides the page once the sidebar has been toggled', async () => {
+    const { user } = renderApp('/dashboard');
+    const sidebar = document.querySelector('.sidebar');
+    expect(sidebar).not.toHaveClass('is-toggled');
+
+    await user.click(screen.getByRole('button', { name: 'Collapse sidebar' }));
+
+    expect(sidebar).toHaveClass('is-toggled', 'collapsed');
+  });
+
   it('shows a page for unknown addresses', async () => {
     const { user, router } = renderApp('/nowhere');
     expect(await screen.findByRole('status', { name: 'Page not found' })).toBeInTheDocument();

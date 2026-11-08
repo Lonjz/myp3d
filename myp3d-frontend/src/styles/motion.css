@@ -98,6 +98,26 @@
   animation-delay: calc(min(var(--row, 0), 14) * var(--stagger-row) + 100ms);
 }
 
+.sidebar.is-toggled.expanded ~ .app-content {
+  animation: content-from-collapsed var(--duration-sidebar) var(--ease-sidebar);
+}
+
+.sidebar.is-toggled.collapsed ~ .app-content {
+  animation: content-from-expanded var(--duration-sidebar) var(--ease-sidebar);
+}
+
+@keyframes content-from-collapsed {
+  from {
+    transform: translateX(calc(var(--sidebar-collapsed-width) - var(--sidebar-expanded-width)));
+  }
+}
+
+@keyframes content-from-expanded {
+  from {
+    transform: translateX(calc(var(--sidebar-expanded-width) - var(--sidebar-collapsed-width)));
+  }
+}
+
 @keyframes fade-in {
   from {
     opacity: 0;
@@ -167,6 +187,18 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  @keyframes content-from-collapsed {
+    from {
+      transform: none;
+    }
+  }
+
+  @keyframes content-from-expanded {
+    from {
+      transform: none;
+    }
+  }
+
   @keyframes pop-in {
     from {
       opacity: 0;
@@ -228,7 +260,6 @@
   }
 
   .sidebar,
-  .app-content,
   .sync-meter span {
     transition: none;
   }
