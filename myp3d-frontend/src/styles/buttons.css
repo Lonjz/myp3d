@@ -161,6 +161,12 @@
   background: rgba(255, 255, 255, 0.05);
 }
 
+.segmented--equal {
+  display: inline-grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+}
+
 .segmented__option {
   position: relative;
   display: inline-flex;

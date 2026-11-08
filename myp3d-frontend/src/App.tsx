@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState } from 'react';
-import { AudioLines, ChevronLeft, Menu, Search } from 'lucide-react';
+import { AudioLines, ChevronLeft, Menu, Search, Settings } from 'lucide-react';
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ToastProvider } from './components/messages/ToastProvider';
 import { DownloadQueueProvider } from './components/downloads/DownloadQueueProvider';
@@ -19,8 +19,10 @@ import { SPOTLIGHT_SHORTCUT_LABEL } from './components/spotlight/spotlightTypes'
 import { usePresence } from './hooks/usePresence';
 import { Spinner } from './components/ui/Spinner';
 import { BackendStatus } from './components/shell/BackendStatus';
-import { ShortcutsOverlay } from './components/shell/ShortcutsOverlay';
 import { ErrorBoundary } from './components/shell/ErrorBoundary';
+import { AppearanceProvider } from './components/settings/AppearanceProvider';
+import { SettingsDialog } from './components/settings/SettingsDialog';
+import { emitAppEvent } from './utils/appEvents';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then((module) => ({ default: module.DashboardPage })));
@@ -168,89 +170,102 @@ function App() {
         <PlayerProvider>
           <TrackActionsProvider>
             <DownloadQueueProvider>
-              <DocumentTitle />
-              <AppBackdrop />
-              <BackendStatus />
-              <ShortcutsOverlay />
-              <div className="app-shell">
-                <aside
-                  className={`sidebar glass ${isSidebarExpanded ? 'expanded' : 'collapsed'} ${
-                    isMobileSidebarOpen ? 'mobile-open' : ''
-                  }`}
-                >
-                  <div className="sidebar-header">
-                    <span className="sidebar-brand">
-                      <AudioLines aria-hidden="true" />
-                      <span>MYP3D</span>
-                    </span>
-                    <IconButton
-                      icon={ChevronLeft}
-                      label={isSidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
-                      variant="ghost"
-                      className="sidebar-collapse-btn"
-                      onClick={() => setIsSidebarExpanded((value) => !value)}
+              <AppearanceProvider>
+                <DocumentTitle />
+                <AppBackdrop />
+                <BackendStatus />
+                <SettingsDialog />
+                <div className="app-shell">
+                  <aside
+                    className={`sidebar glass ${isSidebarExpanded ? 'expanded' : 'collapsed'} ${
+                      isMobileSidebarOpen ? 'mobile-open' : ''
+                    }`}
+                  >
+                    <div className="sidebar-header">
+                      <span className="sidebar-brand">
+                        <AudioLines aria-hidden="true" />
+                        <span>MYP3D</span>
+                      </span>
+                      <IconButton
+                        icon={ChevronLeft}
+                        label={isSidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
+                        variant="ghost"
+                        className="sidebar-collapse-btn"
+                        onClick={() => setIsSidebarExpanded((value) => !value)}
+                      />
+                    </div>
+
+                    <SidebarSearchButton />
+
+                    <nav className="sidebar-nav" aria-label="Primary navigation">
+                      {NAV_ITEMS.map((item) => (
+                        <NavLink
+                          key={item.to}
+                          to={item.to}
+                          className={() => (item.isActive(location.pathname) ? 'sidebar-link is-active' : 'sidebar-link')}
+                          title={item.label}
+                        >
+                          <item.icon aria-hidden="true" />
+                          <span className="sidebar-label">{item.label}</span>
+                          {item.to === '/downloads' && <DownloadsActivity />}
+                        </NavLink>
+                      ))}
+                    </nav>
+
+                    <button
+                      type="button"
+                      className="sidebar-link sidebar-settings"
+                      aria-label="Settings"
+                      title="Settings"
+                      onClick={() => emitAppEvent('show-settings')}
+                    >
+                      <Settings aria-hidden="true" />
+                      <span className="sidebar-label">Settings</span>
+                    </button>
+                  </aside>
+
+                  {sidebarOverlay.mounted && (
+                    <button
+                      type="button"
+                      aria-label="Close navigation"
+                      className="sidebar-overlay motion-fade"
+                      data-state={sidebarOverlay.closing ? 'closed' : 'open'}
+                      onClick={() => setIsMobileSidebarOpen(false)}
                     />
-                  </div>
+                  )}
 
-                  <SidebarSearchButton />
+                  <section className={isFillPage ? 'app-content app-content--fill' : 'app-content'}>
+                    <header className="content-header glass">
+                      <IconButton
+                        icon={Menu}
+                        label="Open navigation"
+                        variant="ghost"
+                        onClick={() => setIsMobileSidebarOpen(true)}
+                      />
+                      <HeaderSearchButton />
+                    </header>
 
-                  <nav className="sidebar-nav" aria-label="Primary navigation">
-                    {NAV_ITEMS.map((item) => (
-                      <NavLink
-                        key={item.to}
-                        to={item.to}
-                        className={() => (item.isActive(location.pathname) ? 'sidebar-link is-active' : 'sidebar-link')}
-                        title={item.label}
-                      >
-                        <item.icon aria-hidden="true" />
-                        <span className="sidebar-label">{item.label}</span>
-                        {item.to === '/downloads' && <DownloadsActivity />}
-                      </NavLink>
-                    ))}
-                  </nav>
-                </aside>
+                    <main className="content-main">
+                      <ErrorBoundary resetKey={location.pathname}>
+                        <Suspense fallback={<Spinner />}>
+                          <KeepAliveRoutes pages={KEEP_ALIVE_PAGES}>
+                            <Routes>
+                              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                              <Route path="/download" element={<Navigate to="/query" replace />} />
+                              <Route path="/details/:songName" element={<EditRoute />} />
+                              <Route path="/albums/:albumKey" element={<AlbumEditRoute />} />
+                              <Route path="/playlists/:playlistId" element={<PlaylistEditRoute />} />
+                              <Route path="*" element={<NotFoundPage />} />
+                            </Routes>
+                          </KeepAliveRoutes>
+                        </Suspense>
+                      </ErrorBoundary>
+                    </main>
 
-                {sidebarOverlay.mounted && (
-                  <button
-                    type="button"
-                    aria-label="Close navigation"
-                    className="sidebar-overlay motion-fade"
-                    data-state={sidebarOverlay.closing ? 'closed' : 'open'}
-                    onClick={() => setIsMobileSidebarOpen(false)}
-                  />
-                )}
-
-                <section className={isFillPage ? 'app-content app-content--fill' : 'app-content'}>
-                  <header className="content-header glass">
-                    <IconButton
-                      icon={Menu}
-                      label="Open navigation"
-                      variant="ghost"
-                      onClick={() => setIsMobileSidebarOpen(true)}
-                    />
-                    <HeaderSearchButton />
-                  </header>
-
-                  <main className="content-main">
-                    <ErrorBoundary resetKey={location.pathname}>
-                      <Suspense fallback={<Spinner />}>
-                        <KeepAliveRoutes pages={KEEP_ALIVE_PAGES}>
-                          <Routes>
-                            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                            <Route path="/download" element={<Navigate to="/query" replace />} />
-                            <Route path="/details/:songName" element={<EditRoute />} />
-                            <Route path="/albums/:albumKey" element={<AlbumEditRoute />} />
-                            <Route path="/playlists/:playlistId" element={<PlaylistEditRoute />} />
-                            <Route path="*" element={<NotFoundPage />} />
-                          </Routes>
-                        </KeepAliveRoutes>
-                      </Suspense>
-                    </ErrorBoundary>
-                  </main>
-
-                  <PlayerBar />
-                </section>
-              </div>
+                    <PlayerBar />
+                  </section>
+                </div>
+              </AppearanceProvider>
             </DownloadQueueProvider>
           </TrackActionsProvider>
         </PlayerProvider>

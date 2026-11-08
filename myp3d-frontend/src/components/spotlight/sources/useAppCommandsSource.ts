@@ -1,15 +1,13 @@
 import { useMemo } from 'react';
-import { DatabaseZap, DiscAlbum, Keyboard, Music } from 'lucide-react';
+import { DatabaseZap, DiscAlbum, Keyboard, Music, Settings } from 'lucide-react';
 import { exportApi } from '../../../api/exportApi';
-import { mp3Api } from '../../../api/mp3Api';
+import { useClearCache } from '../../../hooks/useClearCache';
 import { emitAppEvent } from '../../../utils/appEvents';
-import { useToast } from '../../messages/toastContext';
 import { createCommandsSource } from './commandsSource';
 import type { InstantSpotlightSource } from '../spotlightTypes';
-import { errorMessage } from '../../../utils/formatters';
 
 export function useAppCommandsSource(): InstantSpotlightSource {
-  const { showSuccess, showError } = useToast();
+  const clearCache = useClearCache();
 
   return useMemo(
     () =>
@@ -19,16 +17,7 @@ export function useAppCommandsSource(): InstantSpotlightSource {
           title: 'Clear cache',
           icon: DatabaseZap,
           keywords: ['refresh', 'reload', 'covers', 'images', 'artwork'],
-          run: async () => {
-            try {
-              await mp3Api.clearServerCache();
-            } catch (err) {
-              showError(errorMessage(err, 'Failed to clear cache'));
-              return;
-            }
-            emitAppEvent('library-changed');
-            showSuccess('Cache cleared');
-          },
+          run: clearCache,
         },
         {
           id: 'export-tracks',
@@ -51,7 +40,14 @@ export function useAppCommandsSource(): InstantSpotlightSource {
           keywords: ['keys', 'hotkeys', 'help'],
           run: () => emitAppEvent('show-shortcuts'),
         },
+        {
+          id: 'settings',
+          title: 'Settings',
+          icon: Settings,
+          keywords: ['preferences', 'theme', 'appearance', 'amoled', 'background', 'accent', 'backup'],
+          run: () => emitAppEvent('show-settings'),
+        },
       ]),
-    [showError, showSuccess],
+    [clearCache],
   );
 }

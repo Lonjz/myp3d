@@ -25,13 +25,25 @@ describe('app shell', () => {
     expect(router.state.location.pathname).toBe('/dashboard');
   });
 
-  it('lists the keyboard shortcuts on ?', async () => {
+  it('opens the shortcuts tab of settings on ?', async () => {
     const { user } = renderApp('/dashboard');
     await user.keyboard('?');
-    const dialog = await screen.findByRole('dialog', { name: 'Keyboard shortcuts' });
+    const dialog = await screen.findByRole('dialog', { name: 'Settings' });
+    expect(within(dialog).getByRole('button', { name: 'Shortcuts' })).toHaveAttribute('aria-pressed', 'true');
     expect(within(dialog).getByText('Play or pause')).toBeInTheDocument();
+    const search = within(dialog).getByText('Search').closest('div') as HTMLElement;
+    expect(within(search).getByText('K')).toBeInTheDocument();
+    expect(within(search).getByText('/')).toBeInTheDocument();
     await user.keyboard('{Escape}');
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Keyboard shortcuts' })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Settings' })).not.toBeInTheDocument());
+  });
+
+  it('closes settings when ? is pressed again', async () => {
+    const { user } = renderApp('/dashboard');
+    await user.keyboard('?');
+    await screen.findByRole('dialog', { name: 'Settings' });
+    await user.keyboard('?');
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Settings' })).not.toBeInTheDocument());
   });
 
   it('saves the edit page with Ctrl+S', async () => {

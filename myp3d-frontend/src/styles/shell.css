@@ -30,6 +30,20 @@
     radial-gradient(44% 46% at 12% 90%, color-mix(in srgb, var(--backdrop-4) 40%, transparent), transparent 72%);
 }
 
+.app-backdrop__image {
+  position: absolute;
+  inset: calc(-2 * var(--backdrop-image-blur));
+  background-position: center;
+  background-size: cover;
+  filter: blur(var(--backdrop-image-blur));
+}
+
+.app-backdrop__dim {
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / var(--backdrop-image-dim));
+}
+
 .sidebar {
   position: fixed;
   top: var(--sidebar-gap);
@@ -183,6 +197,18 @@
   color: var(--color-text);
   background: var(--selected-bg);
   box-shadow: var(--selected-shadow);
+}
+
+.sidebar-settings {
+  flex-shrink: 0;
+  width: 100%;
+  margin-top: auto;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: var(--font-weight-medium);
+  text-align: left;
+  cursor: pointer;
 }
 
 .sidebar-label {

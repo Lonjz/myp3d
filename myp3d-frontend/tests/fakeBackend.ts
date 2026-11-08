@@ -398,6 +398,8 @@ const handlers = [
 
   route('get', '/music/status', () => ({ available: false, detected_folder: null })),
 
+  route('get', '/system/info', () => ({ version: '1.0.0', device_name: 'This PC' })),
+
   http.all('*', ({ request }) => {
     unhandled.push(`${request.method} ${request.url}`);
     return HttpResponse.error();

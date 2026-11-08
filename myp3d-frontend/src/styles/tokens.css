@@ -26,6 +26,8 @@
   --backdrop-2: #ff9ec4;
   --backdrop-3: #ffc4a3;
   --backdrop-4: #9ec5ff;
+  --backdrop-image-dim: 0.45;
+  --backdrop-image-blur: 0px;
 
   --color-success: #8ee3b8;
   --color-danger: #ff8b9a;
@@ -90,6 +92,9 @@
   --space-7: 2rem;
   --space-8: 3rem;
 
+  --table-cell-padding-y: var(--space-3);
+  --table-cover-size: 44px;
+
   --radius-sm: 10px;
   --radius-md: 14px;
   --radius-lg: 22px;
@@ -120,6 +125,11 @@
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-spring: cubic-bezier(0.2, 0.9, 0.3, 1.12);
+}
+
+:root[data-density='compact'] {
+  --table-cell-padding-y: var(--space-1);
+  --table-cover-size: 32px;
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {

@@ -7,6 +7,7 @@ export interface AppEventMap {
   'preview-play': undefined;
   'backend-unreachable': undefined;
   'show-shortcuts': undefined;
+  'show-settings': undefined;
 }
 
 type AppEventName = keyof AppEventMap;
