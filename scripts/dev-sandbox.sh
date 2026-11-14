@@ -12,6 +12,12 @@ if [[ ! -x "$PYTHON_BIN" ]]; then
     exit 1
 fi
 
+if ! cmp -s "$BACKEND_DIR/requirements.txt" "$BACKEND_DIR/venv/installed-requirements.txt"; then
+    echo "Backend packages are missing or out of date. Installing them."
+    "$PYTHON_BIN" -m pip install -r "$BACKEND_DIR/requirements.txt"
+    cp "$BACKEND_DIR/requirements.txt" "$BACKEND_DIR/venv/installed-requirements.txt"
+fi
+
 if [[ "$FRONTEND_DIR/package-lock.json" -nt "$FRONTEND_DIR/node_modules/.package-lock.json" ]]; then
     echo "Frontend packages are missing or out of date. Installing them."
     (

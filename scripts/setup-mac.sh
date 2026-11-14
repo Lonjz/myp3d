@@ -22,6 +22,7 @@ if [[ ! -x "$PYTHON_BIN" ]]; then
 fi
 
 "$PYTHON_BIN" -m pip install -r "$BACKEND_DIR/requirements.txt"
+cp "$BACKEND_DIR/requirements.txt" "$BACKEND_DIR/venv/installed-requirements.txt"
 
 (
     cd "$FRONTEND_DIR"

@@ -9,6 +9,17 @@ if (-not (Test-Path $pythonExe)) {
     throw "Backend Python executable not found at $pythonExe"
 }
 
+$requirements = Join-Path $backendDir "requirements.txt"
+$installedRequirements = Join-Path $backendDir "venv\installed-requirements.txt"
+if (-not (Test-Path $installedRequirements) -or (Get-FileHash $requirements).Hash -ne (Get-FileHash $installedRequirements).Hash) {
+    Write-Host "Backend packages are missing or out of date. Installing them."
+    & $pythonExe -m pip install -r $requirements
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to install the backend packages."
+    }
+    Copy-Item $requirements $installedRequirements
+}
+
 $packageLock = Join-Path $frontendDir "package-lock.json"
 $installedLock = Join-Path $frontendDir "node_modules\.package-lock.json"
 if (-not (Test-Path $installedLock) -or (Get-Item $packageLock).LastWriteTime -gt (Get-Item $installedLock).LastWriteTime) {

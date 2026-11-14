@@ -35,6 +35,7 @@ if (-not (Test-Path $pythonExe)) {
 if ($LASTEXITCODE -ne 0) {
     throw "Failed to install the backend packages."
 }
+Copy-Item (Join-Path $backendDir "requirements.txt") (Join-Path $venvDir "installed-requirements.txt")
 
 Push-Location $frontendDir
 npm install
