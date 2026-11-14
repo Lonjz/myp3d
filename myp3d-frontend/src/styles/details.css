@@ -4,6 +4,26 @@
   gap: var(--space-5);
 }
 
+.page--fill > .details-layout {
+  flex: 1;
+  min-height: 0;
+}
+
+.page--fill .details-sidebar {
+  max-height: 100%;
+}
+
+.page--fill .details-song-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+}
+
+.page--fill .details-main {
+  align-self: stretch;
+  min-height: 0;
+}
+
 .details-sidebar {
   position: sticky;
   top: var(--space-4);
@@ -225,7 +245,8 @@
     width: 100%;
   }
 
-  .details-song-list {
+  .details-song-list,
+  .page--fill .details-song-list {
     max-height: 260px;
   }
 }

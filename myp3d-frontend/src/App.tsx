@@ -57,7 +57,7 @@ function DetailRoute({ param, back, render }: DetailRouteProps) {
 
 const KEEP_ALIVE_PAGES: KeepAlivePage[] = [
   { path: '/dashboard', element: <DashboardPage /> },
-  { path: '/query', element: <QueryPage /> },
+  { path: '/query', element: <QueryPage />, fill: true },
   { path: '/spotify', element: <SpotifyPage />, fill: true },
   { path: '/downloads', element: <DownloadsPage />, fill: true },
   { path: '/library', element: <LibraryPage />, fill: true },
@@ -68,6 +68,8 @@ const KEEP_ALIVE_PAGES: KeepAlivePage[] = [
   { path: '/sync', element: <SyncPage /> },
   { path: '/music', element: <MusicPage />, fill: true },
 ];
+
+const FILL_DETAIL_PREFIXES = ['/details/', '/albums/', '/playlists/'];
 
 function SidebarSearchButton() {
   const { open } = useSpotlight();
@@ -116,7 +118,9 @@ function App() {
   const sidebarOverlay = usePresence(isMobileSidebarOpen);
   const [sidebarPathname, setSidebarPathname] = useState(location.pathname);
   const pagePath = location.pathname.replace(/(.)\/+$/, '$1');
-  const isFillPage = KEEP_ALIVE_PAGES.some((page) => page.fill && page.path === pagePath);
+  const isFillPage =
+    KEEP_ALIVE_PAGES.some((page) => page.fill && page.path === pagePath) ||
+    FILL_DETAIL_PREFIXES.some((prefix) => pagePath.startsWith(prefix));
 
   if (sidebarPathname !== location.pathname) {
     setSidebarPathname(location.pathname);

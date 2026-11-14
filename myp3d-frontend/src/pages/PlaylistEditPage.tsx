@@ -244,7 +244,7 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
   const effectiveCoverPreview = coverPreview || (detail.has_cover ? playlistApi.coverUrl(detail, 'full') : null);
 
   return (
-    <div className="page">
+    <div className="page page--fill">
       <div className="details-layout">
         <InfiniteSidebarList<PlaylistInfo>
           backLabel="Back to playlists"
@@ -331,6 +331,7 @@ export function PlaylistEditPage({ playlistId, onBack }: PlaylistEditPageProps) 
           </div>
 
           <DataTable
+            fill
             className="album-tracks-table playlist-tracks-table library-table--selectable"
             items={visibleRows}
             getRowKey={(row) => row.key}

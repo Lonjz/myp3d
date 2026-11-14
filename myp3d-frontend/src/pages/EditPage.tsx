@@ -158,7 +158,7 @@ export function EditPage({ filename, onBack }: EditPageProps) {
   const isPlayingThis = player.isCurrent(mp3.filename) && player.state.isPlaying;
 
   return (
-    <div className="page">
+    <div className="page page--fill">
       <div className="details-layout">
         <InfiniteSidebarList<MP3Info>
           backLabel="Back to library"

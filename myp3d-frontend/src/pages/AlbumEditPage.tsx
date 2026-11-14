@@ -132,7 +132,7 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
   };
 
   return (
-    <div className="page">
+    <div className="page page--fill">
       <div className="details-layout">
         <InfiniteSidebarList<AlbumInfo>
           backLabel="Back to albums"
@@ -209,6 +209,7 @@ export function AlbumEditPage({ albumKey, onBack }: AlbumEditPageProps) {
           </div>
 
           <DataTable
+            fill
             className="album-tracks-table"
             items={albumDetail.tracks}
             getRowKey={(track) => track.filename}

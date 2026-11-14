@@ -225,7 +225,7 @@ export function QueryPage() {
   };
 
   return (
-    <div className="page">
+    <div className="page page--fill">
       <div className="query-layout">
         <aside className="query-sidebar glass">
           <form onSubmit={handleSearch} className="query-search-form">
