@@ -21,6 +21,11 @@ class TrimRequest(BaseModel):
     filenames: list[str] = Field(min_length=1)
 
 
+class RangeTrimRequest(BaseModel):
+    start: float = Field(ge=0)
+    end: float = Field(gt=0)
+
+
 class SilenceBoundsRequest(BaseModel):
     url: str = Field(min_length=1)
 

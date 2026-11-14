@@ -35,6 +35,7 @@ SMART_SILENCE_LEVEL = 33
 SMART_PAD_S = 0.1
 SCAN_WORKERS = 4
 FFMPEG_TIMEOUT_S = 120.0
+RANGE_SLACK_S = 0.05
 
 VALID_NAME = re.compile(r"[a-z0-9]+(?: [a-z0-9]+)*\.mp3")
 ARTIST_SPLIT = re.compile(r"\s*,\s*|\s+&\s+")
@@ -108,10 +109,23 @@ def silence_bounds(url: str) -> TrimRange:
         if len(downloaded) != 1:
             raise AppError(502, "Couldn't download the audio")
         samples = _decode(downloaded[0], None)
+    return _bounds(samples, "The video is silent")
+
+
+def track_silence(path: Path) -> TrimRange:
+    _ffmpeg()
+    try:
+        samples = _decode(path, None)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise AppError(500, "Couldn't read the song") from exc
+    return _bounds(samples, "The song is silent")
+
+
+def _bounds(samples: array, silent: str) -> TrimRange:
     lead = _leading_silence(samples, SMART_SILENCE_LEVEL)
     tail = _trailing_silence(samples, SMART_SILENCE_LEVEL)
     if lead is None or tail is None:
-        raise AppError(422, "The video is silent")
+        raise AppError(422, silent)
     duration = len(samples) // CHANNELS / SAMPLE_RATE
     return TrimRange(
         start=round(max(0.0, lead - SMART_PAD_S), 2),
@@ -203,13 +217,17 @@ def _trim_one(path: Path) -> None:
     cut = length - silence + KEEP_PAD_S
     if cut <= KEEP_PAD_S:
         raise ValueError("The song is all silence")
+    _cut(path, 0, cut)
 
+
+def _cut(path: Path, start: float, end: float) -> None:
     audio_part = OUTPUT_DIR / f".{path.name}.trim.part"
     joined_part = OUTPUT_DIR / f".{path.name}.trimmed.part"
+    seek = ["-ss", f"{start:.3f}"] if start > 0 else []
     try:
         result = _run(
             [
-                "-y", "-i", str(path), "-map", "0:a:0", "-c:a", "copy", "-t", f"{cut:.3f}",
+                "-y", "-i", str(path), "-map", "0:a:0", "-c:a", "copy", *seek, "-t", f"{end - start:.3f}",
                 "-id3v2_version", "0", "-write_id3v1", "0", "-f", "mp3", str(audio_part),
             ],
             capture=False,
@@ -221,6 +239,29 @@ def _trim_one(path: Path) -> None:
     finally:
         audio_part.unlink(missing_ok=True)
         joined_part.unlink(missing_ok=True)
+
+
+def trim_range(path: Path, start: float, end: float) -> None:
+    _ensure_idle()
+    _ffmpeg()
+    try:
+        length = _stream_length(path)
+        if end <= start or end > length + RANGE_SLACK_S:
+            raise AppError(400, "Pick a range inside the song")
+        if start <= RANGE_SLACK_S and end >= length - RANGE_SLACK_S:
+            raise AppError(400, "Nothing to trim")
+        _cut(path, start, min(end, length))
+    except subprocess.TimeoutExpired as exc:
+        raise AppError(504, "ffmpeg took too long") from exc
+    except PermissionError as exc:
+        raise AppError(409, IN_USE) from exc
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise AppError(500, str(exc) or "Couldn't trim the song") from exc
+    finally:
+        invalidate_library_cache()
+    with _lock:
+        if _scan is not None:
+            _scan.tracks = [track for track in _scan.tracks if track.filename != path.name]
 
 
 def _ensure_idle() -> None:

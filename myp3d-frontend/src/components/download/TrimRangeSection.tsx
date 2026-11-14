@@ -1,4 +1,4 @@
-import type { ChangeEvent, CSSProperties } from 'react';
+import type { ChangeEvent, CSSProperties, ReactNode } from 'react';
 import { ArrowLeftToLine, ArrowRightToLine, Clock, Crosshair, FoldHorizontal, Pause, Play, Repeat, Scissors, WandSparkles } from 'lucide-react';
 import { IconButton } from '../ui/IconButton';
 import { cx, formatDuration } from '../../utils/formatters';
@@ -25,6 +25,7 @@ interface TrimRangeSectionProps {
   onSmartTrim?: () => void;
   smartTrimming?: boolean;
   onPlayEdges?: () => void;
+  action?: ReactNode;
 }
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
@@ -51,6 +52,7 @@ export function TrimRangeSection({
   onSmartTrim,
   smartTrimming = false,
   onPlayEdges,
+  action,
 }: TrimRangeSectionProps) {
   const isDisabled = disabled || !duration || duration <= 0;
   const isScrubDisabled = disabled || !duration || duration <= 0 || !canScrub;
@@ -138,6 +140,7 @@ export function TrimRangeSection({
           <Clock aria-hidden="true" />
           {safeDuration > 0 ? formatDuration(safeDuration) : '--:--'}
         </span>
+        {action}
       </div>
 
       <div

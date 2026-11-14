@@ -59,7 +59,7 @@ export function QueueItemDialog({ item, closing, onClose, onSaved }: QueueItemDi
   });
 
   const videoId = getVideoIdFromUrl(url);
-  const { containerRef: playerRef, ...trim } = useTrimPreview(videoId, { start: item.start_time ?? 0, end: item.end_time ?? 0 });
+  const { containerRef: playerRef, ...trim } = useTrimPreview({ kind: 'youtube', videoId }, { start: item.start_time ?? 0, end: item.end_time ?? 0 });
   const confirming = overwriteDialogProps.open;
 
   const handleUrlChange = (nextUrl: string) => {

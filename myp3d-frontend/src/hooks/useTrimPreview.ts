@@ -1,5 +1,6 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { mp3Api } from '../api/mp3Api';
+import type { TrimRange } from '../api/mp3Api';
 import { useToast } from '../components/messages/toastContext';
 import { emitAppEvent, subscribeAppEvent } from '../utils/appEvents';
 import { errorMessage } from '../utils/formatters';
@@ -7,8 +8,11 @@ import { loadYouTubeApi } from '../utils/youtube';
 import type { YouTubePlayer } from '../utils/youtube';
 
 const EDGE_SECONDS = 3;
+const SAME_LENGTH_S = 0.05;
 
 export type TrimMode = 'range' | 'playhead';
+
+export type TrimSource = { kind: 'youtube'; videoId: string } | { kind: 'track'; filename: string };
 
 export interface TrimTiming {
   duration: number | null;
@@ -18,30 +22,120 @@ export interface TrimTiming {
   loop: boolean;
 }
 
-export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {}) {
+interface TrimPlayer {
+  currentTime: () => number;
+  seek: (seconds: number) => void;
+  play: () => void;
+  pause: () => void;
+  destroy: () => void;
+}
+
+interface PlayerEvents {
+  ready: (length: number) => void;
+  playing: (on: boolean) => void;
+  failed: (message: string) => void;
+}
+
+function createAudioPlayer(url: string, events: PlayerEvents): TrimPlayer {
+  const audio = new Audio(url);
+  audio.preload = 'auto';
+  const listeners: Array<[string, () => void]> = [
+    ['loadedmetadata', () => events.ready(Number.isFinite(audio.duration) ? audio.duration : 0)],
+    ['playing', () => events.playing(true)],
+    ['pause', () => events.playing(false)],
+    ['ended', () => events.playing(false)],
+    ['error', () => events.failed("Couldn't load the song")],
+  ];
+  listeners.forEach(([name, listener]) => audio.addEventListener(name, listener));
+  return {
+    currentTime: () => audio.currentTime,
+    seek: (seconds) => {
+      audio.currentTime = seconds;
+    },
+    play: () => {
+      audio.play().catch(() => events.playing(false));
+    },
+    pause: () => audio.pause(),
+    destroy: () => {
+      listeners.forEach(([name, listener]) => audio.removeEventListener(name, listener));
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+    },
+  };
+}
+
+function createYouTubePlayer(
+  api: Awaited<ReturnType<typeof loadYouTubeApi>>,
+  container: HTMLElement,
+  videoId: string,
+  events: PlayerEvents,
+): TrimPlayer {
+  container.innerHTML = '';
+  const target = document.createElement('div');
+  target.className = 'query-player-iframe';
+  container.appendChild(target);
+
+  const player: YouTubePlayer = new api.Player(target, {
+    videoId,
+    height: '100%',
+    width: '100%',
+    playerVars: {
+      autoplay: 0,
+      controls: 0,
+      modestbranding: 1,
+      rel: 0,
+      playsinline: 1,
+      origin: window.location.origin,
+    },
+    events: {
+      onReady: () => events.ready(player.getDuration?.() ?? 0),
+      onStateChange: ({ data }) => {
+        if (data === 1) events.playing(true);
+        else if (data === 2 || data === 0) events.playing(false);
+      },
+      onError: () => events.failed('This video cannot be embedded for preview.'),
+    },
+  });
+
+  return {
+    currentTime: () => player.getCurrentTime?.() ?? 0,
+    seek: (seconds) => player.seekTo?.(seconds, true),
+    play: () => player.playVideo?.(),
+    pause: () => player.pauseVideo?.(),
+    destroy: () => player.destroy?.(),
+  };
+}
+
+export function useTrimPreview(source: TrimSource, initial: Partial<TrimTiming> = {}) {
+  const sourceKey = source.kind === 'youtube' ? source.videoId : source.filename;
+  const isTrack = source.kind === 'track';
+
   const [duration, setDuration] = useState<number | null>(initial.duration ?? null);
   const [start, setStart] = useState(initial.start ?? 0);
   const [end, setEnd] = useState(initial.end ?? 0);
   const [isReady, setIsReady] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [failure, setFailure] = useState<{ videoId: string; message: string } | null>(null);
+  const [failure, setFailure] = useState<{ key: string; message: string } | null>(null);
   const [playhead, setPlayhead] = useState(0);
   const [mode, setMode] = useState<TrimMode>(initial.mode ?? 'range');
   const [loop, setLoop] = useState(initial.loop ?? true);
   const [smartTrimming, setSmartTrimming] = useState(false);
+  const [attachKey, setAttachKey] = useState(0);
   const { showError } = useToast();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const playerRef = useRef<YouTubePlayer | null>(null);
+  const playerRef = useRef<TrimPlayer | null>(null);
   const monitorRef = useRef<number | null>(null);
   const startRef = useRef(start);
   const endRef = useRef(end);
   const isPlayingRef = useRef(isPlaying);
   const loopRef = useRef(loop);
   const edgeRef = useRef<'head' | 'tail' | null>(null);
-  const videoIdRef = useRef(videoId);
+  const sourceKeyRef = useRef(sourceKey);
+  const readyKeyRef = useRef<string | null>(null);
 
-  const previewError = failure?.videoId === videoId ? failure.message : null;
+  const previewError = failure?.key === sourceKey ? failure.message : null;
   const hasDuration = Boolean(duration && duration > 0);
   const hasTrimRange = hasDuration && end > start;
   const isFullRange = hasDuration && start <= 0.01 && end >= (duration ?? 0) - 0.01;
@@ -52,8 +146,8 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
     endRef.current = end;
     isPlayingRef.current = isPlaying;
     loopRef.current = loop;
-    videoIdRef.current = videoId;
-  }, [start, end, isPlaying, loop, videoId]);
+    sourceKeyRef.current = sourceKey;
+  }, [start, end, isPlaying, loop, sourceKey]);
 
   const reset = (nextDuration: number | null) => {
     setDuration(nextDuration);
@@ -70,12 +164,12 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
   };
 
   const destroyPlayer = () => {
-    playerRef.current?.destroy?.();
+    playerRef.current?.destroy();
     playerRef.current = null;
   };
 
   const stopAt = (seconds: number) => {
-    playerRef.current?.pauseVideo?.();
+    playerRef.current?.pause();
     setIsPlaying(false);
     setPlayhead(seconds);
     stopMonitor();
@@ -85,13 +179,13 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
     stopMonitor();
     monitorRef.current = window.setInterval(() => {
       if (!playerRef.current) return;
-      const current = playerRef.current.getCurrentTime?.() ?? 0;
+      const current = playerRef.current.currentTime();
       setPlayhead(current);
       const currentStart = startRef.current;
       const currentEnd = endRef.current;
       if (edgeRef.current === 'head' && current >= currentStart + EDGE_SECONDS) {
         edgeRef.current = 'tail';
-        playerRef.current.seekTo?.(currentEnd - EDGE_SECONDS, true);
+        playerRef.current.seek(currentEnd - EDGE_SECONDS);
         setPlayhead(currentEnd - EDGE_SECONDS);
         return;
       }
@@ -102,9 +196,9 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
       }
       if (currentEnd > currentStart && current >= currentEnd) {
         if (loopRef.current) {
-          playerRef.current.seekTo?.(currentStart, true);
+          playerRef.current.seek(currentStart);
           if (isPlayingRef.current) {
-            playerRef.current.playVideo?.();
+            playerRef.current.play();
           }
           setPlayhead(currentStart);
         } else {
@@ -115,25 +209,25 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
   };
 
   const playFrom = (seconds: number) => {
-    playerRef.current?.seekTo?.(seconds, true);
+    playerRef.current?.seek(seconds);
     setPlayhead(seconds);
-    playerRef.current?.playVideo?.();
+    playerRef.current?.play();
     setIsPlaying(true);
     startMonitor();
   };
 
   const pause = () => {
     edgeRef.current = null;
-    playerRef.current?.pauseVideo?.();
+    playerRef.current?.pause();
     stopMonitor();
     setIsPlaying(false);
   };
 
-  const canScrub = Boolean(videoId && isReady && !previewError);
-  const canPlay = Boolean(videoId && isReady && hasTrimRange && !previewError);
+  const canScrub = Boolean(sourceKey && isReady && !previewError);
+  const canPlay = Boolean(sourceKey && isReady && hasTrimRange && !previewError);
   const playHint = previewError
     ? previewError
-    : !videoId
+    : !sourceKey
       ? undefined
       : !isReady
         ? 'Loading preview...'
@@ -141,78 +235,67 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
           ? 'Select a trim range to enable playback.'
           : undefined;
 
-  const handlePlayerReady = useEffectEvent(() => {
+  const handlePlayerReady = useEffectEvent((length: number) => {
     setIsReady(true);
-    const playerDuration = playerRef.current?.getDuration?.() ?? 0;
-    if (playerDuration > 0 && !hasDuration) {
-      setDuration(playerDuration);
-      if (endRef.current <= 0) setEnd(playerDuration);
+    if (isTrack) {
+      const sameFile = readyKeyRef.current === sourceKey && hasDuration && Math.abs((duration ?? 0) - length) < SAME_LENGTH_S;
+      readyKeyRef.current = sourceKey;
+      if (!sameFile && length > 0) reset(length);
+      return;
     }
-    playerRef.current?.seekTo?.(start || 0, true);
-    playerRef.current?.pauseVideo?.();
+    if (length > 0 && !hasDuration) {
+      setDuration(length);
+      if (endRef.current <= 0) setEnd(length);
+    }
+    playerRef.current?.seek(start || 0);
+    playerRef.current?.pause();
     setPlayhead(start);
   });
 
-  const handlePlayerStateChange = useEffectEvent((state: number) => {
-    if (state === 1) {
+  const handlePlayingChange = useEffectEvent((on: boolean) => {
+    setIsPlaying(on);
+    if (on) {
       emitAppEvent('preview-play');
-      setIsPlaying(true);
       startMonitor();
-    } else if (state === 2 || state === 0) {
-      setIsPlaying(false);
+    } else {
       stopMonitor();
     }
   });
 
   useEffect(() => {
-    if (!videoId || !containerRef.current) {
+    const container = containerRef.current;
+    if (!sourceKey || (!isTrack && !container)) {
       destroyPlayer();
       stopMonitor();
       return undefined;
     }
 
     let cancelled = false;
+    const events: PlayerEvents = {
+      ready: (length) => {
+        if (!cancelled) handlePlayerReady(length);
+      },
+      playing: (on) => {
+        if (!cancelled) handlePlayingChange(on);
+      },
+      failed: (message) => {
+        if (!cancelled) setFailure({ key: sourceKey, message });
+      },
+    };
 
-    loadYouTubeApi()
-      .then((YT) => {
-        if (cancelled || !containerRef.current) return;
-
-        destroyPlayer();
-        containerRef.current.innerHTML = '';
-        const playerTarget = document.createElement('div');
-        playerTarget.className = 'query-player-iframe';
-        containerRef.current.appendChild(playerTarget);
-
-        playerRef.current = new YT.Player(playerTarget, {
-          videoId,
-          height: '100%',
-          width: '100%',
-          playerVars: {
-            autoplay: 0,
-            controls: 0,
-            modestbranding: 1,
-            rel: 0,
-            playsinline: 1,
-            origin: window.location.origin,
-          },
-          events: {
-            onReady: () => {
-              if (!cancelled) handlePlayerReady();
-            },
-            onStateChange: (event: { data: number }) => {
-              if (!cancelled) handlePlayerStateChange(event.data);
-            },
-            onError: () => {
-              if (cancelled) return;
-              setFailure({ videoId, message: 'This video cannot be embedded for preview.' });
-            },
-          },
+    if (isTrack) {
+      playerRef.current = createAudioPlayer(mp3Api.getFileUrl(sourceKey), events);
+    } else {
+      loadYouTubeApi()
+        .then((api) => {
+          if (cancelled || !container) return;
+          destroyPlayer();
+          playerRef.current = createYouTubePlayer(api, container, sourceKey, events);
+        })
+        .catch((err: Error) => {
+          if (!cancelled) setFailure({ key: sourceKey, message: err.message || 'Preview unavailable' });
         });
-      })
-      .catch((err: Error) => {
-        if (cancelled) return;
-        setFailure({ videoId, message: err.message || 'Preview unavailable' });
-      });
+    }
 
     return () => {
       cancelled = true;
@@ -221,9 +304,9 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
       setIsReady(false);
       setIsPlaying(false);
     };
-  }, [videoId]);
+  }, [sourceKey, isTrack, attachKey]);
 
-  useEffect(() => subscribeAppEvent('player-play', () => playerRef.current?.pauseVideo?.()), []);
+  useEffect(() => subscribeAppEvent('player-play', () => playerRef.current?.pause()), []);
 
   const togglePlay = () => {
     if (!playerRef.current || !canPlay) return;
@@ -242,9 +325,9 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
     if (!playerRef.current || !canScrub) {
       return;
     }
-    playerRef.current.seekTo?.(value, true);
+    playerRef.current.seek(value);
     if (isPlayingRef.current) {
-      playerRef.current.playVideo?.();
+      playerRef.current.play();
       startMonitor();
     }
   };
@@ -255,25 +338,35 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
     playFrom(start);
   };
 
+  const findSilence = (key: string): Promise<TrimRange> =>
+    isTrack ? mp3Api.trackSilence(key) : mp3Api.silenceBounds(`https://www.youtube.com/watch?v=${key}`);
+
   const smartTrim = async () => {
-    if (!videoId) return;
-    const requested = videoId;
+    if (!sourceKey) return;
+    const requested = sourceKey;
     pause();
     setSmartTrimming(true);
     try {
-      const range = await mp3Api.silenceBounds(`https://www.youtube.com/watch?v=${requested}`);
-      if (requested !== videoIdRef.current) return;
+      const range = await findSilence(requested);
+      if (requested !== sourceKeyRef.current) return;
       const total = hasDuration && duration ? duration : range.duration;
-      const nextEnd = Math.min(range.end, total);
       setDuration(total);
       setStart(range.start);
-      setEnd(nextEnd);
+      setEnd(Math.min(range.end, total));
     } catch (err) {
       showError(errorMessage(err, "Couldn't find the silence"));
     } finally {
       setSmartTrimming(false);
     }
   };
+
+  const release = () => {
+    pause();
+    destroyPlayer();
+    setIsReady(false);
+  };
+
+  const reload = () => setAttachKey((key) => key + 1);
 
   return {
     containerRef,
@@ -289,6 +382,8 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
     shouldTrim,
     reset,
     pause,
+    release,
+    reload,
     trimRangeProps: {
       duration,
       start,
@@ -307,7 +402,7 @@ export function useTrimPreview(videoId: string, initial: Partial<TrimTiming> = {
       onPlayheadChange: changePlayhead,
       onStartChange: setStart,
       onEndChange: setEnd,
-      onSmartTrim: videoId ? () => void smartTrim() : undefined,
+      onSmartTrim: sourceKey ? () => void smartTrim() : undefined,
       smartTrimming,
       onPlayEdges: playEdges,
     },

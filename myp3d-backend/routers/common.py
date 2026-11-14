@@ -8,6 +8,7 @@ from services.cover_service import CoverSize, get_album_cover, get_cover_variant
 from services.filenames import is_track_name
 
 CACHE_CONTROL_HEADER = {"Cache-Control": "public, max-age=300"}
+REVALIDATE_HEADER = {"Cache-Control": "no-cache"}
 IMMUTABLE_CACHE_HEADER = {"Cache-Control": "public, max-age=31536000, immutable"}
 
 

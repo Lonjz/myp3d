@@ -42,7 +42,7 @@ export function QueryPage() {
   const [selectedResult, setSelectedResult] = useState<YouTubeSearchResult | null>(initialDraft.selectedResult ?? null);
   const [selectedVideoId, setSelectedVideoId] = useState(initialDraft.selectedVideoId ?? '');
 
-  const trim = useTrimPreview(selectedVideoId, {
+  const trim = useTrimPreview({ kind: 'youtube', videoId: selectedVideoId }, {
     duration: initialDraft.videoDuration,
     start: initialDraft.trimStart,
     end: initialDraft.trimEnd,

@@ -55,6 +55,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const currentTrack = state.queue[state.index] ?? null;
   const currentFilename = currentTrack?.filename ?? null;
+  const currentDuration = currentTrack?.duration ?? null;
+  const loadedAudioRef = useRef({ filename: currentFilename, duration: currentDuration });
 
   const [time, setTime] = useState<PlayerTimeValue>(() => ({
     currentTime: initialPosition,
@@ -115,6 +117,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       audio.src = url;
     }
   }, [currentFilename]);
+
+  const reloadAudio = useEffectEvent(() => {
+    const audio = audioRef.current;
+    if (!audio?.getAttribute('src')) return;
+    switchingRef.current = true;
+    pendingSeekRef.current = audio.currentTime;
+    audio.load();
+    if (state.isPlaying) audio.play().catch(() => dispatch({ type: 'setPlaying', playing: false }));
+  });
+
+  useEffect(() => {
+    const loaded = loadedAudioRef.current;
+    loadedAudioRef.current = { filename: currentFilename, duration: currentDuration };
+    if (currentFilename && loaded.filename === currentFilename && loaded.duration !== currentDuration) reloadAudio();
+  }, [currentFilename, currentDuration]);
 
   useEffect(() => {
     const audio = audioRef.current;

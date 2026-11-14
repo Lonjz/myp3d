@@ -70,7 +70,8 @@
 .query-preview-card,
 .download-form,
 .details-sidebar,
-.edit-container {
+.edit-container,
+.edit-trim {
   animation: panel-rise var(--duration-rise) var(--ease-spring) backwards;
 }
 
@@ -84,7 +85,8 @@
   animation-delay: 120ms;
 }
 
-.details-main .data-table > .library-table-wrap {
+.details-main .data-table > .library-table-wrap,
+.edit-trim {
   animation-delay: 180ms;
 }
 

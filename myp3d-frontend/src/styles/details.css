@@ -104,6 +104,11 @@
   border-radius: var(--radius-xl);
 }
 
+.edit-trim {
+  padding: var(--space-5);
+  border-radius: var(--radius-xl);
+}
+
 .cover-preview {
   position: relative;
   flex-shrink: 0;

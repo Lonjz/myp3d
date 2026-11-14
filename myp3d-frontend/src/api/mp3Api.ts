@@ -343,6 +343,14 @@ export const mp3Api = {
     return apiFetch('/youtube/silence', jsonInit('POST', { url }), "Couldn't find the silence");
   },
 
+  trackSilence(filename: string): Promise<TrimRange> {
+    return apiFetch(`${trackPath(filename)}/silence`, undefined, "Couldn't find the silence");
+  },
+
+  trimTrack(filename: string, start: number, end: number): Promise<MP3Info> {
+    return apiFetch(`${trackPath(filename)}/trim`, jsonInit('POST', { start, end }), "Couldn't trim the song");
+  },
+
   getInfo(filename: string): Promise<MP3Info> {
     return apiFetch(`${trackPath(filename)}/info`, undefined, 'Failed to fetch MP3 info');
   },

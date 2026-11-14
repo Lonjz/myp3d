@@ -4,6 +4,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 
+from models.health import RangeTrimRequest, TrimRange
 from models.library import (
     BulkFailure,
     BulkMetadataUpdate,
@@ -15,8 +16,8 @@ from models.library import (
     PaginatedMP3Response,
     PaginationMeta,
 )
-from routers.common import CACHE_CONTROL_HEADER, cache_headers, cover_response, read_cover, require_mp3, track_path
-from services import favorite_service, playlist_service, track_records
+from routers.common import REVALIDATE_HEADER, cache_headers, cover_response, read_cover, require_mp3, track_path
+from services import favorite_service, health_service, playlist_service, track_records
 from services.cover_service import CoverSize, set_cover_images
 from services.mp3_service import (
     IN_USE,
@@ -126,12 +127,24 @@ def bulk_delete(payload: BulkTracksRequest):
 
 @router.get("/{filename}")
 def get_mp3(filename: str):
-    return FileResponse(require_mp3(filename), media_type="audio/mpeg", filename=filename, headers=CACHE_CONTROL_HEADER)
+    return FileResponse(require_mp3(filename), media_type="audio/mpeg", filename=filename, headers=REVALIDATE_HEADER)
 
 
 @router.get("/{filename}/info", response_model=MP3Info)
 def get_mp3_metadata(filename: str):
     return with_real_dates([get_mp3_info(require_mp3(filename))])[0]
+
+
+@router.post("/{filename}/trim", response_model=MP3Info)
+def trim_mp3(filename: str, payload: RangeTrimRequest):
+    filepath = require_mp3(filename)
+    health_service.trim_range(filepath, payload.start, payload.end)
+    return with_real_dates([get_mp3_info(filepath)])[0]
+
+
+@router.get("/{filename}/silence", response_model=TrimRange)
+def get_mp3_silence(filename: str):
+    return health_service.track_silence(require_mp3(filename))
 
 
 @router.put("/{filename}/metadata")

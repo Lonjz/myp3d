@@ -1,24 +1,27 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DiscAlbum, FileAudio, MicVocal, Music, Pause, Play, Save } from 'lucide-react';
+import { DiscAlbum, FileAudio, MicVocal, Music, Pause, Play, Save, ScissorsLineDashed, Undo2 } from 'lucide-react';
 import { mp3Api } from '../api/mp3Api';
 import type { MP3Info } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
 import { CoverEditButton } from '../components/cover/CoverEditButton';
 import { useCoverImageCrop } from '../components/cover/useCoverImageCrop';
+import { TrimRangeSection } from '../components/download/TrimRangeSection';
 import { useToast } from '../components/messages/toastContext';
 import { InfiniteSidebarList } from '../components/sidebar/InfiniteSidebarList';
 import { usePlayer } from '../components/player/playerContext';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { IconButton } from '../components/ui/IconButton';
 import { IconField } from '../components/ui/IconField';
 import { Spinner } from '../components/ui/Spinner';
 import { EmptyState, LoadFailed } from '../components/ui/EmptyState';
 import { useDetail } from '../hooks/useDetail';
+import { useTrimPreview } from '../hooks/useTrimPreview';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { emitAppEvent, subscribeAppEvent } from '../utils/appEvents';
 import { fetchMp3Info } from '../utils/detailCache';
 import { normalizeFilenameInput, stripMp3Extension } from '../utils/filenames';
-import { errorMessage } from '../utils/formatters';
+import { errorMessage, formatDuration } from '../utils/formatters';
 import { DiscardChangesDialog } from '../components/ui/DiscardChangesDialog';
 import { useSaveShortcut } from '../hooks/useSaveShortcut';
 
@@ -79,6 +82,32 @@ export function EditPage({ filename, onBack }: EditPageProps) {
   const { blocker, allowNavigation } = useUnsavedChangesGuard(isDirty);
   useSaveShortcut(() => void handleSave(), !(saving || !current || !isDirty));
   const player = usePlayer();
+  const trim = useTrimPreview({ kind: 'track', filename });
+  const [trimming, setTrimming] = useState(false);
+  const [confirmingTrim, setConfirmingTrim] = useState(false);
+  const busy = saving || trimming || !current;
+
+  const handleTrim = async () => {
+    setConfirmingTrim(false);
+    if (!mp3 || !current) return;
+    const { start, end } = trim;
+    trim.release();
+    if (player.isCurrent(filename)) player.pause();
+    setTrimming(true);
+    clearToast();
+    try {
+      const trimmed = await mp3Api.trimTrack(filename, start, end);
+      player.trackUpdated(filename, trimmed);
+      emitAppEvent('library-changed');
+      showSuccess(`Trimmed to ${formatDuration(trimmed.duration)}`);
+      await reload();
+    } catch (err) {
+      showError(errorMessage(err, "Couldn't trim the song"));
+    } finally {
+      setTrimming(false);
+      trim.reload();
+    }
+  };
 
   const handleSave = async () => {
     if (!mp3 || !current) return;
@@ -201,10 +230,39 @@ export function EditPage({ filename, onBack }: EditPageProps) {
             </div>
           </div>
 
+          <div className="edit-trim glass">
+            <TrimRangeSection
+              {...trim.trimRangeProps}
+              disabled={busy}
+              canPlay={trim.trimRangeProps.canPlay && !busy}
+              action={
+                <IconButton
+                  icon={ScissorsLineDashed}
+                  label="Trim song"
+                  onClick={() => setConfirmingTrim(true)}
+                  busy={trimming}
+                  disabled={busy || isDirty || !trim.shouldTrim}
+                />
+              }
+            />
+          </div>
         </section>
       </div>
 
       <DiscardChangesDialog blocker={blocker} />
+
+      <ConfirmDialog
+        open={confirmingTrim}
+        icon={ScissorsLineDashed}
+        title={`Trim "${mp3.title || mp3.filename}" to ${formatDuration(trim.end - trim.start)}?`}
+        cancelLabel="Keep"
+        cancelIcon={Undo2}
+        confirmLabel="Trim"
+        confirmIcon={ScissorsLineDashed}
+        tone="danger"
+        onCancel={() => setConfirmingTrim(false)}
+        onConfirm={() => void handleTrim()}
+      />
 
       <CoverCropModal {...cropModalProps} />
     </div>
