@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from models.health import SilenceBoundsRequest, TrimRange
 from models.library import TagSuggestion
-from models.queue import YouTubePlaylist, YouTubeSearchResponse
+from models.queue import YouTubeArtist, YouTubePlaylist, YouTubeSearchResponse
 from services import health_service, ytmusic_service
 from services.errors import AppError
 
@@ -20,6 +20,21 @@ def youtube_search(
 @router.get("/youtube/playlist", response_model=YouTubePlaylist)
 def youtube_playlist(url: str = Query(..., min_length=1, description="YouTube playlist link")):
     return ytmusic_service.playlist(url)
+
+
+@router.get("/youtube/artist", response_model=YouTubeArtist)
+def youtube_artist(name: str = Query(..., min_length=1, description="Artist name")):
+    return ytmusic_service.artist(name)
+
+
+@router.get("/youtube/album/{browse_id}", response_model=YouTubePlaylist)
+def youtube_album(browse_id: str):
+    return ytmusic_service.album(browse_id)
+
+
+@router.get("/youtube/similar", response_model=YouTubePlaylist)
+def youtube_similar(filename: str = Query(..., min_length=1, description="Library song file name")):
+    return ytmusic_service.similar(filename)
 
 
 @router.post("/youtube/silence", response_model=TrimRange)

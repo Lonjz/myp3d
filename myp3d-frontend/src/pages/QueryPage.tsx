@@ -170,6 +170,17 @@ export function QueryPage() {
   };
 
   useConsumeSearchParams((params) => {
+    const incomingArtist = params.get('artist');
+    const incomingSimilar = params.get('similar');
+    if (incomingArtist) {
+      void list.openArtist(incomingArtist);
+      return true;
+    }
+    if (incomingSimilar) {
+      void list.openSimilar(incomingSimilar);
+      return true;
+    }
+
     const incomingUrl = params.get('url');
     const incomingQuery = params.get('q') ?? params.get('playlist');
     if (!incomingUrl && !incomingQuery) return false;

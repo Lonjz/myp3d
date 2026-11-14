@@ -71,6 +71,21 @@ export interface YouTubePlaylist {
   unavailable: number;
 }
 
+export interface YouTubeRelease {
+  browse_id: string;
+  title: string;
+  year: string | null;
+  kind: 'album' | 'single' | 'ep';
+  thumbnail_url: string | null;
+  in_library: boolean;
+}
+
+export interface YouTubeArtist {
+  name: string;
+  songs: YouTubeSearchResult[];
+  releases: YouTubeRelease[];
+}
+
 export interface LibraryNames {
   artists: string[];
   albums: string[];
@@ -302,6 +317,18 @@ export const mp3Api = {
 
   youtubePlaylist(url: string): Promise<YouTubePlaylist> {
     return apiFetch(`/youtube/playlist?${new URLSearchParams({ url }).toString()}`, undefined, "Couldn't open the playlist");
+  },
+
+  youtubeArtist(name: string): Promise<YouTubeArtist> {
+    return apiFetch(`/youtube/artist?${new URLSearchParams({ name }).toString()}`, undefined, "Couldn't load the artist");
+  },
+
+  youtubeAlbum(browseId: string): Promise<YouTubePlaylist> {
+    return apiFetch(`/youtube/album/${encodeURIComponent(browseId)}`, undefined, "Couldn't load the album");
+  },
+
+  youtubeSimilar(filename: string): Promise<YouTubePlaylist> {
+    return apiFetch(`/youtube/similar?${new URLSearchParams({ filename }).toString()}`, undefined, "Couldn't find similar songs");
   },
 
   libraryNames(): Promise<LibraryNames> {

@@ -2,12 +2,12 @@ import re
 import threading
 import unicodedata
 from functools import lru_cache
-from typing import Optional
+from typing import Callable, Optional, TypeVar
 
 from ytmusicapi import YTMusic
 
 from models.library import TagSuggestion
-from models.queue import YouTubePlaylist, YouTubeSearchResult
+from models.queue import YouTubeArtist, YouTubePlaylist, YouTubeRelease, YouTubeSearchResult
 from services.errors import AppError
 from services.mp3_service import list_mp3_infos
 from services.youtube_service import playlist_entries, search_youtube
@@ -19,8 +19,13 @@ CLEAN_PHRASES = ("clean", "radio edit", "censored")
 SONG_VIDEO_TYPE = "MUSIC_VIDEO_TYPE_ATV"
 COVER_SIZE = "=w544-h544"
 SUGGESTION_LIMIT = 5
+RADIO_LIMIT = 50
+ALBUM_ID_PATTERN = re.compile(r"MPREb_[A-Za-z0-9_-]+")
+RELEASE_KINDS = {"album": "album", "single": "single", "ep": "ep"}
+UNREACHABLE = "Couldn't reach YouTube Music"
 
 LibraryIndex = tuple[set[str], set[tuple[str, str]]]
+T = TypeVar("T")
 
 _ytmusic = threading.local()
 
@@ -109,6 +114,7 @@ def parse_entry(entry: dict, kind: Optional[str] = None) -> Optional[dict]:
         return None
     thumbnails = entry.get("thumbnails") or entry.get("thumbnail") or []
     resolved = kind or ("song" if entry.get("videoType") == SONG_VIDEO_TYPE else "video")
+    explicit = entry.get("isExplicit")
     return {
         "video_id": video_id,
         "url": f"https://www.youtube.com/watch?v={video_id}",
@@ -117,7 +123,7 @@ def parse_entry(entry: dict, kind: Optional[str] = None) -> Optional[dict]:
         "album": _album_name(entry.get("album")),
         "duration": _seconds(entry),
         "thumbnail_url": thumbnails[-1].get("url") if thumbnails else None,
-        "explicit": bool(entry.get("isExplicit")) if resolved == "song" else None,
+        "explicit": bool(explicit) if resolved == "song" and explicit is not None else None,
         "kind": resolved,
     }
 
@@ -253,3 +259,119 @@ def _youtube_playlist(playlist_id: str) -> YouTubePlaylist:
     index = library_index()
     tracks = [to_result(from_youtube(entry), index) for entry in entries]
     return YouTubePlaylist(title=title, tracks=tracks, unavailable=unavailable)
+
+
+def _reachable(fetch: Callable[[str], T], argument: str) -> T:
+    try:
+        return fetch(argument)
+    except AppError:
+        raise
+    except Exception as exc:
+        raise AppError(502, UNREACHABLE) from exc
+
+
+def _find_artist(name: str) -> dict:
+    wanted = normalize(name)
+    hits = [hit for hit in client().search(name, filter="artists", limit=5) if hit.get("browseId")]
+    if not hits:
+        raise AppError(404, "Couldn't find that artist on YouTube Music")
+    return next((hit for hit in hits if normalize(hit.get("artist")) == wanted), hits[0])
+
+
+def _top_songs(section: dict) -> list[dict]:
+    entries = section.get("results") or []
+    if not section.get("browseId"):
+        return entries
+    try:
+        return client().get_playlist(section["browseId"], limit=None).get("tracks") or entries
+    except Exception:
+        return entries
+
+
+def _release_items(section: dict) -> list[dict]:
+    items = section.get("results") or []
+    if not section.get("browseId") or not section.get("params"):
+        return items
+    try:
+        return client().get_artist_albums(section["browseId"], section["params"], limit=None) or items
+    except Exception:
+        return items
+
+
+def _releases(data: dict, albums: set[str]) -> list[YouTubeRelease]:
+    releases: dict[str, YouTubeRelease] = {}
+    for key, default in (("albums", "album"), ("singles", "single")):
+        for item in _release_items(data.get(key) or {}):
+            browse_id, title = item.get("browseId"), item.get("title")
+            if not browse_id or not title or browse_id in releases:
+                continue
+            thumbnails = item.get("thumbnails") or []
+            year = item.get("year")
+            releases[browse_id] = YouTubeRelease(
+                browse_id=browse_id,
+                title=title,
+                year=str(year) if year else None,
+                kind=RELEASE_KINDS.get(str(item.get("type") or "").lower(), default),
+                thumbnail_url=thumbnails[-1].get("url") if thumbnails else None,
+                in_library=normalize(title) in albums,
+            )
+    return list(releases.values())
+
+
+def _artist(name: str) -> YouTubeArtist:
+    hit = _find_artist(name)
+    data = client().get_artist(hit["browseId"])
+    songs, _ = _results(_top_songs(data.get("songs") or {}))
+    albums = {normalize(info.album) for info in list_mp3_infos() if info.album}
+    return YouTubeArtist(name=data.get("name") or hit.get("artist") or name, songs=songs, releases=_releases(data, albums))
+
+
+def artist(name: str) -> YouTubeArtist:
+    if not name.strip():
+        raise AppError(400, "Artist name is required")
+    return _reachable(_artist, name.strip())
+
+
+def _album(browse_id: str) -> YouTubePlaylist:
+    data = client().get_album(browse_id)
+    title = data.get("title") or ""
+    thumbnails = data.get("thumbnails") or []
+    entries = [
+        {**track, "album": title, "thumbnails": thumbnails, "artists": track.get("artists") or data.get("artists")}
+        for track in data.get("tracks") or []
+    ]
+    tracks, unavailable = _results(entries, "song")
+    return YouTubePlaylist(title=title, tracks=tracks, unavailable=unavailable)
+
+
+def album(browse_id: str) -> YouTubePlaylist:
+    if not ALBUM_ID_PATTERN.fullmatch(browse_id):
+        raise AppError(400, "Invalid album")
+    return _reachable(_album, browse_id)
+
+
+def _seed_song(title: str, artist_name: Optional[str]) -> dict:
+    wanted = song_key(title, artist_name)
+    songs = search_entries(" ".join(filter(None, [title, artist_name])), "songs", 10)
+    if not songs:
+        raise AppError(404, "Couldn't find that song on YouTube Music")
+    return next(
+        (song for song in songs if song_key(song["title"], song["artists"][0] if song["artists"] else None) == wanted),
+        songs[0],
+    )
+
+
+def _similar(filename: str) -> YouTubePlaylist:
+    track = next((info for info in list_mp3_infos() if info.filename == filename), None)
+    if track is None:
+        raise AppError(404, "MP3 file not found")
+    title = track.title or filename.removesuffix(".mp3")
+    seed = _seed_song(title, track.artist)
+    radio = client().get_watch_playlist(seed["video_id"], radio=True, limit=RADIO_LIMIT)
+    entries = [entry for entry in radio.get("tracks") or [] if entry.get("videoId") != seed["video_id"]]
+    tracks, unavailable = _results(entries)
+    return YouTubePlaylist(title=title, tracks=tracks, unavailable=unavailable)
+
+
+def similar(filename: str) -> YouTubePlaylist:
+    return _reachable(_similar, filename)

@@ -92,3 +92,18 @@ class YouTubePlaylist(BaseModel):
     title: str = ""
     tracks: list[YouTubeSearchResult]
     unavailable: int = 0
+
+
+class YouTubeRelease(BaseModel):
+    browse_id: str
+    title: str
+    year: Optional[str] = None
+    kind: Literal["album", "single", "ep"] = "album"
+    thumbnail_url: Optional[str] = None
+    in_library: bool = False
+
+
+class YouTubeArtist(BaseModel):
+    name: str
+    songs: list[YouTubeSearchResult]
+    releases: list[YouTubeRelease]

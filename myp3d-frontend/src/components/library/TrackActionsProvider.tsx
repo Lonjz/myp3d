@@ -7,10 +7,12 @@ import {
   ListEnd,
   ListPlus,
   ListStart,
+  MicVocal,
   Music,
   Pencil,
   Play,
   Shuffle,
+  Sparkles,
   Star,
   StarOff,
   Trash2,
@@ -125,6 +127,10 @@ export function TrackActionsProvider({ children }: { children: ReactNode }) {
           icon: favorite ? StarOff : Star,
           run: () => void toggleFavorite(track.filename),
         },
+        { id: 'similar', label: 'Similar songs', icon: Sparkles, run: () => navigate(`/query?similar=${encodeURIComponent(track.filename)}`) },
+        ...(track.artist
+          ? [{ id: 'artist', label: 'More from artist', icon: MicVocal, run: () => navigate(`/query?artist=${encodeURIComponent(track.artist ?? '')}`) }]
+          : []),
         { id: 'edit', label: 'Edit', icon: Pencil, run: () => navigate(`/details/${encodeURIComponent(track.filename)}`) },
         { id: 'download', label: 'Download', icon: Download, run: () => downloadFile(track.filename) },
         ...extra,
