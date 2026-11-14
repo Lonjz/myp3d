@@ -10,7 +10,7 @@ from models.library import TagSuggestion
 from models.queue import YouTubeArtist, YouTubePlaylist, YouTubeRelease, YouTubeSearchResult
 from services.errors import AppError
 from services.mp3_service import list_mp3_infos
-from services.youtube_service import playlist_entries, search_youtube
+from services.youtube_service import playlist_entries
 
 FEAT_PATTERN = re.compile(r"\s*[(\[](?:feat\.?|ft\.?|featuring|with)\s[^)\]]*[)\]]", re.I)
 PLAYLIST_ID_PATTERN = re.compile(r"[?&]list=([A-Za-z0-9_-]+)")
@@ -178,12 +178,9 @@ def search(query: str, limit: int) -> list[YouTubeSearchResult]:
         songs = best_songs(search_entries(wanted, "songs", limit), wanted)
         listed = {song["video_id"] for song in songs}
         videos = [video for video in search_entries(wanted, "videos", limit // 2) if video["video_id"] not in listed]
-        raws = [*songs, *videos]
-    except Exception:
-        try:
-            raws = [from_youtube(result) for result in search_youtube(wanted, limit)]
-        except Exception as exc:
-            raise AppError(502, "YouTube search failed") from exc
+    except Exception as exc:
+        raise AppError(502, UNREACHABLE) from exc
+    raws = [*songs, *videos]
     index = library_index()
     return [to_result(raw, index) for raw in raws]
 

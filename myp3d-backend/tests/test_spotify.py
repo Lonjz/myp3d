@@ -81,12 +81,12 @@ def test_match_searches_videos_when_songs_are_weak(client, library, web, ytmusic
     assert body["candidates"][0]["kind"] == "video"
 
 
-def test_match_falls_back_to_youtube_search(client, library, web, ytmusic, youtube):
+def test_match_reports_youtube_music_being_down(client, library, web, ytmusic, youtube):
     web.spotify("track", TRACK_ID, spotify_track(TRACK_ID, "Rare Song", ["Unknown Band"]))
     ytmusic.error = RuntimeError("ytmusic is down")
-    youtube.search_results = [youtube.add_video("Unknown Band - Rare Song", uploader="Unknown Band")]
-    body = client.get(f"/spotify/tracks/{TRACK_ID}", params={"album": "x"}).json()
-    assert body["candidates"][0]["title"] == "Unknown Band - Rare Song"
+    response = client.get(f"/spotify/tracks/{TRACK_ID}", params={"album": "x"})
+    assert (response.status_code, response.json()["detail"]) == (502, "Couldn't reach YouTube Music")
+    assert youtube.calls == []
 
 
 def test_match_knows_songs_already_in_the_library(client, library, web, ytmusic):

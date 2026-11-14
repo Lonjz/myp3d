@@ -1,5 +1,3 @@
-from yt_dlp.utils import DownloadError
-
 from tests.fakes import ytmusic_result
 
 PLAYLIST_URL = "https://music.youtube.com/playlist?list={}"
@@ -73,20 +71,11 @@ def test_search_lists_explicit_songs_then_videos(client, ytmusic):
     assert ytmusic.searches == [("money trees", "songs"), ("money trees", "videos")]
 
 
-def test_search_falls_back_to_youtube(client, ytmusic, youtube):
+def test_search_only_uses_youtube_music(client, ytmusic, youtube):
     ytmusic.error = RuntimeError("ytmusic is down")
-    youtube.search_results = [youtube.add_video("Nights"), youtube.add_video("White Ferrari", uploader="Frank Ocean")]
-    body = client.get("/youtube/search", params={"query": "nights", "limit": 5}).json()
-    assert [result["title"] for result in body["results"]] == ["Nights", "White Ferrari"]
-    assert body["results"][1]["artist"] == "Frank Ocean"
-    assert youtube.calls[0].url == "ytsearch5:nights"
-
-
-def test_search_fails_only_when_both_sources_fail(client, ytmusic, youtube):
-    ytmusic.error = RuntimeError("ytmusic is down")
-    youtube.fail_next(DownloadError("boom"), times=2)
     response = client.get("/youtube/search", params={"query": "anything"})
-    assert (response.status_code, response.json()["detail"]) == (502, "YouTube search failed")
+    assert (response.status_code, response.json()["detail"]) == (502, "Couldn't reach YouTube Music")
+    assert youtube.calls == []
 
 
 def test_artist_lists_top_songs_and_releases(client, library, ytmusic):

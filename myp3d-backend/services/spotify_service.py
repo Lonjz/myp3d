@@ -9,16 +9,15 @@ from html import unescape
 from typing import Optional
 
 from models.spotify import SpotifyCandidate, SpotifyResolveResult, SpotifyTrack, SpotifyTrackMatch, SpotifyTrackRef
-from services.youtube_service import search_youtube
 from services.errors import AppError
 from services.ytmusic_service import (
     CLEAN_PHRASES,
     FEAT_PATTERN,
+    UNREACHABLE,
     adds_phrase,
     base_title,
     default_filename,
     format_title,
-    from_youtube,
     has_phrase,
     in_library,
     library_index,
@@ -185,10 +184,6 @@ def _ytmusic_results(query: str, kind: str) -> list[dict]:
     return search_entries(query, kind, SEARCH_LIMIT)
 
 
-def _youtube_results(query: str) -> list[dict]:
-    return [from_youtube(result) for result in search_youtube(query, SEARCH_LIMIT)]
-
-
 def _title_score(title: str, candidate_title: str, artists: list[str]) -> float:
     target = normalize(title).split()
     if not target:
@@ -261,11 +256,8 @@ def _candidates(track: SpotifyTrack) -> list[SpotifyCandidate]:
         results = _ytmusic_results(query, "songs")
         if not results or max(_score(track, result) for result in results) < GOOD_SCORE:
             results += _ytmusic_results(query, "videos")
-    except Exception:
-        try:
-            results = _youtube_results(query)
-        except Exception as exc:
-            raise AppError(502, "Couldn't search YouTube") from exc
+    except Exception as exc:
+        raise AppError(502, UNREACHABLE) from exc
 
     unique: dict[str, dict] = {}
     for result in results:

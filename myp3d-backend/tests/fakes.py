@@ -37,7 +37,6 @@ class FakeYoutube:
     def __init__(self, make_audio: Callable[..., Path]) -> None:
         self._make_audio = make_audio
         self.videos: dict[str, Video] = {}
-        self.search_results: list[Video] = []
         self.playlists: dict[str, tuple[str, list[Optional[Video]]]] = {}
         self.calls: list[YoutubeCall] = []
         self._failures: list[Exception] = []
@@ -108,10 +107,6 @@ class FakeYoutubeDL:
                 raise DownloadError(f"ERROR: [youtube:tab] {listed.group(1)}: The playlist does not exist")
             title, videos = self.youtube.playlists[listed.group(1)]
             return {"title": title, "entries": [self._info(video) if video else {"id": "private0000", "title": "[Private video]"} for video in videos]}
-        search = re.fullmatch(r"ytsearch(\d+):(.*)", url)
-        if search:
-            limit = int(search.group(1))
-            return {"entries": [{**self._info(video), "thumbnails": [{"url": f"https://i.ytimg.com/vi/{video.id}/hq.jpg"}]} for video in self.youtube.search_results[:limit]]}
         video = self.youtube.videos.get(url)
         if video is None:
             raise DownloadError(f"ERROR: [youtube] {url}: Video unavailable")

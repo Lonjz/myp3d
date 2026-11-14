@@ -63,17 +63,6 @@ def _entry_result(entry: dict) -> Optional[dict]:
     }
 
 
-def search_youtube(query: str, limit: int = 12) -> list[dict]:
-    normalized_query = query.strip()
-    if not normalized_query:
-        raise ValueError("Search query cannot be empty")
-
-    safe_limit = max(1, min(limit, 30))
-    info = extract_info({**FLAT_OPTS, "noplaylist": True}, f"ytsearch{safe_limit}:{normalized_query}", download=False)
-    entries = info.get("entries") if isinstance(info, dict) else None
-    return [result for entry in entries or [] if entry and (result := _entry_result(entry))]
-
-
 def playlist_entries(playlist_id: str) -> tuple[str, list[dict], int]:
     info = extract_info(FLAT_OPTS, f"https://www.youtube.com/playlist?list={playlist_id}", download=False)
     if not isinstance(info, dict):

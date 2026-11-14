@@ -59,14 +59,3 @@ def test_startup_removes_partial_files(library, make_client):
         pass
     assert not leftover.exists()
     assert keep.exists()
-
-
-def test_spotify_fallback_failure_is_a_clear_error(client, library, web, ytmusic, youtube):
-    from tests.fakes import spotify_track
-
-    track_id = "4uLU6hMCjMI75M1A2tKUQC"
-    web.spotify("track", track_id, spotify_track(track_id, "Song", ["Band"]))
-    ytmusic.error = RuntimeError("down")
-    youtube.fail_next(times=2)
-    response = client.get(f"/spotify/tracks/{track_id}", params={"album": "x"})
-    assert (response.status_code, response.json()["detail"]) == (502, "Couldn't search YouTube")
