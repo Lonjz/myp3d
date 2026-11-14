@@ -55,6 +55,7 @@ from services import (  # noqa: E402
     spotify_service,
     sync_service,
     youtube_service,
+    ytmusic_service,
 )
 from services.discovery_service import discovery  # noqa: E402
 from tests import seed  # noqa: E402
@@ -163,8 +164,8 @@ def youtube(monkeypatch) -> FakeYoutube:
 @pytest.fixture(autouse=True)
 def ytmusic(monkeypatch) -> FakeYTMusic:
     fake = FakeYTMusic()
-    monkeypatch.setattr(spotify_service, "YTMusic", fake.client)
-    monkeypatch.setattr(spotify_service, "_ytmusic", threading.local())
+    monkeypatch.setattr(ytmusic_service, "YTMusic", fake.client)
+    monkeypatch.setattr(ytmusic_service, "_ytmusic", threading.local())
     return fake
 
 

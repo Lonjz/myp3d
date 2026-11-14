@@ -79,4 +79,27 @@ describe('LibraryPage', () => {
     const reopened = await screen.findByRole('dialog', { name: 'Edit 2 tracks' });
     expect(within(reopened).getByRole('textbox', { name: 'Artist' })).toHaveValue('Stevie Nicks');
   });
+
+  it('finds similar songs and more from the artist from a song menu', async () => {
+    backend.seed({
+      tracks: [makeTrack({ title: 'Dreams', artist: 'Fleetwood Mac', filename: 'dreams.mp3' }), makeTrack({ title: 'Untagged', artist: null })],
+    });
+    const { user, router } = renderApp('/library');
+    const openMenu = async (title: string) => {
+      const row = (await screen.findByRole('checkbox', { name: `Select ${title}` })).closest('tr')!;
+      await user.pointer({ keys: '[MouseRight]', target: row });
+      return screen.findByRole('menu');
+    };
+
+    expect(within(await openMenu('Untagged')).queryByRole('menuitem', { name: /More from artist/ })).not.toBeInTheDocument();
+    await user.keyboard('{Escape}');
+
+    await user.click(within(await openMenu('Dreams')).getByRole('menuitem', { name: /More from artist/ }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/query'));
+    await waitFor(() => expect(backend.requestsTo('GET', '/youtube/artist?name=Fleetwood')).toHaveLength(1));
+
+    await router.navigate('/library');
+    await user.click(within(await openMenu('Dreams')).getByRole('menuitem', { name: /Similar songs/ }));
+    await waitFor(() => expect(backend.requestsTo('GET', '/youtube/similar?filename=dreams.mp3')).toHaveLength(1));
+  });
 });

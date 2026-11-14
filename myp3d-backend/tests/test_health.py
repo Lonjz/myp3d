@@ -81,3 +81,41 @@ def test_silent_video_has_no_bounds(client, library, youtube):
 def test_silence_bounds_report_download_errors(client, library, youtube):
     youtube.fail_next()
     assert client.post("/youtube/silence", json={"url": "https://youtu.be/missing"}).status_code == 502
+
+
+def test_range_trim_keeps_tags_and_records(client, library, make_playlist, star):
+    library.add("song.mp3", "Song", "Artist", "Album", seconds=10, cover=(40, 80, 160))
+    playlist_id = make_playlist("Mix", ["song.mp3"])
+    star("song.mp3")
+    before = library.tags("song.mp3")
+
+    response = client.post("/mp3s/song.mp3/trim", json={"start": 2, "end": 6})
+    assert response.status_code == 200
+    assert response.json()["duration"] == pytest.approx(4, abs=0.15)
+
+    after = library.tags("song.mp3")
+    assert after["duration"] == pytest.approx(4, abs=0.15)
+    assert {key: after[key] for key in ("title", "artist", "album", "has_cover")} == {
+        key: before[key] for key in ("title", "artist", "album", "has_cover")
+    }
+    assert [track["filename"] for track in client.get(f"/playlists/{playlist_id}").json()["tracks"]] == ["song.mp3"]
+    assert "song.mp3" in favorite_service.list_filenames()
+    assert client.get("/mp3s/song.mp3").headers["cache-control"] == "no-cache"
+
+
+def test_range_trim_rejects_bad_ranges(client, library):
+    library.add("song.mp3", "Song", seconds=10)
+    for start, end, detail in ((0, 60, "Pick a range inside the song"), (5, 5, "Pick a range inside the song"), (0, 10, "Nothing to trim")):
+        response = client.post("/mp3s/song.mp3/trim", json={"start": start, "end": end})
+        assert (response.status_code, response.json()["detail"]) == (400, detail)
+    assert client.post("/mp3s/song.mp3/trim", json={"start": -1, "end": 4}).status_code == 422
+    assert client.post("/mp3s/missing.mp3/trim", json={"start": 1, "end": 4}).status_code == 404
+    assert library.tags("song.mp3")["duration"] == pytest.approx(10, abs=0.15)
+
+
+def test_library_song_silence_bounds(client, library):
+    library.add("quiet.mp3", "Quiet", seconds=4, silence_tail=2)
+    bounds = client.get("/mp3s/quiet.mp3/silence").json()
+    assert bounds["start"] == pytest.approx(0, abs=0.1)
+    assert bounds["end"] == pytest.approx(4.1, abs=0.15)
+    assert bounds["duration"] == pytest.approx(6, abs=0.15)

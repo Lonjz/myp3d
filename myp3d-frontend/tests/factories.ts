@@ -1,4 +1,4 @@
-import type { MP3Info } from '../src/api/mp3Api';
+import type { MP3Info, YouTubeSearchResult } from '../src/api/mp3Api';
 import type { PlaylistInfo } from '../src/api/playlistApi';
 import type { QueueItem } from '../src/api/queueApi';
 
@@ -35,6 +35,27 @@ export function makeTrack(overrides: Partial<MP3Info> = {}): MP3Info {
 
 export function makeTracks(count: number, overrides: Partial<MP3Info> = {}): MP3Info[] {
   return Array.from({ length: count }, () => makeTrack(overrides));
+}
+
+export function makeYouTubeResult(overrides: Partial<YouTubeSearchResult> = {}): YouTubeSearchResult {
+  const id = next();
+  const videoId = `video${String(id).padStart(6, '0')}`;
+  const title = overrides.title ?? `Song ${id}`;
+  return {
+    video_id: videoId,
+    url: `https://www.youtube.com/watch?v=${videoId}`,
+    title,
+    artist: 'Frank Ocean',
+    album: 'Blonde',
+    thumbnail_url: null,
+    duration: 200,
+    kind: 'song',
+    explicit: false,
+    in_library: false,
+    filename: title.toLowerCase(),
+    cover_url: null,
+    ...overrides,
+  };
 }
 
 export interface PlaylistRecord extends PlaylistInfo {

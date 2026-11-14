@@ -1,5 +1,5 @@
-import { act, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { backend } from '../fakeBackend';
 import { albumKeyOf, makeTrack } from '../factories';
 import { renderApp } from '../render';
@@ -8,6 +8,52 @@ const field = (name: string) => screen.getByRole('textbox', { name }) as HTMLInp
 const saveButton = () => screen.getByRole('button', { name: /save/i });
 
 describe('EditPage', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('trims the song to the chosen range and reloads it in the player', async () => {
+    const previews: HTMLAudioElement[] = [];
+    vi.stubGlobal(
+      'Audio',
+      class extends window.Audio {
+        constructor(src?: string) {
+          super(src);
+          previews.push(this);
+        }
+      },
+    );
+    const load = vi.spyOn(HTMLMediaElement.prototype, 'load');
+    backend.seed({ tracks: [makeTrack({ title: 'The Chain', filename: 'the chain.mp3', duration: 200 })] });
+    const { user } = renderApp('/details/the chain.mp3');
+
+    await screen.findByDisplayValue('The Chain');
+    await user.click(screen.getByRole('button', { name: 'Play' }));
+    const trimButton = screen.getByRole('button', { name: 'Trim song' });
+    expect(trimButton).toBeDisabled();
+
+    await waitFor(() => expect(previews.length).toBeGreaterThan(0));
+    act(() => {
+      const preview = previews[previews.length - 1];
+      Object.defineProperty(preview, 'duration', { value: 200 });
+      preview.dispatchEvent(new Event('loadedmetadata'));
+    });
+    expect(trimButton).toBeDisabled();
+    fireEvent.change(screen.getByRole('slider', { name: 'Trim start time' }), { target: { value: '10' } });
+    expect(trimButton).toBeEnabled();
+
+    await user.type(field('Artist'), 'x');
+    expect(trimButton).toBeDisabled();
+    await user.type(field('Artist'), '{Backspace}');
+    expect(trimButton).toBeEnabled();
+
+    await user.click(trimButton);
+    await user.click(await screen.findByRole('button', { name: 'Trim' }));
+    await waitFor(() => expect(backend.requestsTo('POST', '/mp3s/the chain.mp3/trim')).toHaveLength(1));
+    expect(backend.requestsTo('POST', '/mp3s/the chain.mp3/trim')[0].body).toEqual({ start: 10, end: 200 });
+    await waitFor(() => expect(load.mock.contexts).toContain(document.querySelector('audio')));
+  });
+
   it('saves edited tags', async () => {
     backend.seed({ tracks: [makeTrack({ title: 'The Chain', filename: 'the chain.mp3' })] });
     const { user } = renderApp('/details/the chain.mp3');

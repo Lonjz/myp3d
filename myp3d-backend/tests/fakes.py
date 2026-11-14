@@ -38,6 +38,7 @@ class FakeYoutube:
         self._make_audio = make_audio
         self.videos: dict[str, Video] = {}
         self.search_results: list[Video] = []
+        self.playlists: dict[str, tuple[str, list[Optional[Video]]]] = {}
         self.calls: list[YoutubeCall] = []
         self._failures: list[Exception] = []
         self._gate: Optional[threading.Event] = None
@@ -57,6 +58,9 @@ class FakeYoutube:
         video = Video(f"https://www.youtube.com/watch?v={video_id}", video_id, title, uploader, seconds, freq, silence_head, silence_tail)
         self.videos[video.url] = video
         return video
+
+    def add_playlist(self, playlist_id: str, title: str, videos: list[Optional[Video]]) -> None:
+        self.playlists[playlist_id] = (title, videos)
 
     def fail_next(self, error: Optional[Exception] = None, times: int = 1) -> None:
         self._failures.extend([error or DownloadError("ERROR: Sign in to confirm you're not a bot")] * times)
@@ -98,6 +102,12 @@ class FakeYoutubeDL:
         self.youtube.calls.append(YoutubeCall(url, download, dict(self.opts)))
         if self.youtube._failures:
             raise self.youtube._failures.pop(0)
+        listed = re.fullmatch(r"https://www\.youtube\.com/playlist\?list=(.+)", url)
+        if listed:
+            if listed.group(1) not in self.youtube.playlists:
+                raise DownloadError(f"ERROR: [youtube:tab] {listed.group(1)}: The playlist does not exist")
+            title, videos = self.youtube.playlists[listed.group(1)]
+            return {"title": title, "entries": [self._info(video) if video else {"id": "private0000", "title": "[Private video]"} for video in videos]}
         search = re.fullmatch(r"ytsearch(\d+):(.*)", url)
         if search:
             limit = int(search.group(1))
@@ -209,7 +219,9 @@ def spotify_list(name: str, tracks: list[tuple[str, str, str]], cover: Optional[
     }
 
 
-def ytmusic_result(video_id: str, title: str, artists: list[str], album: Optional[str] = None, seconds: float = 200, explicit: bool = False) -> dict:
+def ytmusic_result(video_id: str, title: str, artists: list[str], album: Optional[str] = None, seconds: float = 200, explicit: bool = False,
+                   song: bool = True, available: bool = True) -> dict:
+    thumbnail = f"https://lh3.googleusercontent.com/{video_id}=w120-h120-l90-rj" if song else f"https://i.ytimg.com/vi/{video_id}/hq.jpg"
     return {
         "videoId": video_id,
         "title": title,
@@ -217,21 +229,59 @@ def ytmusic_result(video_id: str, title: str, artists: list[str], album: Optiona
         "album": {"name": album} if album else None,
         "duration_seconds": seconds,
         "isExplicit": explicit,
-        "thumbnails": [{"url": f"https://i.ytimg.com/vi/{video_id}/hq.jpg"}],
+        "isAvailable": available,
+        "videoType": "MUSIC_VIDEO_TYPE_ATV" if song else "MUSIC_VIDEO_TYPE_OMV",
+        "thumbnails": [{"url": thumbnail}],
     }
 
 
 class FakeYTMusic:
     def __init__(self) -> None:
-        self.results: dict[str, list[dict]] = {"songs": [], "videos": []}
+        self.results: dict[str, list[dict]] = {"songs": [], "videos": [], "artists": []}
         self.searches: list[tuple[str, str]] = []
         self.error: Optional[Exception] = None
+        self.playlists: dict[str, dict] = {}
+        self.artists: dict[str, dict] = {}
+        self.artist_albums: dict[tuple[str, str], list[dict]] = {}
+        self.albums: dict[str, dict] = {}
+        self.radios: dict[str, list[dict]] = {}
+        self.radio_seeds: list[str] = []
 
     def client(self, *_, **__) -> "FakeYTMusic":
         return self
 
-    def search(self, query: str, filter: str = "songs", limit: int = 10) -> list[dict]:
-        self.searches.append((query, filter))
+    def _check(self) -> None:
         if self.error is not None:
             raise self.error
+
+    @staticmethod
+    def _found(store: dict, key, kind: str):
+        if key not in store:
+            raise KeyError(f"No fake {kind} {key}")
+        return store[key]
+
+    def search(self, query: str, filter: str = "songs", limit: int = 10) -> list[dict]:
+        self.searches.append((query, filter))
+        self._check()
         return list(self.results.get(filter, []))[:limit]
+
+    def get_playlist(self, playlist_id: str, limit: Optional[int] = 100) -> dict:
+        self._check()
+        return self._found(self.playlists, playlist_id, "playlist")
+
+    def get_artist(self, channel_id: str) -> dict:
+        self._check()
+        return self._found(self.artists, channel_id, "artist")
+
+    def get_artist_albums(self, channel_id: str, params: str, limit: Optional[int] = 100) -> list[dict]:
+        self._check()
+        return self._found(self.artist_albums, (channel_id, params), "release list")
+
+    def get_album(self, browse_id: str) -> dict:
+        self._check()
+        return self._found(self.albums, browse_id, "album")
+
+    def get_watch_playlist(self, videoId: Optional[str] = None, radio: bool = False, limit: int = 25) -> dict:
+        self.radio_seeds.append(videoId or "")
+        self._check()
+        return {"tracks": self.radios.get(videoId or "", [])}

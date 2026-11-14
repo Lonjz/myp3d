@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import type { JsonBodyType } from 'msw';
 import { setupServer } from 'msw/node';
 import { API_BASE } from '../src/api/mp3Api';
-import type { AlbumInfo, LibraryStats, MP3Info, TagSuggestion, YouTubeSearchResult } from '../src/api/mp3Api';
+import type { AlbumInfo, LibraryStats, MP3Info, TagSuggestion, YouTubeArtist, YouTubePlaylist, YouTubeSearchResult } from '../src/api/mp3Api';
 import type { PlaylistDetail, PlaylistInfo } from '../src/api/playlistApi';
 import type { QueueItem } from '../src/api/queueApi';
 import type { ArtistTrack, NamingTrack, SilentTrack } from '../src/api/healthApi';
@@ -31,13 +31,31 @@ interface Store {
   playlists: PlaylistRecord[];
   queue: QueueItem[];
   youtube: YouTubeSearchResult[];
+  ytPlaylists: Record<string, YouTubePlaylist>;
+  ytArtists: Record<string, YouTubeArtist>;
+  ytAlbums: Record<string, YouTubePlaylist>;
+  ytSimilar: Record<string, YouTubePlaylist>;
   songs: TagSuggestion[];
   silent: SilentTrack[];
   naming: NamingTrack[];
   artists: ArtistTrack[];
 }
 
-const emptyStore = (): Store => ({ tracks: [], favorites: [], playlists: [], queue: [], youtube: [], songs: [], silent: [], naming: [], artists: [] });
+const emptyStore = (): Store => ({
+  tracks: [],
+  favorites: [],
+  playlists: [],
+  queue: [],
+  youtube: [],
+  ytPlaylists: {},
+  ytArtists: {},
+  ytAlbums: {},
+  ytSimilar: {},
+  songs: [],
+  silent: [],
+  naming: [],
+  artists: [],
+});
 
 let store = emptyStore();
 let isDown = false;
@@ -238,6 +256,17 @@ const handlers = [
     return { success: true };
   }),
   route('get', '/mp3s/:filename/cover', () => error(404, 'No cover image found')),
+  route('get', '/mp3s/:filename/silence', ({ params }) => {
+    const track = findTrack(params.filename);
+    return track ? { start: 0.5, end: (track.duration ?? 0) - 1, duration: track.duration } : error(404, 'MP3 file not found');
+  }),
+  route('post', '/mp3s/:filename/trim', ({ params, body }) => {
+    const track = findTrack(params.filename);
+    if (!track) return error(404, 'MP3 file not found');
+    const { start, end } = body as { start: number; end: number };
+    Object.assign(track, { duration: end - start, file_size: track.file_size - 1 });
+    return track;
+  }),
   route('get', '/mp3s/:filename', ({ params }) => (findTrack(params.filename) ? new HttpResponse(new Uint8Array(16), { headers: { 'Content-Type': 'audio/mpeg' } }) : error(404, 'MP3 file not found'))),
   route('delete', '/mp3s/:filename', ({ params }) => {
     if (!findTrack(params.filename)) return error(404, 'MP3 file not found');
@@ -284,6 +313,13 @@ const handlers = [
     return { tracks: tracks.slice(0, limit), albums: albums().filter((album) => album.album_name.toLowerCase().includes(query)).slice(0, limit) };
   }),
   route('get', '/youtube/search', ({ url }) => ({ query: url.searchParams.get('query'), results: store.youtube })),
+  route('get', '/youtube/playlist', ({ url }) => {
+    const id = new URL(url.searchParams.get('url') ?? '').searchParams.get('list') ?? '';
+    return store.ytPlaylists[id] ?? error(502, "Couldn't open that playlist");
+  }),
+  route('get', '/youtube/artist', ({ url }) => store.ytArtists[url.searchParams.get('name') ?? ''] ?? error(404, "Couldn't find that artist on YouTube Music")),
+  route('get', '/youtube/album/:id', ({ params }) => store.ytAlbums[params.id] ?? error(400, 'Invalid album')),
+  route('get', '/youtube/similar', ({ url }) => store.ytSimilar[url.searchParams.get('filename') ?? ''] ?? error(404, 'MP3 file not found')),
   route('get', '/youtube/songs', () => store.songs),
   route('post', '/youtube/silence', () => ({ start: 1.5, end: 197.5, duration: 200 })),
   route('post', '/download', ({ body }) => {

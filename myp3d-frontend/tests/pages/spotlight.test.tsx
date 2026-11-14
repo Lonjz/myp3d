@@ -33,4 +33,17 @@ describe('Spotlight', () => {
     await user.click(await within(dialog).findByRole('option', { name: /^Playlists/ }));
     await waitFor(() => expect(router.state.location.pathname).toBe('/playlists'));
   });
+
+  it('opens a YouTube playlist link in Query', async () => {
+    const link = 'https://www.youtube.com/playlist?list=PLmix';
+    backend.seed({ ytPlaylists: { PLmix: { title: 'Road Trip', unavailable: 0, tracks: [] } } });
+    const { user, router } = renderApp('/dashboard');
+    await user.keyboard('{Control>}k{/Control}');
+    const dialog = await screen.findByRole('dialog', { name: 'Spotlight' });
+
+    await user.type(within(dialog).getByRole('combobox', { name: 'Search' }), link);
+    await user.click(await within(dialog).findByRole('option', { name: /Open playlist in Query/ }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/query'));
+    await waitFor(() => expect(backend.requestsTo('GET', '/youtube/playlist')).toHaveLength(1));
+  });
 });

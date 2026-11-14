@@ -78,18 +78,15 @@ def test_download_name_keeps_percent_signs(client, library, youtube):
     assert library.names() == ["100%(id)s.mp3"]
 
 
-def test_youtube_search(client, youtube):
-    youtube.search_results = [youtube.add_video("Nights"), youtube.add_video("White Ferrari", uploader="Frank Ocean")]
-    body = client.get("/youtube/search", params={"query": "nights", "limit": 5}).json()
-    assert [result["title"] for result in body["results"]] == ["Nights", "White Ferrari"]
-    assert body["results"][1]["artist"] == "Frank Ocean"
-    assert youtube.calls[0].url == "ytsearch5:nights"
-
-
-def test_youtube_search_reports_failures(client, youtube):
-    youtube.fail_next(DownloadError("boom"), times=2)
-    response = client.get("/youtube/search", params={"query": "anything"})
-    assert response.status_code == 500
+def test_download_fetches_a_cover_from_a_link(client, library, youtube, web, cover_jpeg):
+    web.route("https://lh3.googleusercontent.com/cover=w544-h544-l90-rj", cover_jpeg)
+    video = youtube.add_video()
+    response = client.post(
+        "/download",
+        json={"url": video.url, "custom_filename": "covered", "cover_url": "https://lh3.googleusercontent.com/cover=w544-h544-l90-rj"},
+    )
+    assert response.status_code == 200
+    assert library.tags("covered.mp3")["has_cover"] is True
 
 
 def test_existing_names_need_overwrite(client, library, youtube):

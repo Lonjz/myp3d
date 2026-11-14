@@ -3,7 +3,31 @@ import { normalizeFilenameInput, stripMp3Extension } from '../../src/utils/filen
 import { formatBytes, formatDuration, formatHours, formatTrackSubtitle } from '../../src/utils/formatters';
 import { matchScore } from '../../src/utils/matchScore';
 import { extractTrackLinks, hasSpotifyLink } from '../../src/utils/spotify';
-import { getVideoIdFromUrl, isYouTubeUrl } from '../../src/utils/youtube';
+import { selectionCycle } from '../../src/utils/selectionCycle';
+import { getVideoIdFromUrl, isYouTubePlaylistUrl, isYouTubeUrl } from '../../src/utils/youtube';
+
+describe('selectionCycle', () => {
+  const songs = [{ id: 'owned', fresh: false }, { id: 'a', fresh: true }, { id: 'b', fresh: true }];
+  const cycle = (selected: string[]) =>
+    selectionCycle(songs, (song) => song.fresh, (song) => selected.includes(song.id));
+
+  it('goes from none to songs not in the library, to all, to none', () => {
+    expect(cycle([]).next.map((song) => song.id)).toEqual(['a', 'b']);
+    expect(cycle(['a', 'b']).next.map((song) => song.id)).toEqual(['owned', 'a', 'b']);
+    expect(cycle(['owned', 'a', 'b'])).toMatchObject({ allSelected: true, next: [], label: 'Select none' });
+    expect(cycle(['a']).selectedCount).toBe(1);
+  });
+});
+
+describe('YouTube playlist links', () => {
+  it('only counts links without a video as playlists', () => {
+    expect(isYouTubePlaylistUrl('https://www.youtube.com/playlist?list=PLmix')).toBe(true);
+    expect(isYouTubePlaylistUrl('https://music.youtube.com/playlist?list=OLAK5uy_abc')).toBe(true);
+    expect(isYouTubePlaylistUrl('https://www.youtube.com/watch?v=abc&list=PLmix')).toBe(false);
+    expect(isYouTubePlaylistUrl('https://example.com/playlist?list=PLmix')).toBe(false);
+    expect(isYouTubePlaylistUrl('daft punk')).toBe(false);
+  });
+});
 
 describe('formatters', () => {
   it('formats sizes and lengths', () => {
