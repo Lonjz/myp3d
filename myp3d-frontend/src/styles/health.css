@@ -1,13 +1,19 @@
-.health-page {
+.page.health-page {
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   width: 100%;
 }
 
 .health-check {
-  display: contents;
+  display: flex;
+  grid-area: 1 / 1;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 0;
 }
 
-.health-check[hidden] {
-  display: none;
+.health-check.is-hidden {
+  visibility: hidden;
 }
 
 .health-select-all {

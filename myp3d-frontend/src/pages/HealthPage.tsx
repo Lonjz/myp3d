@@ -393,13 +393,13 @@ export function HealthPage() {
 
   return (
     <div className="page page--fill sync-page health-page">
-      <div className="health-check" hidden={check !== 'silence'}>
+      <div className={cx('health-check', check !== 'silence' && 'is-hidden')} inert={check !== 'silence'}>
         <SilenceCheck picker={picker} />
       </div>
-      <div className="health-check" hidden={check !== 'naming'}>
+      <div className={cx('health-check', check !== 'naming' && 'is-hidden')} inert={check !== 'naming'}>
         <NamingCheck picker={picker} />
       </div>
-      <div className="health-check" hidden={check !== 'artists'}>
+      <div className={cx('health-check', check !== 'artists' && 'is-hidden')} inert={check !== 'artists'}>
         <ArtistCheck picker={picker} />
       </div>
     </div>
