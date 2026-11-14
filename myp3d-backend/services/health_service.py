@@ -43,7 +43,6 @@ FEATURED = re.compile(r"[(\[](?:feat\.?|ft\.?|featuring|with)\s([^)\]]*)[)\]]", 
 
 _lock = threading.Lock()
 _scan: Optional[SilenceScanInfo] = None
-_tails: dict[str, tuple[int, int, Optional[float]]] = {}
 
 
 def _ffmpeg() -> str:
@@ -133,7 +132,7 @@ def _measure_tail(path: Path, duration: float) -> Optional[float]:
 
 def silent_tail(path: Path, duration: Optional[float] = None) -> Optional[float]:
     try:
-        return stat_cached(_tails, path, lambda target, _: _measure_tail(target, duration or _stream_length(target)))
+        return stat_cached("tail", path, lambda target, _:_measure_tail(target, duration or _stream_length(target)))
     except (OSError, subprocess.SubprocessError):
         return None
 

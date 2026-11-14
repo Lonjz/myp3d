@@ -106,8 +106,6 @@ class _Plan:
 _opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 _lock = threading.Lock()
 _session: Optional[_Session] = None
-_file_digests: dict[str, tuple[int, int, str]] = {}
-_tag_digests: dict[str, tuple[int, int, str]] = {}
 
 
 def _peer_url(session: _Session, path: str) -> str:
@@ -378,23 +376,23 @@ def _tag_digest(handle, size: int) -> str:
     return digest.hexdigest()
 
 
-def _cached_digest(cache: dict, path: Path, compute) -> Optional[str]:
+def _cached_digest(kind: str, path: Path, compute) -> Optional[str]:
     def read(target: Path, size: int) -> str:
         with open(target, "rb") as handle:
             return compute(handle, size)
 
     try:
-        return stat_cached(cache, path, read)
+        return stat_cached(kind, path, read)
     except OSError:
         return None
 
 
 def _fingerprint(path: Path) -> Optional[str]:
-    return _cached_digest(_file_digests, path, _file_digest)
+    return _cached_digest("file", path, _file_digest)
 
 
 def _tag_fingerprint(path: Path) -> Optional[str]:
-    return _cached_digest(_tag_digests, path, _tag_digest)
+    return _cached_digest("tags", path, _tag_digest)
 
 
 def _local_manifest() -> list[SyncManifestEntry]:

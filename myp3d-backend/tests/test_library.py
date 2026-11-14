@@ -1,6 +1,6 @@
 import pytest
 
-from services import mp3_service, search_service
+from services import audio_fingerprint, mp3_service, search_service
 from services.db import connect
 from services.mp3_service import make_album_key
 from tests.seed import DEFAULT_LIBRARY, write_tags
@@ -226,6 +226,49 @@ def test_stored_tags_from_an_older_version_are_read_again(library, reads):
     [track] = mp3_service.list_mp3_infos()
     assert track.duration is not None
     assert reads == ["song.mp3"]
+
+
+@pytest.fixture
+def fingerprints(monkeypatch) -> list[str]:
+    seen: list[str] = []
+    original = audio_fingerprint._compute_fingerprint
+    monkeypatch.setattr(audio_fingerprint, "_compute_fingerprint", lambda path, size: seen.append(path.name) or original(path, size))
+    return seen
+
+
+def test_a_restart_reuses_the_stored_fingerprints(library, fingerprints):
+    library.add("song.mp3", "Song", "Band")
+    first = audio_fingerprint.audio_fingerprint(library.path("song.mp3"))
+
+    audio_fingerprint._caches.clear()
+    assert audio_fingerprint.audio_fingerprint(library.path("song.mp3")) == first
+    assert fingerprints == ["song.mp3"]
+
+
+def test_a_song_changed_while_stopped_is_fingerprinted_again(library, fingerprints):
+    library.add("song.mp3", "Song", "Band", freq=300)
+    first = audio_fingerprint.audio_fingerprint(library.path("song.mp3"))
+    library.add("song.mp3", "Song", "Band", freq=600)
+
+    audio_fingerprint._caches.clear()
+    assert audio_fingerprint.audio_fingerprint(library.path("song.mp3")) != first
+    assert fingerprints == ["song.mp3", "song.mp3"]
+
+
+def test_stored_fingerprints_are_pruned_and_cleared(client, library, fingerprints):
+    library.add("a.mp3", "A", "Band", freq=300)
+    library.add("b.mp3", "B", "Band", freq=310)
+    for name in ("a.mp3", "b.mp3"):
+        audio_fingerprint.audio_fingerprint(library.path(name))
+    library.path("a.mp3").unlink()
+
+    audio_fingerprint.prune_file_cache()
+    with connect() as conn:
+        assert [row["path"] for row in conn.execute("SELECT path FROM file_cache")] == [str(library.path("b.mp3"))]
+
+    assert client.post("/cache/clear").status_code == 200
+    audio_fingerprint.audio_fingerprint(library.path("b.mp3"))
+    assert fingerprints == ["a.mp3", "b.mp3", "b.mp3"]
 
 
 def test_only_real_mp3_files_are_listed(library):

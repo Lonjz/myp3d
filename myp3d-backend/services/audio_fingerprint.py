@@ -1,13 +1,15 @@
 import hashlib
+import json
 import os
 import threading
 from io import BytesIO
 from pathlib import Path
-from typing import Optional
+from typing import Any, Callable, Optional
 
 from PIL import Image
 
 from services.cover_service import get_album_cover
+from services.db import connect
 
 SAMPLE_BYTES = 64 * 1024
 ID3V1_LENGTH = 128
@@ -16,9 +18,19 @@ APE_HAS_HEADER = 1 << 31
 COVER_HASH_SIZE = (9, 8)
 COVER_MATCH_DISTANCE = 6
 
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS file_cache (
+    kind TEXT NOT NULL,
+    path TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    mtime_ns INTEGER NOT NULL,
+    value TEXT NOT NULL,
+    PRIMARY KEY (kind, path)
+)
+"""
+
 _lock = threading.Lock()
-_fingerprints: dict[str, tuple[int, int, Optional[str]]] = {}
-_cover_hashes: dict[str, tuple[int, int, Optional[int]]] = {}
+_caches: dict[str, dict[str, tuple[int, int, Any]]] = {}
 
 
 def id3_tag_length(header: bytes) -> int:
@@ -29,19 +41,54 @@ def id3_tag_length(header: bytes) -> int:
     return 10 + size + footer
 
 
-def stat_cached(cache: dict, path: Path, compute):
+def init() -> None:
+    with connect() as conn:
+        conn.execute(SCHEMA)
+
+
+def prune_file_cache() -> None:
+    with connect() as conn:
+        paths = [row["path"] for row in conn.execute("SELECT DISTINCT path FROM file_cache")]
+        conn.executemany("DELETE FROM file_cache WHERE path = ?", [(path,) for path in paths if not os.path.exists(path)])
+
+
+def clear_file_cache() -> None:
+    with _lock, connect() as conn:
+        _caches.clear()
+        conn.execute("DELETE FROM file_cache")
+
+
+def _cache(kind: str) -> dict[str, tuple[int, int, Any]]:
+    with _lock:
+        cache = _caches.get(kind)
+    if cache is not None:
+        return cache
+    with connect() as conn:
+        rows = conn.execute("SELECT path, size, mtime_ns, value FROM file_cache WHERE kind = ?", (kind,)).fetchall()
+    loaded = {row["path"]: (row["size"], row["mtime_ns"], json.loads(row["value"])) for row in rows}
+    with _lock:
+        return _caches.setdefault(kind, loaded)
+
+
+def stat_cached(kind: str, path: Path, compute: Callable[[Path, int], Any]) -> Any:
     try:
         stats = path.stat()
     except OSError:
         return None
     key = str(path)
+    cache = _cache(kind)
     with _lock:
         cached = cache.get(key)
-    if cached is not None and cached[0] == stats.st_size and cached[1] == stats.st_mtime_ns:
+    if cached is not None and cached[:2] == (stats.st_size, stats.st_mtime_ns):
         return cached[2]
     value = compute(path, stats.st_size)
     with _lock:
         cache[key] = (stats.st_size, stats.st_mtime_ns, value)
+    with connect() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO file_cache (kind, path, size, mtime_ns, value) VALUES (?, ?, ?, ?, ?)",
+            (kind, key, stats.st_size, stats.st_mtime_ns, json.dumps(value)),
+        )
     return value
 
 
@@ -102,7 +149,7 @@ def _compute_fingerprint(path: Path, size: int) -> Optional[str]:
 
 
 def audio_fingerprint(path: Path) -> Optional[str]:
-    return stat_cached(_fingerprints, path, _compute_fingerprint)
+    return stat_cached("audio", path, _compute_fingerprint)
 
 
 def _compute_cover_hash(path: Path, _: int) -> Optional[int]:
@@ -128,7 +175,7 @@ def _compute_cover_hash(path: Path, _: int) -> Optional[int]:
 
 
 def cover_hash(path: Path) -> Optional[int]:
-    return stat_cached(_cover_hashes, path, _compute_cover_hash)
+    return stat_cached("cover", path, _compute_cover_hash)
 
 
 def covers_match(first: Optional[int], second: Optional[int]) -> bool:

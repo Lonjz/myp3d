@@ -10,7 +10,7 @@ from starlette.datastructures import Headers
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from routers import albums, cache, download, export, favorites, health, mp3s, music, peer, playlists, queue, search, spotify, stats, sync, system, youtube
-from services import database_sync, db, date_service, favorite_playlist, favorite_service, mp3_service, music_playlist_service, music_service, playlist_service, queue_service
+from services import audio_fingerprint, database_sync, db, date_service, favorite_playlist, favorite_service, mp3_service, music_playlist_service, music_service, playlist_service, queue_service
 from services.config import API_PORT, API_RELOAD, VERSION
 from services.discovery_service import discovery
 from services.errors import AppError
@@ -58,6 +58,8 @@ async def lifespan(_: FastAPI):
     date_service.init()
     music_playlist_service.init()
     music_service.init()
+    audio_fingerprint.init()
+    audio_fingerprint.prune_file_cache()
     database_sync.purge_tombstones()
     favorite_playlist.ensure()
     yield

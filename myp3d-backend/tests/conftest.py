@@ -105,19 +105,16 @@ def _reset_state() -> None:
     date_service.init()
     music_playlist_service.init()
     music_service.init()
+    audio_fingerprint.init()
     mp3_service.invalidate_library_cache()
     mp3_service._file_infos.clear()
     youtube_service._download_locks.clear()
-    audio_fingerprint._fingerprints.clear()
-    audio_fingerprint._cover_hashes.clear()
+    audio_fingerprint._caches.clear()
     cover_service.clear_cover_cache()
     health_service._scan = None
-    health_service._tails.clear()
     queue_service._progress.clear()
     queue_service._worker = None
     sync_service._session = None
-    sync_service._file_digests.clear()
-    sync_service._tag_digests.clear()
     music_service._slot.job = None
     music_playlist_service._slot.job = None
     spotify_service._track_details.cache_clear()

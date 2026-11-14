@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from services.audio_fingerprint import clear_file_cache
 from services.cover_service import clear_cover_cache
 from services.mp3_service import clear_tag_cache
 
@@ -10,4 +11,5 @@ router = APIRouter(prefix="/cache", tags=["Cache"])
 def clear_cache():
     clear_tag_cache()
     clear_cover_cache()
+    clear_file_cache()
     return {"success": True}
