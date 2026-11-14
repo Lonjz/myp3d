@@ -12,9 +12,12 @@ if [[ ! -x "$PYTHON_BIN" ]]; then
     exit 1
 fi
 
-if [[ ! -d "$FRONTEND_DIR/node_modules" ]]; then
-    echo "Frontend packages not installed. Run npm install in myp3d-frontend first."
-    exit 1
+if [[ "$FRONTEND_DIR/package-lock.json" -nt "$FRONTEND_DIR/node_modules/.package-lock.json" ]]; then
+    echo "Frontend packages are missing or out of date. Installing them."
+    (
+        cd "$FRONTEND_DIR"
+        npm install
+    )
 fi
 
 (

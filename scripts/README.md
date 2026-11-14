@@ -1,6 +1,6 @@
 # Scripts
 
-Run these from the repository root. Each one checks that the backend venv and the frontend packages are installed first.
+Run these from the repository root. Each one checks that the backend venv is installed first, and runs `npm install` when the frontend packages are missing or `package-lock.json` has changed since the last install.
 
 | Script | |
 | --- | --- |

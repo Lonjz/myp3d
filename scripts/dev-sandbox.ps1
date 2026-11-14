@@ -9,8 +9,17 @@ if (-not (Test-Path $pythonExe)) {
     throw "Backend Python executable not found at $pythonExe"
 }
 
-if (-not (Test-Path (Join-Path $frontendDir "node_modules"))) {
-    throw "Frontend packages not installed. Run npm install in myp3d-frontend first."
+$packageLock = Join-Path $frontendDir "package-lock.json"
+$installedLock = Join-Path $frontendDir "node_modules\.package-lock.json"
+if (-not (Test-Path $installedLock) -or (Get-Item $packageLock).LastWriteTime -gt (Get-Item $installedLock).LastWriteTime) {
+    Write-Host "Frontend packages are missing or out of date. Installing them."
+    Push-Location $frontendDir
+    npm install
+    $npmExitCode = $LASTEXITCODE
+    Pop-Location
+    if ($npmExitCode -ne 0) {
+        throw "Failed to install the frontend packages."
+    }
 }
 
 $backendCommand = "Set-Location '$backendDir'; & '$pythonExe' tests\sandbox.py $args"
