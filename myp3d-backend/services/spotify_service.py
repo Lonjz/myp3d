@@ -8,7 +8,6 @@ from functools import lru_cache
 from html import unescape
 from typing import Optional
 
-from models.library import TagSuggestion
 from models.spotify import SpotifyCandidate, SpotifyResolveResult, SpotifyTrack, SpotifyTrackMatch, SpotifyTrackRef
 from services.youtube_service import search_youtube
 from services.errors import AppError
@@ -17,7 +16,6 @@ from services.ytmusic_service import (
     FEAT_PATTERN,
     adds_phrase,
     base_title,
-    client,
     default_filename,
     format_title,
     from_youtube,
@@ -25,15 +23,13 @@ from services.ytmusic_service import (
     in_library,
     library_index,
     normalize,
-    parse_entry,
-    song_key,
+    search_entries,
 )
 
 USER_AGENT = "Mozilla/5.0"
 FETCH_TIMEOUT_S = 15
 EMBED_TRACK_LIMIT = 100
 SEARCH_LIMIT = 10
-SUGGESTION_LIMIT = 5
 MATCH_LIMIT = 5
 GOOD_SCORE = 0.7
 RETRY_STATUSES = {429, 500, 502, 503, 504}
@@ -186,24 +182,7 @@ def _track_details(spotify_id: str, album_hint: Optional[str]) -> SpotifyTrack:
 
 
 def _ytmusic_results(query: str, kind: str) -> list[dict]:
-    entries = client().search(query, filter=kind, limit=SEARCH_LIMIT)[:SEARCH_LIMIT]
-    parsed = (parse_entry(entry, "song" if kind == "songs" else "video") for entry in entries)
-    return [result for result in parsed if result is not None]
-
-
-def song_suggestions(query: str) -> list[TagSuggestion]:
-    wanted = normalize(query)
-    songs = sorted(_ytmusic_results(query, "songs"), key=lambda song: not song["explicit"])
-    suggestions: dict[tuple[str, str], TagSuggestion] = {}
-    for song in songs:
-        title = normalize(song["title"])
-        if not title or not song["artists"]:
-            continue
-        if adds_phrase(CLEAN_PHRASES, title, wanted):
-            continue
-        key = song_key(song["title"], song["artists"][0])
-        suggestions.setdefault(key, TagSuggestion(title=format_title(song["title"], song["artists"]), artist=song["artists"][0], album=song["album"]))
-    return list(suggestions.values())[:SUGGESTION_LIMIT]
+    return search_entries(query, kind, SEARCH_LIMIT)
 
 
 def _youtube_results(query: str) -> list[dict]:

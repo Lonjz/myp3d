@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 
 from models.queue import DownloadRequest, DownloadResponse
+from services.cover_service import remote_square_cover
 from services.youtube_service import download_as_mp3, validate_trim_range
 
 router = APIRouter(tags=["Download"])
@@ -17,6 +18,8 @@ def download_mp3(request: DownloadRequest):
             "album": request.album,
             "cover_image_base64": request.cover_image_base64,
         }
+        if not request.cover_image_base64 and request.cover_url:
+            metadata["cover_image"] = remote_square_cover(request.cover_url)
         filename = download_as_mp3(
             request.url,
             metadata,

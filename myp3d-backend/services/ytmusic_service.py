@@ -6,10 +6,11 @@ from typing import Optional
 
 from ytmusicapi import YTMusic
 
+from models.library import TagSuggestion
 from models.queue import YouTubePlaylist, YouTubeSearchResult
 from services.errors import AppError
 from services.mp3_service import list_mp3_infos
-from services.youtube_service import playlist_entries
+from services.youtube_service import playlist_entries, search_youtube
 
 FEAT_PATTERN = re.compile(r"\s*[(\[](?:feat\.?|ft\.?|featuring|with)\s[^)\]]*[)\]]", re.I)
 PLAYLIST_ID_PATTERN = re.compile(r"[?&]list=([A-Za-z0-9_-]+)")
@@ -17,6 +18,7 @@ SIZE_PATTERN = re.compile(r"=w\d+-h\d+")
 CLEAN_PHRASES = ("clean", "radio edit", "censored")
 SONG_VIDEO_TYPE = "MUSIC_VIDEO_TYPE_ATV"
 COVER_SIZE = "=w544-h544"
+SUGGESTION_LIMIT = 5
 
 LibraryIndex = tuple[set[str], set[tuple[str, str]]]
 
@@ -132,6 +134,52 @@ def from_youtube(result: dict) -> dict:
         "explicit": None,
         "kind": "video",
     }
+
+
+def search_entries(query: str, kind: str, limit: int) -> list[dict]:
+    entries = client().search(query, filter=kind, limit=limit)[:limit]
+    parsed = (parse_entry(entry, "song" if kind == "songs" else "video") for entry in entries)
+    return [result for result in parsed if result is not None]
+
+
+def best_songs(songs: list[dict], query: str) -> list[dict]:
+    wanted = normalize(query)
+    chosen: dict[tuple[str, str], dict] = {}
+    for song in songs:
+        title = normalize(song["title"])
+        if not title or adds_phrase(CLEAN_PHRASES, title, wanted):
+            continue
+        key = song_key(song["title"], song["artists"][0] if song["artists"] else None)
+        current = chosen.get(key)
+        if current is None or (song["explicit"] and not current["explicit"]):
+            chosen[key] = song
+    return list(chosen.values())
+
+
+def song_suggestions(query: str) -> list[TagSuggestion]:
+    songs = [song for song in search_entries(query, "songs", 10) if song["artists"]]
+    return [
+        TagSuggestion(title=format_title(song["title"], song["artists"]), artist=song["artists"][0], album=song["album"])
+        for song in best_songs(songs, query)[:SUGGESTION_LIMIT]
+    ]
+
+
+def search(query: str, limit: int) -> list[YouTubeSearchResult]:
+    wanted = query.strip()
+    if not wanted:
+        raise AppError(400, "Search query cannot be empty")
+    try:
+        songs = best_songs(search_entries(wanted, "songs", limit), wanted)
+        listed = {song["video_id"] for song in songs}
+        videos = [video for video in search_entries(wanted, "videos", limit // 2) if video["video_id"] not in listed]
+        raws = [*songs, *videos]
+    except Exception:
+        try:
+            raws = [from_youtube(result) for result in search_youtube(wanted, limit)]
+        except Exception as exc:
+            raise AppError(502, "YouTube search failed") from exc
+    index = library_index()
+    return [to_result(raw, index) for raw in raws]
 
 
 def _cover_url(raw: dict) -> Optional[str]:

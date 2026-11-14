@@ -67,7 +67,9 @@ export function QueryPage() {
     loading: downloading,
     submitting,
     coverImageBase64,
+    coverUrl,
     coverPreview,
+    applyCoverUrl,
     handleCoverFileSelect,
     handleRemoveCover,
     cropModalProps,
@@ -93,7 +95,7 @@ export function QueryPage() {
       trimEnd: trim.end,
       sliderMode: trim.mode,
       loopEnabled: trim.loop,
-      form: { url, customFilename, title, artist, album, cover: coverImageBase64 },
+      form: { url, customFilename, title, artist, album, cover: coverImageBase64, coverUrl },
     }),
     [
       searchQuery,
@@ -110,6 +112,7 @@ export function QueryPage() {
       artist,
       album,
       coverImageBase64,
+      coverUrl,
     ],
   );
 
@@ -125,6 +128,8 @@ export function QueryPage() {
     setTitle(result.title || '');
     setArtist(result.artist || '');
     setAlbum(result.album || '');
+    setCustomFilename(result.filename || '');
+    applyCoverUrl(result.cover_url);
     trim.reset(nextDuration);
 
     clearToast();
@@ -215,7 +220,7 @@ export function QueryPage() {
           <form onSubmit={handleSearch} className="query-search-form">
             <IconField
               icon={Search}
-              label="Search YouTube or paste a playlist"
+              label="Search songs or paste a playlist"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               disabled={list.loading}

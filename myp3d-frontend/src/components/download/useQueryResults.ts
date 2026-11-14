@@ -55,7 +55,7 @@ export function useQueryResults() {
       load(
         async () => ({ results: await mp3Api.searchYouTube(query, 20), source: { kind: 'search' } }),
         'YouTube search failed',
-        'No videos found. Try another search.',
+        'Nothing found. Try another search.',
         false,
       ),
     [load],

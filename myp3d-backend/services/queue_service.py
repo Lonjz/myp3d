@@ -1,6 +1,5 @@
 import sqlite3
 import threading
-import urllib.request
 import uuid
 from pathlib import Path
 from typing import Optional
@@ -11,12 +10,11 @@ from models.queue import QueueItem, QueueItemCreate, QueueItemUpdate
 from models.sync import SyncQueueRecord
 from services.db import connect as _connect
 from services.db import now as _now
-from services.cover_service import cover_digest, make_square_cover, square_cover_from_base64
+from services.cover_service import cover_digest, remote_square_cover, square_cover_from_base64
 from services.filenames import clean_custom_name
 from services.youtube_service import download_as_mp3, validate_trim_range
 from services.errors import AppError
 
-COVER_FETCH_TIMEOUT_S = 15
 EDITABLE_STATUSES = ("pending", "failed")
 ACTIVE_STATUSES = ("queued", "running")
 
@@ -67,17 +65,6 @@ def _clean(value: Optional[str]) -> Optional[str]:
 
 def _square_cover(image_base64: Optional[str]) -> Optional[bytes]:
     return square_cover_from_base64(image_base64)[0] if image_base64 else None
-
-
-def _remote_cover(url: str) -> Optional[bytes]:
-    if not url.startswith("https://"):
-        return None
-    request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    try:
-        with urllib.request.urlopen(request, timeout=COVER_FETCH_TIMEOUT_S) as response:
-            return make_square_cover(response.read())[0]
-    except (OSError, ValueError):
-        return None
 
 
 def _to_item(row: sqlite3.Row) -> QueueItem:
@@ -131,7 +118,7 @@ def add_items(items: list[QueueItemCreate]) -> list[QueueItem]:
         cover = _square_cover(item.cover_image_base64)
         if cover is None and item.cover_url:
             if item.cover_url not in remote_covers:
-                remote_covers[item.cover_url] = _remote_cover(item.cover_url)
+                remote_covers[item.cover_url] = remote_square_cover(item.cover_url)
             cover = remote_covers[item.cover_url]
         prepared.append(
             (

@@ -31,6 +31,7 @@ export interface DownloadFormValues {
   artist: string;
   album: string;
   cover?: string;
+  coverUrl?: string;
 }
 
 interface UseDownloadFormOptions {
@@ -44,6 +45,7 @@ export function useDownloadForm({ onSubmitted, initialValues }: UseDownloadFormO
   const [title, setTitle] = useState(initialValues?.title ?? '');
   const [artist, setArtist] = useState(initialValues?.artist ?? '');
   const [album, setAlbum] = useState(initialValues?.album ?? '');
+  const [coverUrl, setCoverUrl] = useState(initialValues?.coverUrl ?? '');
   const [submitting, setSubmitting] = useState<SubmitAction | null>(null);
   const [overwriteTarget, setOverwriteTarget] = useState<string | null>(null);
   const overwriteResolverRef = useRef<((confirmed: boolean) => void) | null>(null);
@@ -97,7 +99,18 @@ export function useDownloadForm({ onSubmitted, initialValues }: UseDownloadFormO
     setTitle('');
     setArtist('');
     setAlbum('');
+    setCoverUrl('');
     resetCoverState();
+  };
+
+  const removeCover = () => {
+    handleRemoveCover();
+    setCoverUrl('');
+  };
+
+  const applyCoverUrl = (next: string | null) => {
+    if (next) handleRemoveCover();
+    setCoverUrl(next ?? '');
   };
 
   const confirmOverwrite = (filename: string) =>
@@ -145,6 +158,7 @@ export function useDownloadForm({ onSubmitted, initialValues }: UseDownloadFormO
         artist: artist.trim() || undefined,
         album: album.trim() || undefined,
         cover_image_base64: coverImageBase64,
+        cover_url: coverImageBase64 ? undefined : coverUrl || undefined,
         ...extra,
       };
 
@@ -212,9 +226,11 @@ export function useDownloadForm({ onSubmitted, initialValues }: UseDownloadFormO
     loading: submitting !== null,
     submitting,
     coverImageBase64,
-    coverPreview,
+    coverUrl,
+    coverPreview: coverPreview ?? (coverUrl || null),
+    applyCoverUrl,
     handleCoverFileSelect,
-    handleRemoveCover,
+    handleRemoveCover: removeCover,
     cropModalProps,
     overwriteDialogProps,
     checkOverwrite,

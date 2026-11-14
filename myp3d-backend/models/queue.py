@@ -17,6 +17,7 @@ class DownloadFields(BaseModel):
 class DownloadRequest(DownloadFields):
     url: str
     overwrite: bool = False
+    cover_url: Optional[str] = None
 
 
 class DownloadResponse(BaseModel):

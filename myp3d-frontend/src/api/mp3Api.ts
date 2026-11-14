@@ -44,6 +44,7 @@ export interface DownloadRequest {
   artist?: string;
   album?: string;
   cover_image_base64?: string;
+  cover_url?: string;
   start_time?: number;
   end_time?: number;
   overwrite?: boolean;

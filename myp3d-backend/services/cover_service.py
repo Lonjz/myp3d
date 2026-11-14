@@ -2,6 +2,7 @@ import base64
 import binascii
 import hashlib
 import threading
+import urllib.request
 from collections import OrderedDict
 from io import BytesIO
 from pathlib import Path
@@ -15,6 +16,7 @@ from PIL import Image, ImageOps
 CoverSize = Literal["thumb", "medium", "full"]
 
 COVER_SIZE = (500, 500)
+COVER_FETCH_TIMEOUT_S = 15
 
 COVER_VARIANTS: dict[str, tuple[int, int]] = {
     "thumb": (96, 80),
@@ -140,6 +142,17 @@ def make_square_cover(image_data: bytes) -> tuple[bytes, str]:
 
 def square_cover_from_base64(image_base64: str) -> tuple[bytes, str]:
     return make_square_cover(_decode_base64_image(image_base64))
+
+
+def remote_square_cover(url: str) -> Optional[bytes]:
+    if not url.startswith("https://"):
+        return None
+    request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    try:
+        with urllib.request.urlopen(request, timeout=COVER_FETCH_TIMEOUT_S) as response:
+            return make_square_cover(response.read())[0]
+    except (OSError, ValueError):
+        return None
 
 
 def set_cover_images(tag: eyed3.id3.tag.Tag, image_data: bytes, mime_type: str) -> None:
