@@ -40,6 +40,10 @@ HTMLMediaElement.prototype.load = () => undefined;
 URL.createObjectURL = () => 'blob:fake';
 URL.revokeObjectURL = () => undefined;
 
+const lazyPages = import.meta.glob('../src/pages/*.tsx');
+
+beforeAll(() => Promise.all(Object.values(lazyPages).map((load) => load())), 0);
+
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 
 beforeEach(() => {
