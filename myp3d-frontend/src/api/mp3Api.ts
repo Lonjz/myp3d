@@ -57,6 +57,17 @@ export interface YouTubeSearchResult {
   album: string | null;
   thumbnail_url: string | null;
   duration: number | null;
+  kind: 'song' | 'video';
+  explicit: boolean | null;
+  in_library: boolean;
+  filename: string | null;
+  cover_url: string | null;
+}
+
+export interface YouTubePlaylist {
+  title: string;
+  tracks: YouTubeSearchResult[];
+  unavailable: number;
 }
 
 export interface LibraryNames {
@@ -286,6 +297,10 @@ export const mp3Api = {
       'Failed to search YouTube',
     );
     return payload.results || [];
+  },
+
+  youtubePlaylist(url: string): Promise<YouTubePlaylist> {
+    return apiFetch(`/youtube/playlist?${new URLSearchParams({ url }).toString()}`, undefined, "Couldn't open the playlist");
   },
 
   libraryNames(): Promise<LibraryNames> {

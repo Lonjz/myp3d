@@ -1,11 +1,11 @@
-import { useMemo, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
-import { ArrowRight, Download, ListPlus, MonitorPlay, Search } from 'lucide-react';
-import { mp3Api } from '../api/mp3Api';
+import { useMemo, useState } from 'react';
+import { ArrowRight, Download, ListPlus, Search } from 'lucide-react';
 import type { DownloadRequest, YouTubeSearchResult } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
 import { DownloadConfigSection } from '../components/download/DownloadConfigSection';
+import { QueryResults } from '../components/download/QueryResults';
 import { TrimRangeSection } from '../components/download/TrimRangeSection';
+import { useQueryResults } from '../components/download/useQueryResults';
 import { YouTubePreview } from '../components/download/YouTubePreview';
 import { useToast } from '../components/messages/toastContext';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -18,8 +18,7 @@ import type { DownloadFormValues } from '../hooks/useDownloadForm';
 import { readStoredValue, useStoredValueWriter } from '../hooks/usePersistentState';
 import { useTrimPreview } from '../hooks/useTrimPreview';
 import type { TrimMode } from '../hooks/useTrimPreview';
-import { cx, errorMessage, formatDuration } from '../utils/formatters';
-import { getVideoIdFromUrl } from '../utils/youtube';
+import { getVideoIdFromUrl, isYouTubePlaylistUrl } from '../utils/youtube';
 
 const QUERY_DRAFT_KEY = 'query:draft';
 
@@ -38,8 +37,7 @@ interface QueryDraft {
 export function QueryPage() {
   const [initialDraft] = useState(() => readStoredValue<Partial<QueryDraft>>(QUERY_DRAFT_KEY, {}));
   const [searchQuery, setSearchQuery] = useState(initialDraft.searchQuery ?? '');
-  const [searching, setSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<YouTubeSearchResult[]>([]);
+  const list = useQueryResults();
 
   const [selectedResult, setSelectedResult] = useState<YouTubeSearchResult | null>(initialDraft.selectedResult ?? null);
   const [selectedVideoId, setSelectedVideoId] = useState(initialDraft.selectedVideoId ?? '');
@@ -132,34 +130,22 @@ export function QueryPage() {
     clearToast();
   };
 
-  const searchIdRef = useRef(0);
-
   const runSearch = async (query: string) => {
     const normalized = query.trim();
     if (!normalized) {
       showError('Please enter a search query');
       return;
     }
+    if (isYouTubePlaylistUrl(normalized)) {
+      await list.openPlaylist(normalized);
+      return;
+    }
 
-    const searchId = ++searchIdRef.current;
-    setSearching(true);
-    clearToast();
-
-    try {
-      const results = await mp3Api.searchYouTube(normalized, 20);
-      if (searchId !== searchIdRef.current) return;
-      setSearchResults(results);
-
-      if (results.length === 0) {
-        setSelectedResult(null);
-        setSelectedVideoId('');
-        trim.reset(null);
-        showError('No videos found. Try another search.');
-      }
-    } catch (err) {
-      if (searchId === searchIdRef.current) showError(errorMessage(err, 'YouTube search failed'));
-    } finally {
-      if (searchId === searchIdRef.current) setSearching(false);
+    const results = await list.search(normalized);
+    if (results?.length === 0) {
+      setSelectedResult(null);
+      setSelectedVideoId('');
+      trim.reset(null);
     }
   };
 
@@ -180,7 +166,7 @@ export function QueryPage() {
 
   useConsumeSearchParams((params) => {
     const incomingUrl = params.get('url');
-    const incomingQuery = params.get('q');
+    const incomingQuery = params.get('q') ?? params.get('playlist');
     if (!incomingUrl && !incomingQuery) return false;
 
     if (incomingUrl) {
@@ -229,52 +215,19 @@ export function QueryPage() {
           <form onSubmit={handleSearch} className="query-search-form">
             <IconField
               icon={Search}
-              label="Search YouTube"
+              label="Search YouTube or paste a playlist"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              disabled={searching}
+              disabled={list.loading}
             />
-            {searching ? (
+            {list.loading ? (
               <span className="query-search-spinner"><Spinner inline /></span>
             ) : (
               <IconButton icon={ArrowRight} label="Search" variant="primary" type="submit" />
             )}
           </form>
 
-
-          <div className="query-results-list">
-            {searchResults.map((result, index) => {
-              const isActive = selectedResult?.video_id === result.video_id;
-              return (
-                <button
-                  key={`${result.video_id}-${result.url}`}
-                  type="button"
-                  className={cx('query-result-item', isActive && 'is-active')}
-                  style={{ '--row': index } as CSSProperties}
-                  onClick={() => applySelectedResult(result)}
-                >
-                  <div className="query-result-thumb-wrap">
-                    {result.thumbnail_url ? (
-                      <img
-                        className="query-result-thumb"
-                        src={result.thumbnail_url}
-                        alt={`${result.title} thumbnail`}
-                      />
-                    ) : (
-                      <div className="query-result-thumb query-result-thumb-placeholder"><MonitorPlay aria-hidden="true" /></div>
-                    )}
-                  </div>
-                  <div className="query-result-text">
-                    <span className="query-result-title">{result.title}</span>
-                    <span className="query-result-subtitle">{result.artist || 'Unknown Artist'}</span>
-                    {result.duration ? (
-                      <span className="query-result-duration">{formatDuration(result.duration)}</span>
-                    ) : null}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+          <QueryResults list={list} activeKey={selectedResult?.video_id ?? null} onPick={applySelectedResult} />
         </aside>
 
         <section className="query-main">

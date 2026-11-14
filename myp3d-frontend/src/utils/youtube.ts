@@ -75,14 +75,24 @@ export function getVideoIdFromUrl(url: string): string {
   }
 }
 
-export function isYouTubeUrl(value: string): boolean {
+function parseYouTubeUrl(value: string): URL | null {
   try {
     const parsed = new URL(value.trim());
     const host = parsed.hostname.replace(/^(www|m|music)\./, '');
-    return YOUTUBE_HOSTS.includes(host) && Boolean(getVideoIdFromUrl(parsed.href));
+    return YOUTUBE_HOSTS.includes(host) ? parsed : null;
   } catch {
-    return false;
+    return null;
   }
+}
+
+export function isYouTubeUrl(value: string): boolean {
+  const parsed = parseYouTubeUrl(value);
+  return Boolean(parsed && getVideoIdFromUrl(parsed.href));
+}
+
+export function isYouTubePlaylistUrl(value: string): boolean {
+  const parsed = parseYouTubeUrl(value);
+  return Boolean(parsed && parsed.searchParams.get('list') && !getVideoIdFromUrl(parsed.href));
 }
 
 export function getYouTubeThumbnailUrl(videoId: string): string {

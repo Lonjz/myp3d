@@ -17,7 +17,7 @@ from services import track_records
 from services.audio_fingerprint import splice_audio, stat_cached
 from services.config import OUTPUT_DIR, get_ffmpeg_path
 from services.mp3_service import IN_USE, edit_tags, invalidate_library_cache, list_mp3_infos
-from services.spotify_service import default_filename, format_title
+from services.ytmusic_service import default_filename, format_title
 from services.youtube_service import audio_opts, extract_info
 from services.errors import AppError
 from services.filenames import is_track_name

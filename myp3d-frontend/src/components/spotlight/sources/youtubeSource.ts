@@ -1,6 +1,6 @@
-import { Link, MonitorPlay } from 'lucide-react';
+import { Link, ListMusic, MonitorPlay } from 'lucide-react';
 import { hasSpotifyLink } from '../../../utils/spotify';
-import { getVideoIdFromUrl, getYouTubeThumbnailUrl, isYouTubeUrl } from '../../../utils/youtube';
+import { getVideoIdFromUrl, getYouTubeThumbnailUrl, isYouTubePlaylistUrl, isYouTubeUrl } from '../../../utils/youtube';
 import type { InstantSpotlightSource } from '../spotlightTypes';
 
 export const youtubeSource: InstantSpotlightSource = {
@@ -8,6 +8,20 @@ export const youtubeSource: InstantSpotlightSource = {
   search: (query) => {
     const value = query.trim();
     if (!value || hasSpotifyLink(value)) return [];
+
+    if (isYouTubePlaylistUrl(value)) {
+      return [
+        {
+          id: 'youtube:playlist',
+          section: 'action',
+          title: 'Open playlist in Query',
+          subtitle: value,
+          icon: ListMusic,
+          preview: { meta: [{ icon: Link, label: 'URL', value }] },
+          run: ({ navigate }) => navigate(`/query?playlist=${encodeURIComponent(value)}`),
+        },
+      ];
+    }
 
     if (isYouTubeUrl(value)) {
       const thumbnail = getYouTubeThumbnailUrl(getVideoIdFromUrl(value));

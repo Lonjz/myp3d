@@ -75,8 +75,19 @@ class YouTubeSearchResult(BaseModel):
     album: Optional[str] = None
     thumbnail_url: Optional[str] = None
     duration: Optional[int] = None
+    kind: Literal["song", "video"] = "video"
+    explicit: Optional[bool] = None
+    in_library: bool = False
+    filename: Optional[str] = None
+    cover_url: Optional[str] = None
 
 
 class YouTubeSearchResponse(BaseModel):
     query: str
     results: list[YouTubeSearchResult]
+
+
+class YouTubePlaylist(BaseModel):
+    title: str = ""
+    tracks: list[YouTubeSearchResult]
+    unavailable: int = 0

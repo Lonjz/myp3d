@@ -1,8 +1,6 @@
 import json
 import re
-import threading
 import time
-import unicodedata
 import urllib.error
 import urllib.request
 from difflib import SequenceMatcher
@@ -10,13 +8,26 @@ from functools import lru_cache
 from html import unescape
 from typing import Optional
 
-from ytmusicapi import YTMusic
-
 from models.library import TagSuggestion
 from models.spotify import SpotifyCandidate, SpotifyResolveResult, SpotifyTrack, SpotifyTrackMatch, SpotifyTrackRef
-from services.mp3_service import list_mp3_infos
 from services.youtube_service import search_youtube
 from services.errors import AppError
+from services.ytmusic_service import (
+    CLEAN_PHRASES,
+    FEAT_PATTERN,
+    adds_phrase,
+    base_title,
+    client,
+    default_filename,
+    format_title,
+    from_youtube,
+    has_phrase,
+    in_library,
+    library_index,
+    normalize,
+    parse_entry,
+    song_key,
+)
 
 USER_AGENT = "Mozilla/5.0"
 FETCH_TIMEOUT_S = 15
@@ -37,7 +48,6 @@ NOT_FOUND_DETAILS = {
 LINK_PATTERN = re.compile(r"(?:open\.spotify\.com/(?:intl-[a-z-]+/)?|spotify:)(track|album|playlist)[/:]([A-Za-z0-9]{22})")
 NEXT_DATA_PATTERN = re.compile(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', re.S)
 DESCRIPTION_PATTERN = re.compile(r'<meta property="og:description" content="([^"]*)"')
-FEAT_PATTERN = re.compile(r"\s*[(\[](?:feat\.?|ft\.?|featuring|with)\s[^)\]]*[)\]]", re.I)
 
 STOP_TOKENS = {
     "official", "music", "video", "audio", "lyric", "lyrics", "visualizer", "hd", "hq", "4k", "mv",
@@ -48,18 +58,6 @@ VARIANT_PHRASES = (
     "reverb", "extended", "demo", "tribute", "made popular by", "originally performed", "in the style of", "backing",
     "piano version", "lullaby",
 )
-CLEAN_PHRASES = ("clean", "radio edit", "censored")
-
-
-_ytmusic = threading.local()
-
-
-def _client() -> YTMusic:
-    client = getattr(_ytmusic, "client", None)
-    if client is None:
-        client = YTMusic()
-        _ytmusic.client = client
-    return client
 
 
 def _retry_wait(exc: urllib.error.HTTPError, attempt: int) -> float:
@@ -110,40 +108,6 @@ def _largest_image(entity: dict) -> Optional[str]:
 
 def _seconds(milliseconds: object) -> Optional[float]:
     return float(round(milliseconds / 1000)) if isinstance(milliseconds, (int, float)) and milliseconds > 0 else None
-
-
-def _normalize(value: Optional[str]) -> str:
-    decomposed = unicodedata.normalize("NFKD", value or "")
-    text = "".join(char for char in decomposed if not unicodedata.combining(char)).casefold()
-    return " ".join(re.findall(r"[^\W_]+", text.replace("&", " and ")))
-
-
-def _has_phrase(text: str, phrase: str) -> bool:
-    return f" {phrase} " in f" {text} "
-
-
-def _adds_phrase(phrases: tuple[str, ...], text: str, original: str) -> bool:
-    return any(_has_phrase(text, phrase) and not _has_phrase(original, phrase) for phrase in phrases)
-
-
-def base_title(name: str) -> str:
-    return FEAT_PATTERN.sub("", name).strip() or name.strip()
-
-
-@lru_cache(maxsize=32768)
-def _song_key(title: str, artist: Optional[str]) -> tuple[str, str]:
-    return _normalize(base_title(title)), _normalize(artist)
-
-
-def format_title(name: str, artists: list[str]) -> str:
-    title = base_title(name)
-    featured = artists[1:]
-    return f"{title} (feat. {', '.join(featured)})" if featured else title
-
-
-def default_filename(name: str) -> Optional[str]:
-    letters = re.sub(r"[^a-z0-9 ]", "", base_title(name).lower())
-    return " ".join(letters.split()) or None
 
 
 def resolve(text: str) -> SpotifyResolveResult:
@@ -222,68 +186,38 @@ def _track_details(spotify_id: str, album_hint: Optional[str]) -> SpotifyTrack:
 
 
 def _ytmusic_results(query: str, kind: str) -> list[dict]:
-    results = []
-    for result in _client().search(query, filter=kind, limit=SEARCH_LIMIT)[:SEARCH_LIMIT]:
-        video_id = result.get("videoId")
-        if not video_id:
-            continue
-        thumbnails = result.get("thumbnails") or []
-        results.append(
-            {
-                "video_id": video_id,
-                "url": f"https://www.youtube.com/watch?v={video_id}",
-                "title": result.get("title") or "",
-                "artists": [artist["name"] for artist in result.get("artists") or [] if artist.get("name")],
-                "album": (result.get("album") or {}).get("name"),
-                "duration": result.get("duration_seconds"),
-                "thumbnail_url": thumbnails[-1].get("url") if thumbnails else None,
-                "explicit": result.get("isExplicit") if kind == "songs" else None,
-                "kind": "song" if kind == "songs" else "video",
-            }
-        )
-    return results
+    entries = client().search(query, filter=kind, limit=SEARCH_LIMIT)[:SEARCH_LIMIT]
+    parsed = (parse_entry(entry, "song" if kind == "songs" else "video") for entry in entries)
+    return [result for result in parsed if result is not None]
 
 
 def song_suggestions(query: str) -> list[TagSuggestion]:
-    wanted = _normalize(query)
+    wanted = normalize(query)
     songs = sorted(_ytmusic_results(query, "songs"), key=lambda song: not song["explicit"])
     suggestions: dict[tuple[str, str], TagSuggestion] = {}
     for song in songs:
-        title = _normalize(song["title"])
+        title = normalize(song["title"])
         if not title or not song["artists"]:
             continue
-        if _adds_phrase(CLEAN_PHRASES, title, wanted):
+        if adds_phrase(CLEAN_PHRASES, title, wanted):
             continue
-        key = _song_key(song["title"], song["artists"][0])
+        key = song_key(song["title"], song["artists"][0])
         suggestions.setdefault(key, TagSuggestion(title=format_title(song["title"], song["artists"]), artist=song["artists"][0], album=song["album"]))
     return list(suggestions.values())[:SUGGESTION_LIMIT]
 
 
 def _youtube_results(query: str) -> list[dict]:
-    return [
-        {
-            "video_id": result["video_id"],
-            "url": result["url"],
-            "title": result["title"],
-            "artists": [result["artist"]] if result.get("artist") else [],
-            "album": None,
-            "duration": result.get("duration"),
-            "thumbnail_url": result.get("thumbnail_url"),
-            "explicit": None,
-            "kind": "video",
-        }
-        for result in search_youtube(query, SEARCH_LIMIT)
-    ]
+    return [from_youtube(result) for result in search_youtube(query, SEARCH_LIMIT)]
 
 
 def _title_score(title: str, candidate_title: str, artists: list[str]) -> float:
-    target = _normalize(title).split()
+    target = normalize(title).split()
     if not target:
         return 0.0
-    artist_tokens = set(_normalize(" ".join(artists)).split())
+    artist_tokens = set(normalize(" ".join(artists)).split())
     candidate = [
         token
-        for token in _normalize(FEAT_PATTERN.sub("", candidate_title)).split()
+        for token in normalize(FEAT_PATTERN.sub("", candidate_title)).split()
         if token not in STOP_TOKENS and (token in target or token not in artist_tokens)
     ]
     if not candidate:
@@ -298,12 +232,12 @@ def _title_score(title: str, candidate_title: str, artists: list[str]) -> float:
 def _artist_score(artists: list[str], candidate: dict) -> float:
     if not artists:
         return 0.5
-    credited = _normalize(" ".join(candidate["artists"]))
-    anywhere = _normalize(" ".join([*candidate["artists"], candidate["title"]]))
+    credited = normalize(" ".join(candidate["artists"]))
+    anywhere = normalize(" ".join([*candidate["artists"], candidate["title"]]))
 
     def present(name: str, haystack: str) -> bool:
-        normalized = _normalize(name)
-        return bool(normalized) and _has_phrase(haystack, normalized)
+        normalized = normalize(name)
+        return bool(normalized) and has_phrase(haystack, normalized)
 
     featured = artists[1:]
     rest = sum(present(name, anywhere) for name in featured) / len(featured) if featured else 1.0
@@ -330,14 +264,14 @@ def _score(track: SpotifyTrack, candidate: dict) -> float:
         score += 0.05
     if candidate["explicit"]:
         score += 0.1
-    if track.album and candidate["album"] and _normalize(candidate["album"]).startswith(_normalize(track.album)):
+    if track.album and candidate["album"] and normalize(candidate["album"]).startswith(normalize(track.album)):
         score += 0.05
 
-    spotify_text = _normalize(f"{track.name} {track.album or ''}")
-    candidate_text = _normalize(f"{candidate['title']} {candidate['album'] or ''}")
-    if _adds_phrase(VARIANT_PHRASES, candidate_text, spotify_text):
+    spotify_text = normalize(f"{track.name} {track.album or ''}")
+    candidate_text = normalize(f"{candidate['title']} {candidate['album'] or ''}")
+    if adds_phrase(VARIANT_PHRASES, candidate_text, spotify_text):
         score -= 0.25
-    if _adds_phrase(CLEAN_PHRASES, candidate_text, spotify_text):
+    if adds_phrase(CLEAN_PHRASES, candidate_text, spotify_text):
         score -= 0.15
     return score
 
@@ -364,16 +298,6 @@ def _candidates(track: SpotifyTrack) -> list[SpotifyCandidate]:
     ]
 
 
-def _in_library(title: str, artist: Optional[str], filename: Optional[str]) -> bool:
-    key = _song_key(title, artist)
-    for info in list_mp3_infos():
-        if filename and info.filename.lower() == f"{filename}.mp3":
-            return True
-        if info.title and _song_key(info.title, info.artist) == key:
-            return True
-    return False
-
-
 def match_track(spotify_id: str, album_hint: Optional[str] = None) -> SpotifyTrackMatch:
     if not re.fullmatch(r"[A-Za-z0-9]{22}", spotify_id):
         raise AppError(400, "Invalid Spotify track")
@@ -385,6 +309,6 @@ def match_track(spotify_id: str, album_hint: Optional[str] = None) -> SpotifyTra
         title=format_title(track.name, track.artists),
         artist=artist,
         filename=filename,
-        in_library=_in_library(track.name, artist, filename),
+        in_library=in_library(track.name, artist, filename, library_index()),
         candidates=_candidates(track),
     )

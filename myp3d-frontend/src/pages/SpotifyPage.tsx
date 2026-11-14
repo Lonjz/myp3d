@@ -26,6 +26,7 @@ import { IconField } from '../components/ui/IconField';
 import { ProgressRow } from '../components/ui/ProgressRow';
 import { Spinner } from '../components/ui/Spinner';
 import { cx, formatDuration, formatTrackSubtitle, trackCount } from '../utils/formatters';
+import { selectionCycle } from '../utils/selectionCycle';
 
 const TRUNCATED_HINT =
   'Spotify only shows the first 100 songs of a playlist. Export it at exportify.net and drop the CSV here to get the rest.';
@@ -152,25 +153,17 @@ export function SpotifyPage() {
   });
 
   const selectable = rows.filter(isReadyRow);
-  const fresh = selectable.filter((row) => !row.match.in_library);
-  const selectedCount = selectable.filter((row) => selected.has(row.ref.id)).length;
-  const allSelected = selectable.length > 0 && selectedCount === selectable.length;
-  const freshSelected =
-    fresh.length > 0 &&
-    fresh.length < selectable.length &&
-    selectedCount === fresh.length &&
-    fresh.every((row) => selected.has(row.ref.id));
+  const { selectedCount, allSelected, label: selectionLabel, next: nextSelection } = selectionCycle(
+    selectable,
+    (row) => !row.match.in_library,
+    (row) => selected.has(row.ref.id),
+  );
   const matched = rows.filter((row) => row.match || row.error).length;
-  const nextSelection = allSelected
-    ? { label: 'Select none', rows: [] }
-    : freshSelected || fresh.length === 0 || fresh.length === selectable.length
-      ? { label: 'Select all, including songs in your library', rows: selectable }
-      : { label: 'Select songs not in your library', rows: fresh };
 
   const queuedCount = rows.filter((row) => row.queued).length;
 
   const cycleSelection = () => {
-    setSelected(new Set(nextSelection.rows.map((row) => row.ref.id)));
+    setSelected(new Set(nextSelection.map((row) => row.ref.id)));
   };
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -267,7 +260,7 @@ export function SpotifyPage() {
         <section className="spotify-list glass" aria-label="Spotify songs" aria-busy={resolving}>
           <header className="spotify-list__header">
             <Checkbox
-              label={nextSelection.label}
+              label={selectionLabel}
               checked={allSelected}
               indeterminate={selectedCount > 0 && !allSelected}
               onChange={cycleSelection}

@@ -2,8 +2,8 @@ from fastapi import APIRouter, HTTPException, Query
 
 from models.health import SilenceBoundsRequest, TrimRange
 from models.library import TagSuggestion
-from models.queue import YouTubeSearchResponse
-from services import health_service, spotify_service
+from models.queue import YouTubePlaylist, YouTubeSearchResponse
+from services import health_service, spotify_service, ytmusic_service
 from services.errors import AppError
 from services.youtube_service import search_youtube
 
@@ -22,6 +22,11 @@ def youtube_search(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"YouTube search failed: {exc}") from exc
+
+
+@router.get("/youtube/playlist", response_model=YouTubePlaylist)
+def youtube_playlist(url: str = Query(..., min_length=1, description="YouTube playlist link")):
+    return ytmusic_service.playlist(url)
 
 
 @router.post("/youtube/silence", response_model=TrimRange)

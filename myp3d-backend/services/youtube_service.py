@@ -29,62 +29,64 @@ def extract_info(opts: dict, url: str, download: bool) -> dict:
             raise error from None
 
 
+FLAT_OPTS = {
+    "quiet": True,
+    "skip_download": True,
+    "extract_flat": True,
+    "ignoreerrors": True,
+}
+UNAVAILABLE_TITLES = {"[Private video]", "[Deleted video]"}
+
+
+def _entry_result(entry: dict) -> Optional[dict]:
+    video_id = str(entry.get("id") or "")
+    webpage_url = entry.get("webpage_url") or entry.get("url")
+    if video_id and (not webpage_url or not str(webpage_url).startswith("http")):
+        webpage_url = f"https://www.youtube.com/watch?v={video_id}"
+    if not webpage_url:
+        return None
+
+    thumbnails = entry.get("thumbnails") or []
+    thumbnail_url = thumbnails[-1].get("url") if thumbnails else None
+    if not thumbnail_url and video_id:
+        thumbnail_url = f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
+
+    duration = entry.get("duration")
+    return {
+        "video_id": video_id,
+        "url": str(webpage_url),
+        "title": str(entry.get("title") or "Untitled"),
+        "artist": entry.get("uploader") or entry.get("channel"),
+        "album": entry.get("album"),
+        "thumbnail_url": thumbnail_url,
+        "duration": int(duration) if isinstance(duration, (int, float)) else None,
+    }
+
+
 def search_youtube(query: str, limit: int = 12) -> list[dict]:
     normalized_query = query.strip()
     if not normalized_query:
         raise ValueError("Search query cannot be empty")
 
     safe_limit = max(1, min(limit, 30))
-    search_term = f"ytsearch{safe_limit}:{normalized_query}"
-    ydl_opts = {
-        "quiet": True,
-        "skip_download": True,
-        "extract_flat": True,
-        "noplaylist": True,
-        "ignoreerrors": True,
-    }
-
-    info = extract_info(ydl_opts, search_term, download=False)
+    info = extract_info({**FLAT_OPTS, "noplaylist": True}, f"ytsearch{safe_limit}:{normalized_query}", download=False)
     entries = info.get("entries") if isinstance(info, dict) else None
-    if not entries:
-        return []
+    return [result for entry in entries or [] if entry and (result := _entry_result(entry))]
 
+
+def playlist_entries(playlist_id: str) -> tuple[str, list[dict], int]:
+    info = extract_info(FLAT_OPTS, f"https://www.youtube.com/playlist?list={playlist_id}", download=False)
+    if not isinstance(info, dict):
+        raise ValueError("Couldn't open that playlist")
     results: list[dict] = []
-    for entry in entries:
-        if not entry:
+    unavailable = 0
+    for entry in info.get("entries") or []:
+        result = _entry_result(entry) if entry and entry.get("title") not in UNAVAILABLE_TITLES else None
+        if result is None:
+            unavailable += 1
             continue
-
-        video_id = str(entry.get("id") or "")
-        webpage_url = entry.get("webpage_url")
-        if not webpage_url and video_id:
-            webpage_url = f"https://www.youtube.com/watch?v={video_id}"
-
-        thumbnails = entry.get("thumbnails") or []
-        thumbnail_url = None
-        if thumbnails:
-            thumbnail_url = thumbnails[-1].get("url")
-        if not thumbnail_url and video_id:
-            thumbnail_url = f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
-
-        duration = entry.get("duration")
-        duration_seconds = int(duration) if isinstance(duration, (int, float)) else None
-
-        if not webpage_url:
-            continue
-
-        results.append(
-            {
-                "video_id": video_id,
-                "url": str(webpage_url),
-                "title": str(entry.get("title") or "Untitled"),
-                "artist": entry.get("uploader") or entry.get("channel"),
-                "album": entry.get("album"),
-                "thumbnail_url": thumbnail_url,
-                "duration": duration_seconds,
-            }
-        )
-
-    return results
+        results.append(result)
+    return str(info.get("title") or ""), results, unavailable
 
 
 _download_locks: dict[str, threading.Lock] = {}
