@@ -84,16 +84,14 @@ export function useInfiniteList<TParams extends Record<string, unknown>, TItem>(
       setLoading(true);
 
       try {
-        const responses = await Promise.all(
-          Array.from({ length: pageCount }, (_, index) => fetchPage({ ...params, page: index + 1, limit: pageSize })),
-        );
+        const response = await fetchPage({ ...params, page: 1, limit: pageCount * pageSize });
         if (requestId !== requestIdRef.current) {
           return;
         }
 
         setList({
-          items: appendUnique([], responses.flatMap((response) => response.items), getKey),
-          total: responses[responses.length - 1].meta.total,
+          items: appendUnique([], response.items, getKey),
+          total: response.meta.total,
           pages: pageCount,
         });
         setFailed(false);

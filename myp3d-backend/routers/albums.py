@@ -29,7 +29,7 @@ def _get_album_group_or_404(album_key: str):
 @router.get("/paged", response_model=PaginatedAlbumResponse)
 def list_album_groups_paged(
     page: int = Query(1, ge=1),
-    limit: int = Query(20, ge=1, le=200),
+    limit: int = Query(20, ge=1),
     search: str = Query(""),
     sort_by: AlbumSortBy = Query("album_name"),
     sort_direction: SortDirection = Query("asc"),

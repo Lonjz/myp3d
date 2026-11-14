@@ -63,7 +63,7 @@ def _track_filters(
 @router.get("/paged", response_model=PaginatedMP3Response)
 def list_mp3s_paged(
     page: int = Query(1, ge=1),
-    limit: int = Query(25, ge=1, le=200),
+    limit: int = Query(25, ge=1),
     filters: dict = Depends(_track_filters),
 ):
     items, total = paginate(filter_sort_mp3_infos(**filters), page, limit)

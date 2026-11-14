@@ -58,6 +58,13 @@ def test_pagination(client, seeded_library):
     assert names(first["items"])[0] == "Broken_Clocks!.mp3"
 
 
+def test_a_refresh_can_reload_many_pages_at_once(client, seeded_library):
+    tracks = client.get("/mp3s/paged", params={"limit": 1000})
+    albums = client.get("/albums/paged", params={"limit": 1000})
+    assert tracks.status_code == albums.status_code == 200
+    assert tracks.json()["meta"]["returned"] == 12
+
+
 def test_sorting(client, seeded_library):
     by_duration = names(client.get("/mp3s/all", params={"sort_by": "duration", "sort_direction": "desc"}).json())
     assert by_duration[0] == "videotape.mp3"

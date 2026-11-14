@@ -1,8 +1,31 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { useCoverImageCrop } from '../../src/components/cover/useCoverImageCrop';
+import { useInfiniteList } from '../../src/hooks/useInfiniteList';
 import { useSelection } from '../../src/hooks/useSelection';
 import { useSortState } from '../../src/hooks/useSortState';
+
+describe('useInfiniteList', () => {
+  it('reloads every loaded page in one request', async () => {
+    const all = Array.from({ length: 10 }, (_, index) => `item ${index}`);
+    const fetchPage = vi.fn(async ({ page, limit }: { page: number; limit: number }) => ({
+      items: all.slice((page - 1) * limit, page * limit),
+      meta: { total: all.length },
+    }));
+    const params = {};
+    const { result } = renderHook(() => useInfiniteList({ pageSize: 2, params, fetchPage, getKey: (item: string) => item }));
+    await waitFor(() => expect(result.current.items).toHaveLength(2));
+    await act(() => result.current.loadMore());
+    await act(() => result.current.loadMore());
+    expect(result.current.items).toHaveLength(6);
+
+    fetchPage.mockClear();
+    await act(() => result.current.refresh());
+    expect(fetchPage.mock.calls).toEqual([[{ page: 1, limit: 6 }]]);
+    expect(result.current.items).toEqual(all.slice(0, 6));
+    expect(result.current.hasMore).toBe(true);
+  });
+});
 
 describe('useSelection', () => {
   it('toggles keys, selects all and drops removed ones', () => {
