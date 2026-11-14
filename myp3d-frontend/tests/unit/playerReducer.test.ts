@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { initialPlayerState, playerReducer, restorePlayerState } from '../../src/components/player/playerReducer';
+import { initialPlayerState, playerReducer, restorePlayerState, storeQueue } from '../../src/components/player/playerReducer';
 import type { PlayerState } from '../../src/components/player/playerReducer';
 import { makeTrack, makeTracks } from '../factories';
 
@@ -72,5 +72,19 @@ describe('playerReducer', () => {
     const restored = restorePlayerState({ queue: [makeTrack(), { bad: true } as never], index: 7, volume: 4, repeat: 'sideways' as never });
     expect(restored).toMatchObject({ index: 0, volume: 1, repeat: 'off', isPlaying: false });
     expect(restored.queue).toHaveLength(1);
+  });
+
+  it('restores a shuffled queue saved apart from the settings', () => {
+    const state = playing(5, 3, { shuffle: true, volume: 0.4 });
+    const { queue, originalQueue, isPlaying, ...settings } = state;
+    const restored = restorePlayerState(settings, JSON.parse(JSON.stringify(storeQueue(queue, originalQueue))));
+    expect(restored).toEqual({ ...state, isPlaying: false });
+    expect(isPlaying).toBe(true);
+  });
+
+  it('prefers the saved queue over one left in old settings', () => {
+    const saved = [makeTrack({ title: 'Saved 1' }), makeTrack({ title: 'Saved 2' })];
+    const restored = restorePlayerState({ queue: makeTracks(3), index: 1 }, storeQueue(saved, null));
+    expect([names(restored), restored.index]).toEqual([['Saved 1', 'Saved 2'], 1]);
   });
 });

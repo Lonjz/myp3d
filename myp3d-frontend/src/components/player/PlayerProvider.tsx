@@ -7,14 +7,15 @@ import { readStoredValue, useStoredValueWriter, writeStoredValue } from '../../h
 import { emitAppEvent, subscribeAppEvent } from '../../utils/appEvents';
 import { isEditableTarget } from '../../utils/keyboard';
 import { useToast } from '../messages/toastContext';
-import { PlayerContext, PlayerTimeContext } from './playerContext';
-import type { PlayerContextValue, PlayerTimeValue, PlayOptions } from './playerContext';
-import { playerReducer, restorePlayerState } from './playerReducer';
+import { PlayerContext, PlayerTimeContext, PlayerVolumeContext } from './playerContext';
+import type { PlaybackState, PlayerContextValue, PlayerTimeValue, PlayerVolumeValue, PlayOptions } from './playerContext';
+import { playerReducer, restorePlayerState, storeQueue } from './playerReducer';
 import { usePlayerCommands } from './usePlayerCommands';
-import type { PersistedPlayerState } from './playerReducer';
+import type { PlayerSettings, SavedPlayerState, StoredQueue } from './playerReducer';
 import { errorMessage } from '../../utils/formatters';
 
 const STATE_KEY = 'player';
+const QUEUE_KEY = 'player:queue';
 const POSITION_KEY = 'player:position';
 const POSITION_SAVE_INTERVAL_MS = 5000;
 const RESTART_THRESHOLD_SECONDS = 3;
@@ -35,7 +36,10 @@ const ownsSpaceKey = (target: EventTarget | null) =>
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const { showError } = useToast();
   const [state, dispatch] = useReducer(playerReducer, undefined, () =>
-    restorePlayerState(readStoredValue<Partial<PersistedPlayerState> | null>(STATE_KEY, null)),
+    restorePlayerState(
+      readStoredValue<SavedPlayerState | null>(STATE_KEY, null),
+      readStoredValue<Partial<StoredQueue> | null>(QUEUE_KEY, null),
+    ),
   );
   const [initialPosition] = useState(() => {
     const saved = readStoredValue<SavedPosition | null>(POSITION_KEY, null);
@@ -63,20 +67,27 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setTime({ currentTime: 0, duration: currentTrack?.duration ?? 0 });
   }
 
-  const persisted = useMemo<PersistedPlayerState>(
+  const settings = useMemo<PlayerSettings>(
+    () => ({ index: state.index, shuffle: state.shuffle, repeat: state.repeat, volume: state.volume, muted: state.muted }),
+    [state.index, state.shuffle, state.repeat, state.volume, state.muted],
+  );
+  const storedQueue = useMemo(() => storeQueue(state.queue, state.originalQueue), [state.queue, state.originalQueue]);
+
+  useStoredValueWriter(STATE_KEY, settings);
+  useStoredValueWriter(QUEUE_KEY, storedQueue);
+
+  const playback = useMemo<PlaybackState>(
     () => ({
       queue: state.queue,
       originalQueue: state.originalQueue,
       index: state.index,
+      isPlaying: state.isPlaying,
       shuffle: state.shuffle,
       repeat: state.repeat,
-      volume: state.volume,
-      muted: state.muted,
     }),
-    [state.queue, state.originalQueue, state.index, state.shuffle, state.repeat, state.volume, state.muted],
+    [state.queue, state.originalQueue, state.index, state.isPlaying, state.shuffle, state.repeat],
   );
-
-  useStoredValueWriter(STATE_KEY, persisted);
+  const volume = useMemo<PlayerVolumeValue>(() => ({ volume: state.volume, muted: state.muted }), [state.volume, state.muted]);
 
   const savePosition = useCallback(() => {
     const audio = audioRef.current;
@@ -187,14 +198,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<PlayerContextValue>(
     () => ({
-      state,
+      state: playback,
       currentTrack,
       playTracks,
       playAlbum,
       playPlaylist,
       playNext: (track) => dispatch({ type: 'playNext', track }),
       enqueue: (tracks) => dispatch({ type: 'enqueue', tracks }),
-      togglePlay: () => dispatch({ type: 'setPlaying', playing: !state.isPlaying }),
+      togglePlay: () => dispatch({ type: 'setPlaying', playing: !playback.isPlaying }),
       play: () => dispatch({ type: 'setPlaying', playing: true }),
       pause: () => dispatch({ type: 'setPlaying', playing: false }),
       next: () => dispatch({ type: 'next' }),
@@ -215,10 +226,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       },
       isCurrent: (filename) => filename === currentFilename,
     }),
-    [state, currentTrack, currentFilename, playTracks, playAlbum, playPlaylist, previous, seek],
+    [playback, currentTrack, currentFilename, playTracks, playAlbum, playPlaylist, previous, seek],
   );
 
-  usePlayerCommands(value);
+  usePlayerCommands(value, state.muted);
 
   const onLibraryChanged = useEffectEvent(() => {
     if (state.queue.length === 0) return;
@@ -401,7 +412,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   return (
     <PlayerContext.Provider value={value}>
       <PlayerTimeContext.Provider value={time}>
-        {children}
+        <PlayerVolumeContext.Provider value={volume}>
+          {children}
+        </PlayerVolumeContext.Provider>
         <audio
           ref={audioRef}
           preload="metadata"

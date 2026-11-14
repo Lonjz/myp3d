@@ -7,8 +7,10 @@ export interface PlayOptions {
   shuffle?: boolean;
 }
 
+export type PlaybackState = Omit<PlayerState, 'volume' | 'muted'>;
+
 export interface PlayerContextValue {
-  state: PlayerState;
+  state: PlaybackState;
   currentTrack: MP3Info | null;
   playTracks: (tracks: MP3Info[], startIndex?: number, options?: PlayOptions) => void;
   playAlbum: (albumKey: string, options?: PlayOptions) => Promise<void>;
@@ -37,9 +39,19 @@ export interface PlayerTimeValue {
   duration: number;
 }
 
+export interface PlayerVolumeValue {
+  volume: number;
+  muted: boolean;
+}
+
 export const [PlayerContext, usePlayer] = createStrictContext<PlayerContextValue>('usePlayer');
 export const PlayerTimeContext = createContext<PlayerTimeValue>({ currentTime: 0, duration: 0 });
+export const PlayerVolumeContext = createContext<PlayerVolumeValue>({ volume: 1, muted: false });
 
 export function usePlayerTime(): PlayerTimeValue {
   return useContext(PlayerTimeContext);
+}
+
+export function usePlayerVolume(): PlayerVolumeValue {
+  return useContext(PlayerVolumeContext);
 }

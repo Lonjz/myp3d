@@ -13,7 +13,14 @@ export interface PlayerState {
   muted: boolean;
 }
 
-export type PersistedPlayerState = Omit<PlayerState, 'isPlaying'>;
+export type PlayerSettings = Pick<PlayerState, 'index' | 'shuffle' | 'repeat' | 'volume' | 'muted'>;
+
+export interface StoredQueue {
+  tracks: MP3Info[];
+  order: string[] | null;
+}
+
+export type SavedPlayerState = Partial<PlayerSettings> & { queue?: MP3Info[]; originalQueue?: MP3Info[] | null };
 
 export type PlayerAction =
   | { type: 'playTracks'; tracks: MP3Info[]; startIndex: number; shuffle?: boolean; seed: number }
@@ -239,18 +246,30 @@ export function playerReducer(state: PlayerState, action: PlayerAction): PlayerS
   }
 }
 
-export function restorePlayerState(saved: Partial<PersistedPlayerState> | null): PlayerState {
-  if (!saved || !Array.isArray(saved.queue)) return initialPlayerState;
-  const queue = saved.queue.filter((track) => track && typeof track.filename === 'string');
-  const index = typeof saved.index === 'number' && queue[saved.index] ? saved.index : queue.length > 0 ? 0 : -1;
+export function storeQueue(queue: MP3Info[], originalQueue: MP3Info[] | null): StoredQueue {
+  return { tracks: queue, order: originalQueue ? originalQueue.map((track) => track.filename) : null };
+}
+
+function restoreOrder(order: unknown, queue: MP3Info[]): MP3Info[] | null {
+  if (!Array.isArray(order)) return null;
+  const byFilename = new Map(queue.map((track) => [track.filename, track]));
+  return order.flatMap((filename) => byFilename.get(filename) ?? []);
+}
+
+export function restorePlayerState(saved: SavedPlayerState | null, stored: Partial<StoredQueue> | null = null): PlayerState {
+  const fromStore = Array.isArray(stored?.tracks);
+  const tracks = fromStore ? stored?.tracks : saved?.queue;
+  const queue = (Array.isArray(tracks) ? tracks : []).filter((track) => track && typeof track.filename === 'string');
+  const legacyOrder = Array.isArray(saved?.originalQueue) ? saved.originalQueue : null;
+  const index = typeof saved?.index === 'number' && queue[saved.index] ? saved.index : queue.length > 0 ? 0 : -1;
   return {
     queue,
-    originalQueue: Array.isArray(saved.originalQueue) ? saved.originalQueue : null,
+    originalQueue: fromStore ? restoreOrder(stored?.order, queue) : legacyOrder,
     index,
     isPlaying: false,
-    shuffle: Boolean(saved.shuffle),
-    repeat: saved.repeat && REPEAT_ORDER.includes(saved.repeat) ? saved.repeat : 'off',
-    volume: typeof saved.volume === 'number' ? Math.min(1, Math.max(0, saved.volume)) : 1,
-    muted: Boolean(saved.muted),
+    shuffle: Boolean(saved?.shuffle),
+    repeat: saved?.repeat && REPEAT_ORDER.includes(saved.repeat) ? saved.repeat : 'off',
+    volume: typeof saved?.volume === 'number' ? Math.min(1, Math.max(0, saved.volume)) : 1,
+    muted: Boolean(saved?.muted),
   };
 }

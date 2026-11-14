@@ -6,10 +6,10 @@ import type { PlayerContextValue } from './playerContext';
 
 const NEXT_REPEAT_TITLES = { off: 'Repeat all', all: 'Repeat one', one: 'Repeat off' } as const;
 
-export function usePlayerCommands(player: PlayerContextValue): void {
+export function usePlayerCommands(player: PlayerContextValue, muted: boolean): void {
   const { state } = player;
   const hasQueue = state.queue.length > 0;
-  const { isPlaying, shuffle, repeat, muted } = state;
+  const { isPlaying, shuffle, repeat } = state;
   const { togglePlay, next, previous, toggleShuffle, cycleRepeat, toggleMute, clear } = player;
 
   const commands = useMemo<SpotlightCommand[]>(() => {

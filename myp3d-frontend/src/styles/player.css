@@ -275,7 +275,13 @@
   gap: var(--space-1);
   padding-right: var(--space-1);
   border-radius: var(--radius-md);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 3.25rem;
   transition: background var(--duration-fast) var(--ease-standard);
+}
+
+.queue-row__main:focus-visible {
+  outline-offset: -2px;
 }
 
 .queue-row:hover {

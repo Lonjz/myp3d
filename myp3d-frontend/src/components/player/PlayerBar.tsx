@@ -18,7 +18,7 @@ import {
 import { mp3Api } from '../../api/mp3Api';
 import { useLingering, usePresence } from '../../hooks/usePresence';
 import { IconButton } from '../ui/IconButton';
-import { usePlayer } from './playerContext';
+import { usePlayer, usePlayerVolume } from './playerContext';
 import { QueuePopover } from './QueuePopover';
 import { SeekBar } from './SeekBar';
 
@@ -27,6 +27,7 @@ const REPEAT_LABELS = { off: 'Repeat', all: 'Repeat all', one: 'Repeat one' } as
 export function PlayerBar() {
   const player = usePlayer();
   const { state, currentTrack } = player;
+  const { volume, muted } = usePlayerVolume();
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const queueButtonRef = useRef<HTMLSpanElement>(null);
   const closeQueue = useCallback(() => setIsQueueOpen(false), []);
@@ -35,7 +36,7 @@ export function PlayerBar() {
 
   if (!track) return null;
 
-  const volumeLevel = state.muted ? 0 : state.volume;
+  const volumeLevel = muted ? 0 : volume;
   const VolumeIcon = volumeLevel === 0 ? VolumeX : volumeLevel < 0.5 ? Volume1 : Volume2;
   const volumeStyle = { '--progress': `${volumeLevel * 100}%` } as CSSProperties;
   const detailsPath = `/details/${encodeURIComponent(track.filename)}`;
@@ -103,7 +104,7 @@ export function PlayerBar() {
             <div className="player-bar__volume">
               <IconButton
                 icon={VolumeIcon}
-                label={state.muted ? 'Unmute' : 'Mute'}
+                label={muted ? 'Unmute' : 'Mute'}
                 variant="ghost"
                 size="sm"
                 onClick={player.toggleMute}
