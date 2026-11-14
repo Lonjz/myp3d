@@ -6,6 +6,8 @@ from urllib.parse import urlsplit
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.datastructures import Headers
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from routers import albums, cache, download, export, favorites, health, mp3s, music, peer, playlists, queue, search, spotify, stats, sync, system, youtube
 from services import database_sync, db, date_service, favorite_playlist, favorite_service, mp3_service, music_playlist_service, music_service, playlist_service, queue_service
@@ -24,6 +26,25 @@ def _is_loopback(host: Optional[str]) -> bool:
         return ipaddress.ip_address(host or "").is_loopback
     except ValueError:
         return False
+
+
+def _is_allowed(scope: Scope) -> bool:
+    client = scope["client"][0] if scope.get("client") else None
+    headers = Headers(scope=scope)
+    host_header = urlsplit(f"//{headers.get('host', '')}").hostname
+    origin = headers.get("origin")
+    return _is_loopback(client) and _is_loopback(host_header) and (origin is None or origin in ALLOWED_ORIGINS)
+
+
+class LocalOnly:
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or scope["path"].startswith(PEER_PREFIX) or _is_allowed(scope):
+            await self.app(scope, receive, send)
+            return
+        await JSONResponse(status_code=403, content={"detail": "Only this device can use the app"})(scope, receive, send)
 
 
 @asynccontextmanager
@@ -51,23 +72,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(LocalOnly)
 
 
 @app.exception_handler(AppError)
 async def app_error(_: Request, exc: AppError):
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
-
-
-@app.middleware("http")
-async def local_only(request: Request, call_next):
-    if request.url.path.startswith(PEER_PREFIX):
-        return await call_next(request)
-    client = request.client.host if request.client else None
-    host_header = urlsplit(f"//{request.headers.get('host', '')}").hostname
-    origin = request.headers.get("origin")
-    if _is_loopback(client) and _is_loopback(host_header) and (origin is None or origin in ALLOWED_ORIGINS):
-        return await call_next(request)
-    return JSONResponse(status_code=403, content={"detail": "Only this device can use the app"})
 
 
 for module in (download, albums, mp3s, youtube, stats, search, cache, sync, peer, music, queue, spotify, export, health, playlists, favorites, system):

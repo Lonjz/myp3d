@@ -24,6 +24,7 @@ def enable_wal() -> None:
 def connect() -> Iterator[sqlite3.Connection]:
     conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA synchronous=NORMAL")
     try:
         with conn:
             yield conn
