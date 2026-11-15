@@ -31,7 +31,6 @@ export interface DownloadFormValues {
   artist: string;
   album: string;
   cover?: string;
-  coverUrl?: string;
 }
 
 interface UseDownloadFormOptions {
@@ -45,7 +44,7 @@ export function useDownloadForm({ onSubmitted, initialValues }: UseDownloadFormO
   const [title, setTitle] = useState(initialValues?.title ?? '');
   const [artist, setArtist] = useState(initialValues?.artist ?? '');
   const [album, setAlbum] = useState(initialValues?.album ?? '');
-  const [coverUrl, setCoverUrl] = useState(initialValues?.coverUrl ?? '');
+  const [coverUrl, setCoverUrl] = useState('');
   const [submitting, setSubmitting] = useState<SubmitAction | null>(null);
   const [overwriteTarget, setOverwriteTarget] = useState<string | null>(null);
   const overwriteResolverRef = useRef<((confirmed: boolean) => void) | null>(null);
@@ -226,7 +225,6 @@ export function useDownloadForm({ onSubmitted, initialValues }: UseDownloadFormO
     loading: submitting !== null,
     submitting,
     coverImageBase64,
-    coverUrl,
     coverPreview: coverPreview ?? (coverUrl || null),
     applyCoverUrl,
     handleCoverFileSelect,

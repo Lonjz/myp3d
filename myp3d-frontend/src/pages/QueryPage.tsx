@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { ArrowRight, Download, ListPlus, Search } from 'lucide-react';
 import type { DownloadRequest, YouTubeSearchResult } from '../api/mp3Api';
 import { CoverCropModal } from '../components/cover/CoverCropModal';
@@ -14,41 +14,17 @@ import { IconField } from '../components/ui/IconField';
 import { Spinner } from '../components/ui/Spinner';
 import { useConsumeSearchParams } from '../hooks/useConsumeSearchParams';
 import { useDownloadForm } from '../hooks/useDownloadForm';
-import type { DownloadFormValues } from '../hooks/useDownloadForm';
-import { readStoredValue, useStoredValueWriter } from '../hooks/usePersistentState';
 import { useTrimPreview } from '../hooks/useTrimPreview';
-import type { TrimMode } from '../hooks/useTrimPreview';
 import { getVideoIdFromUrl, isYouTubePlaylistUrl } from '../utils/youtube';
 
-const QUERY_DRAFT_KEY = 'query:draft';
-
-interface QueryDraft {
-  searchQuery: string;
-  selectedResult: YouTubeSearchResult | null;
-  selectedVideoId: string;
-  videoDuration: number | null;
-  trimStart: number;
-  trimEnd: number;
-  sliderMode: TrimMode;
-  loopEnabled: boolean;
-  form: DownloadFormValues;
-}
-
 export function QueryPage() {
-  const [initialDraft] = useState(() => readStoredValue<Partial<QueryDraft>>(QUERY_DRAFT_KEY, {}));
-  const [searchQuery, setSearchQuery] = useState(initialDraft.searchQuery ?? '');
+  const [searchQuery, setSearchQuery] = useState('');
   const list = useQueryResults();
 
-  const [selectedResult, setSelectedResult] = useState<YouTubeSearchResult | null>(initialDraft.selectedResult ?? null);
-  const [selectedVideoId, setSelectedVideoId] = useState(initialDraft.selectedVideoId ?? '');
+  const [selectedResult, setSelectedResult] = useState<YouTubeSearchResult | null>(null);
+  const [selectedVideoId, setSelectedVideoId] = useState('');
 
-  const trim = useTrimPreview({ kind: 'youtube', videoId: selectedVideoId }, {
-    duration: initialDraft.videoDuration,
-    start: initialDraft.trimStart,
-    end: initialDraft.trimEnd,
-    mode: initialDraft.sliderMode,
-    loop: initialDraft.loopEnabled,
-  });
+  const trim = useTrimPreview({ kind: 'youtube', videoId: selectedVideoId });
 
   const { showError, clearToast } = useToast();
 
@@ -66,8 +42,6 @@ export function QueryPage() {
     setAlbum,
     loading: downloading,
     submitting,
-    coverImageBase64,
-    coverUrl,
     coverPreview,
     applyCoverUrl,
     handleCoverFileSelect,
@@ -77,46 +51,12 @@ export function QueryPage() {
     submitDownload,
     queueDownload,
   } = useDownloadForm({
-    initialValues: initialDraft.form,
     onSubmitted: () => {
       trim.reset(null);
       setSelectedResult(null);
       setSelectedVideoId('');
     },
   });
-
-  const draft = useMemo<QueryDraft>(
-    () => ({
-      searchQuery,
-      selectedResult,
-      selectedVideoId,
-      videoDuration: trim.duration,
-      trimStart: trim.start,
-      trimEnd: trim.end,
-      sliderMode: trim.mode,
-      loopEnabled: trim.loop,
-      form: { url, customFilename, title, artist, album, cover: coverImageBase64, coverUrl },
-    }),
-    [
-      searchQuery,
-      selectedResult,
-      selectedVideoId,
-      trim.duration,
-      trim.start,
-      trim.end,
-      trim.mode,
-      trim.loop,
-      url,
-      customFilename,
-      title,
-      artist,
-      album,
-      coverImageBase64,
-      coverUrl,
-    ],
-  );
-
-  useStoredValueWriter(QUERY_DRAFT_KEY, draft);
 
   const applySelectedResult = (result: YouTubeSearchResult) => {
     const fallbackVideoId = getVideoIdFromUrl(result.url);
