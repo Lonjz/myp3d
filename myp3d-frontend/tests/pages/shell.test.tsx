@@ -18,6 +18,19 @@ describe('app shell', () => {
     expect(await screen.findByRole('checkbox', { name: 'Select Dreams' })).toBeInTheDocument();
   });
 
+  it('dismisses a notification on a click outside it', async () => {
+    const { user } = renderApp('/query');
+    await user.type(await screen.findByRole('textbox', { name: 'Search songs or paste a playlist' }), '{Enter}');
+    const toast = await screen.findByRole('alert');
+    expect(toast).toHaveTextContent('Please enter a search query');
+
+    await user.click(within(toast).getByText('Please enter a search query'));
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+
+    await user.click(document.body);
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+  });
+
   it('only slides the page once the sidebar has been toggled', async () => {
     const { user } = renderApp('/dashboard');
     const sidebar = document.querySelector('.sidebar');
